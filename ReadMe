@@ -1,0 +1,4 @@
+firt install dependencies  command: npm i or npm install
+to run the app: npm run dev
+
+signing up: needs working email for verification
