@@ -44,10 +44,11 @@ declare module 'express-session' {
 const PgSession = pgSession(session);
 const sessionStore = new PgSession({
   pool: new Pool({ 
-    connectionString: process.env.DATABASE_URL 
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
   }),
-  tableName: 'sessions', // Uses your existing sessions table
-  createTableIfMissing: false, // Table already exists in your schema
+  tableName: 'sessions',
+  createTableIfMissing: false,
 });
 
 // =============================================================================
@@ -336,9 +337,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     // Setup Vite for development or serve static files for production
     if (app.get("env") === "development") {
       await setupVite(app, server);
-    } else {
-      serveStatic(app);
-    }
+    } 
 
     // Health check endpoint
     app.get('/health', (_req: Request, res: Response) => {
