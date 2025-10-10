@@ -1,8 +1,13 @@
 import { apiRequest } from "./queryClient";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 // Helper function to ensure all fetches include credentials
 const fetchWithCredentials = (url: string, options: RequestInit = {}) => {
-  return fetch(url, {
+  // Prepend API_BASE_URL if url is relative
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  
+  return fetch(fullUrl, {
     ...options,
     credentials: "include", // ALWAYS include credentials
     headers: {
