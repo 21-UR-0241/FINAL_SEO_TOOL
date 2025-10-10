@@ -24,8 +24,8 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
-  build: {
-  outDir: path.resolve(process.cwd(), "dist"),  // Absolute path from project root
+ build: {
+  outDir: path.resolve(import.meta.dirname, "dist"),  // Use import.meta.dirname instead
   emptyOutDir: true,
 },
   server: {
