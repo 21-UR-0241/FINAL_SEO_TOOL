@@ -212,12 +212,11 @@ app.use(session({
   saveUninitialized: false,
   name: 'ai-seo-session',
   cookie: {
-    // secure: true, // Keep false for testing with Cloudflare tunnel
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax', // Changed to 'none' for cross-origin
-    domain: undefined // Auto-detect domain
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // ← Changed
+    domain: undefined
   },
   rolling: true
 }));
