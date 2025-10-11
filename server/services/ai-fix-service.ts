@@ -3824,7 +3824,7 @@ private extractTextFromHTML(html: string): string {
 
 
 
-  private async improveReadability(
+ private async improveReadability(
   creds: WordPressCredentials,
   fixes: AIFix[],
   userId?: string
@@ -3871,7 +3871,6 @@ ${contentHtml}
 
 Make it clearer and easier to read while keeping all key information.`;
 
-          // Use image-protected wrapper
           const rewritten = await this.callAIWithImageProtection(
             provider,
             systemPrompt,
@@ -3907,7 +3906,6 @@ Make it clearer and easier to read while keeping all key information.`;
     userId
   );
 }
-
   
 //   private async improveReadability(
 //     creds: WordPressCredentials,
