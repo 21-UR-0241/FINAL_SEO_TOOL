@@ -70,11 +70,9 @@ app.set('trust proxy', 1);
 // 2. CORS - CRITICAL: MUST BE BEFORE ALL OTHER MIDDLEWARE
 // =============================================================================
 
-app.use((req: Request, res: Response, next: NextFunction) => {
+// Helper function to set CORS headers consistently
+const setCorsHeaders = (req: Request, res: Response): void => {
   const origin = req.headers.origin;
-  
-  console.log(`🌐 CORS: ${req.method} ${req.path}`);
-  console.log(`   Origin: ${origin || 'none'}`);
   
   // Define allowed origins (all Vercel deployments + production domains + local dev)
   const allowedOrigins = [
@@ -84,24 +82,35 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     'http://localhost:3000',
   ];
   
-  // Allow all Vercel preview deployments
+  // Allow all Vercel preview deployments (*.vercel.app)
   const isVercelPreview = origin && origin.includes('.vercel.app');
-  const isAllowedOrigin = origin && (allowedOrigins.includes(origin) || isVercelPreview);
+  const isExplicitlyAllowed = origin && allowedOrigins.includes(origin);
+  const isAllowedOrigin = isExplicitlyAllowed || isVercelPreview;
   
   if (isAllowedOrigin && origin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    console.log(`   ✅ CORS allowed for: ${origin}`);
-  } else if (origin) {
-    // For unknown origins, still allow but without credentials
+  } else if (origin && process.env.NODE_ENV === 'development') {
+    // In development, allow any origin without credentials
     res.setHeader('Access-Control-Allow-Origin', origin);
-    console.log(`   ⚠️ CORS allowed without credentials for: ${origin}`);
   }
   
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
   res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
   res.setHeader('Access-Control-Max-Age', '86400');
+  res.setHeader('Vary', 'Origin'); // Important for proper caching with CORS
+};
+
+// Apply CORS headers to ALL requests
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`🌐 CORS: ${req.method} ${req.path}`);
+  console.log(`   Origin: ${req.headers.origin || 'none'}`);
+  
+  // Set CORS headers
+  setCorsHeaders(req, res);
+  
+  console.log(`   ✅ CORS headers set`);
   
   // Handle OPTIONS preflight
   if (req.method === 'OPTIONS') {
@@ -124,6 +133,8 @@ app.use(express.urlencoded({ extended: false }));
 // =============================================================================
 
 const rateLimitHandler = (req: Request, res: Response) => {
+  // Ensure CORS headers on rate limit responses
+  setCorsHeaders(req, res);
   res.status(429).json({
     success: false,
     message: 'Too many requests, please try again later.'
@@ -284,6 +295,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
   const originalRedirect = res.redirect.bind(res);
   res.redirect = function(url: string | number, status?: any) {
+    // Ensure CORS headers on redirects
+    setCorsHeaders(req, res);
+    
     if (typeof url === 'number') {
       return res.status(url).json({ 
         success: false, 
@@ -301,7 +315,38 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// SERVER STARTUP
+// DEBUG MIDDLEWARE (Optional - remove in production if not needed)
+// =============================================================================
+
+if (process.env.NODE_ENV === 'development') {
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const originalSend = res.send;
+    const originalJson = res.json;
+    
+    res.send = function(data) {
+      console.log(`📤 Response headers for ${req.method} ${req.path}:`, {
+        'access-control-allow-origin': res.getHeader('access-control-allow-origin'),
+        'access-control-allow-credentials': res.getHeader('access-control-allow-credentials'),
+        'status': res.statusCode
+      });
+      return originalSend.call(this, data);
+    };
+    
+    res.json = function(data) {
+      console.log(`📤 Response headers for ${req.method} ${req.path}:`, {
+        'access-control-allow-origin': res.getHeader('access-control-allow-origin'),
+        'access-control-allow-credentials': res.getHeader('access-control-allow-credentials'),
+        'status': res.statusCode
+      });
+      return originalJson.call(this, data);
+    };
+    
+    next();
+  });
+}
+
+// =============================================================================
+// SERVER STARTUP & ROUTES
 // =============================================================================
 
 (async () => {
@@ -315,19 +360,23 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
     
     app.use("/api/user/auto-schedules", autoSchedulesRouter);
     
+    // Manual scheduler trigger endpoint
     app.post('/api/admin/trigger-scheduler', async (req: Request, res: Response) => {
       try {
         if (!req.user) {
+          setCorsHeaders(req, res);
           return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
         
         const result = await schedulerService.manualProcess();
+        setCorsHeaders(req, res);
         res.json({ 
           success: true, 
           message: 'Scheduler triggered manually',
           result 
         });
       } catch (error: any) {
+        setCorsHeaders(req, res);
         res.status(500).json({ 
           success: false, 
           message: error.message 
@@ -335,26 +384,24 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
       }
     });
 
+    // Health check endpoint
+    app.get('/health', (req: Request, res: Response) => {
+      setCorsHeaders(req, res);
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        uptime: process.uptime()
+      });
+    });
+
     // =============================================================================
     // GLOBAL ERROR HANDLER (with CORS headers)
     // =============================================================================
 
     app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-      // Ensure CORS headers are present on errors too
-      const origin = req.headers.origin;
-      const isVercelPreview = origin && origin.includes('.vercel.app');
-      const allowedOrigins = [
-        'https://final-seo-tool.vercel.app',
-        'http://localhost:5000',
-        'http://localhost:5173',
-        'http://localhost:3000',
-      ];
-      const isAllowedOrigin = origin && (allowedOrigins.includes(origin) || isVercelPreview);
-      
-      if (isAllowedOrigin && origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
+      // CRITICAL: Ensure CORS headers are present on ALL errors
+      setCorsHeaders(req, res);
       
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
@@ -380,37 +427,15 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
       } catch (e) {
         console.log('Vite setup not available or failed, continuing without it');
       }
-    } 
-
-    app.get('/health', (_req: Request, res: Response) => {
-      res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-        uptime: process.uptime()
-      });
-    });
+    }
 
     // =============================================================================
     // 404 HANDLER (with CORS headers)
     // =============================================================================
 
     app.use('*', (req: Request, res: Response) => {
-      // Ensure CORS headers on 404s
-      const origin = req.headers.origin;
-      const isVercelPreview = origin && origin.includes('.vercel.app');
-      const allowedOrigins = [
-        'https://final-seo-tool.vercel.app',
-        'http://localhost:5000',
-        'http://localhost:5173',
-        'http://localhost:3000',
-      ];
-      const isAllowedOrigin = origin && (allowedOrigins.includes(origin) || isVercelPreview);
-      
-      if (isAllowedOrigin && origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
+      // CRITICAL: Ensure CORS headers on 404 responses
+      setCorsHeaders(req, res);
       
       res.status(404).json({
         success: false,
@@ -427,7 +452,7 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
       log(`🔐 Session store: PostgreSQL`);
       log(`🛡️ Security: Helmet + Rate Limiting enabled`);
       log(`📡 API available at: http://${host}:${port}/api`);
-      log(`🌐 CORS: Enabled for all Vercel deployments`);
+      log(`🌐 CORS: Enabled for all Vercel deployments + localhost`);
       
       schedulerService.startScheduler(1);
       log(`⏰ Content scheduler started`);

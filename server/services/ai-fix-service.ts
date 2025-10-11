@@ -1269,7 +1269,6 @@ Write natural, descriptive alt text that helps both users and SEO.`;
   //       const wordCount = contentText.split(/\s+/).length;
 
   //       if (wordCount >= 800) {
-
   //         return {
   //           updated: false,
   //           data: {},
