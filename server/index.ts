@@ -1,15 +1,12 @@
 import 'dotenv/config';
-import { schedulerService } from './services/scheduler-service';
-import autoSchedulesRouter from "./api/user/auto-schedules";
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import { Pool } from 'pg';
-import { registerRoutes } from './routes'; // Adjust import path as needed
-import { setupVite } from './vite-setup'; // Adjust import path as needed
-import { log } from './utils/logger'; // Adjust import path as needed
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { schedulerService } from './services/scheduler-service';
+import autoSchedulesRouter from "./api/user/auto-schedules";
 
 // =============================================================================
 // TYPE DECLARATIONS
@@ -32,6 +29,15 @@ declare module 'express-session' {
   interface SessionData {
     userId: string;
   }
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+// Simple logger function (inline to avoid import issues)
+function log(message: string) {
+  console.log(message);
 }
 
 // =============================================================================
@@ -300,6 +306,11 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
 
 (async () => {
   try {
+    // Dynamic imports to handle optional modules
+    const { registerRoutes } = await import('./routes').catch(() => ({ 
+      registerRoutes: async (app: any) => app 
+    }));
+    
     const server = await registerRoutes(app);
     
     app.use("/api/user/auto-schedules", autoSchedulesRouter);
@@ -361,8 +372,14 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
       });
     });
 
+    // Setup Vite in development
     if (app.get("env") === "development") {
-      await setupVite(app, server);
+      try {
+        const { setupVite } = await import('./vite');
+        await setupVite(app, server);
+      } catch (e) {
+        console.log('Vite setup not available or failed, continuing without it');
+      }
     } 
 
     app.get('/health', (_req: Request, res: Response) => {

@@ -1254,63 +1254,64 @@ Write natural, descriptive alt text that helps both users and SEO.`;
     );
   }
 
-  private async expandThinContent(
-    creds: WordPressCredentials,
-    fixes: AIFix[],
-    userId?: string
-  ): Promise<{ applied: AIFix[]; errors: string[] }> {
-    return this.fixWordPressContent(
-      creds,
-      fixes,
-      async (content, fix) => {
-        const contentText = this.extractTextFromHTML(
-          content.content?.rendered || ""
-        );
-        const wordCount = contentText.split(/\s+/).length;
+  // private async expandThinContent(
+  //   creds: WordPressCredentials,
+  //   fixes: AIFix[],
+  //   userId?: string
+  // ): Promise<{ applied: AIFix[]; errors: string[] }> {
+  //   return this.fixWordPressContent(
+  //     creds,
+  //     fixes,
+  //     async (content, fix) => {
+  //       const contentText = this.extractTextFromHTML(
+  //         content.content?.rendered || ""
+  //       );
+  //       const wordCount = contentText.split(/\s+/).length;
 
-        if (wordCount >= 800) {
-          return {
-            updated: false,
-            data: {},
-            description: `Content length already sufficient (${wordCount} words)`,
-          };
-        }
+  //       if (wordCount >= 800) {
 
-        const provider = await this.selectAIProvider(userId);
-        if (!provider) {
-          return {
-            updated: false,
-            data: {},
-            description: "AI provider not available for content expansion",
-          };
-        }
+  //         return {
+  //           updated: false,
+  //           data: {},
+  //           description: `Content length already sufficient (${wordCount} words)`,
+  //         };
+  //       }
 
-        try {
-          const expandedContent = await this.expandContentWithAI(
-            content.title?.rendered || content.title,
-            content.content?.rendered || "",
-            provider,
-            userId
-          );
+  //       const provider = await this.selectAIProvider(userId);
+  //       if (!provider) {
+  //         return {
+  //           updated: false,
+  //           data: {},
+  //           description: "AI provider not available for content expansion",
+  //         };
+  //       }
 
-          const newWordCount = this.extractTextFromHTML(expandedContent).split(/\s+/).length;
+  //       try {
+  //         const expandedContent = await this.expandContentWithAI(
+  //           content.title?.rendered || content.title,
+  //           content.content?.rendered || "",
+  //           provider,
+  //           userId
+  //         );
 
-          return {
-            updated: true,
-            data: { content: expandedContent },
-            description: `Expanded content from ${wordCount} to ${newWordCount} words`,
-          };
-        } catch (error) {
-          return {
-            updated: false,
-            data: {},
-            description: "Failed to expand content",
-          };
-        }
-      },
-      userId
-    );
-  }
+  //         const newWordCount = this.extractTextFromHTML(expandedContent).split(/\s+/).length;
+
+  //         return {
+  //           updated: true,
+  //           data: { content: expandedContent },
+  //           description: `Expanded content from ${wordCount} to ${newWordCount} words`,
+  //         };
+  //       } catch (error) {
+  //         return {
+  //           updated: false,
+  //           data: {},
+  //           description: "Failed to expand content",
+  //         };
+  //       }
+  //     },
+  //     userId
+  //   );
+  // }
 
   private async fixExternalLinkAttributes(
     creds: WordPressCredentials,
