@@ -1,16 +1,15 @@
-//server/index.ts
-import express from "express";
-import { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import session from "express-session";
-import { Pool } from '@neondatabase/serverless';
-import pgSession from "connect-pg-simple";
 import 'dotenv/config';
 import { schedulerService } from './services/scheduler-service';
 import autoSchedulesRouter from "./api/user/auto-schedules";
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import express, { Request, Response, NextFunction } from 'express';
+import session from 'express-session';
+import pgSession from 'connect-pg-simple';
+import { Pool } from 'pg';
+import { registerRoutes } from './routes'; // Adjust import path as needed
+import { setupVite } from './vite-setup'; // Adjust import path as needed
+import { log } from './utils/logger'; // Adjust import path as needed
 
 // =============================================================================
 // TYPE DECLARATIONS
@@ -66,30 +65,42 @@ app.set('trust proxy', 1);
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin || req.headers.referer || '*';
+  const origin = req.headers.origin;
   
-  // Always log
   console.log(`🌐 CORS: ${req.method} ${req.path}`);
-  console.log(`   Origin: ${origin}`);
+  console.log(`   Origin: ${origin || 'none'}`);
   
-  // Set CORS headers for ALL requests (including those without origin)
-  const allowedOrigin = origin === '*' ? '*' : origin;
+  // Define allowed origins (all Vercel deployments + production domains + local dev)
+  const allowedOrigins = [
+    'https://final-seo-tool.vercel.app',
+    'http://localhost:5000',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ];
   
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Allow all Vercel preview deployments
+  const isVercelPreview = origin && origin.includes('.vercel.app');
+  const isAllowedOrigin = origin && (allowedOrigins.includes(origin) || isVercelPreview);
+  
+  if (isAllowedOrigin && origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    console.log(`   ✅ CORS allowed for: ${origin}`);
+  } else if (origin) {
+    // For unknown origins, still allow but without credentials
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    console.log(`   ⚠️ CORS allowed without credentials for: ${origin}`);
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
   res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
   res.setHeader('Access-Control-Max-Age', '86400');
   
-  console.log(`   ✅ CORS headers set`);
-  
-  // Handle OPTIONS preflight - MUST return immediately
+  // Handle OPTIONS preflight
   if (req.method === 'OPTIONS') {
     console.log(`   ⚡ Handling OPTIONS preflight`);
-    res.status(204);
-    res.end();
-    return; // CRITICAL: Don't call next()
+    return res.status(204).end();
   }
 
   next();
@@ -313,7 +324,27 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
       }
     });
 
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    // =============================================================================
+    // GLOBAL ERROR HANDLER (with CORS headers)
+    // =============================================================================
+
+    app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+      // Ensure CORS headers are present on errors too
+      const origin = req.headers.origin;
+      const isVercelPreview = origin && origin.includes('.vercel.app');
+      const allowedOrigins = [
+        'https://final-seo-tool.vercel.app',
+        'http://localhost:5000',
+        'http://localhost:5173',
+        'http://localhost:3000',
+      ];
+      const isAllowedOrigin = origin && (allowedOrigins.includes(origin) || isVercelPreview);
+      
+      if (isAllowedOrigin && origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+      
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
 
@@ -343,7 +374,27 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
       });
     });
 
-    app.use('*', (_req: Request, res: Response) => {
+    // =============================================================================
+    // 404 HANDLER (with CORS headers)
+    // =============================================================================
+
+    app.use('*', (req: Request, res: Response) => {
+      // Ensure CORS headers on 404s
+      const origin = req.headers.origin;
+      const isVercelPreview = origin && origin.includes('.vercel.app');
+      const allowedOrigins = [
+        'https://final-seo-tool.vercel.app',
+        'http://localhost:5000',
+        'http://localhost:5173',
+        'http://localhost:3000',
+      ];
+      const isAllowedOrigin = origin && (allowedOrigins.includes(origin) || isVercelPreview);
+      
+      if (isAllowedOrigin && origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+      
       res.status(404).json({
         success: false,
         message: 'Route not found'
