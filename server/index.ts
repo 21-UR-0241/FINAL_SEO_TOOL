@@ -6,15 +6,14 @@ import { setupVite, serveStatic, log } from "./vite";
 import session from "express-session";
 import { Pool } from '@neondatabase/serverless';
 import pgSession from "connect-pg-simple";
-import 'dotenv/config'; // must come before importing encryption-service
+import 'dotenv/config';
 import { schedulerService } from './services/scheduler-service';
 import autoSchedulesRouter from "./api/user/auto-schedules";
 import helmet from 'helmet';
-import rateLimit, { MemoryStore } from 'express-rate-limit';
-import path from 'path';
+import rateLimit from 'express-rate-limit';
 
 // =============================================================================
-// TYPE DECLARATIONS (moved to top)
+// TYPE DECLARATIONS
 // =============================================================================
 
 declare global {
@@ -57,19 +56,63 @@ const sessionStore = new PgSession({
 const app = express();
 
 // =============================================================================
-// TRUST PROXY - IMPORTANT FOR CLOUDFLARE
+// 1. TRUST PROXY - MUST BE FIRST
 // =============================================================================
-
-// Trust only the first proxy (Cloudflare) - prevents header spoofing
-// This tells Express to trust the first proxy in the chain (Cloudflare)
 
 app.set('trust proxy', 1);
 
 // =============================================================================
-// SECURITY MIDDLEWARE (Added - Early in the middleware stack)
+// 2. CORS - MUST BE VERY EARLY, BEFORE OTHER MIDDLEWARE
 // =============================================================================
 
-// Custom JSON error handler for rate limiting
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  
+  // Log for debugging
+  console.log(`📡 ${req.method} ${req.path} from: ${origin || 'NO ORIGIN'}`);
+  
+  if (!origin) {
+    return next();
+  }
+
+  // Allow localhost and all Vercel deployments
+  const isVercel = origin.includes('vercel.app');
+  const isLocalhost = origin.startsWith('http://localhost');
+  const isTunnel = origin.includes('trycloudflare.com');
+  const isAllowed = isVercel || isLocalhost || isTunnel;
+
+  if (isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    
+    console.log(`✅ CORS: Allowed from ${origin}`);
+  } else {
+    console.warn(`❌ CORS: Blocked from ${origin}`);
+  }
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    console.log(`🔍 OPTIONS preflight from ${origin}: ${isAllowed ? 'ALLOWED' : 'BLOCKED'}`);
+    return res.status(isAllowed ? 204 : 403).end();
+  }
+
+  next();
+});
+
+// =============================================================================
+// 3. BASIC MIDDLEWARE
+// =============================================================================
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false }));
+
+// =============================================================================
+// 4. RATE LIMITING
+// =============================================================================
+
 const rateLimitHandler = (req: Request, res: Response) => {
   res.status(429).json({
     success: false,
@@ -77,78 +120,51 @@ const rateLimitHandler = (req: Request, res: Response) => {
   });
 };
 
-// General rate limiter
-// FIXED: Removed custom keyGenerator to use default which handles IPv6 properly
 const generalLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 500, // 500 requests per minute
+  windowMs: 1 * 60 * 1000,
+  max: 500,
   handler: rateLimitHandler,
   standardHeaders: true,
   legacyHeaders: false,
-  // Skip validation - we know we're behind Cloudflare and configured correctly
   validate: false,
-
 });
 
-// Auth rate limiter
-// FIXED: Removed custom keyGenerator here as well
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 attempts
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   handler: rateLimitHandler,
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  // Skip validation - we know we're behind Cloudflare and configured correctly
   validate: false,
 });
 
-// Apply rate limiting to routes
 app.use('/api/', generalLimiter);
 app.use('/api/auth/', authLimiter);
 app.use('/api/gsc/auth', authLimiter);
 app.use('/api/gsc/auth-url', authLimiter);
 app.use('/api/gsc/oauth-callback', authLimiter);
 
-// JSON response handler for API redirects (AFTER rate limiters)
-app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
-  const originalRedirect = res.redirect.bind(res);
-  res.redirect = function(url: string | number, status?: any) {
-    if (typeof url === 'number') {
-      return res.status(url).json({ 
-        success: false, 
-        message: 'Unauthorized', 
-        redirect: status 
-      });
-    }
-    return res.status(302).json({ 
-      success: false, 
-      message: 'Redirect required', 
-      redirect: url 
-    });
-  };
-  next();
-});
+// =============================================================================
+// 5. SECURITY HEADERS
+// =============================================================================
 
-// IMPORTANT: Custom COOP headers for OAuth popup communication
+// Custom headers for OAuth
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Allow popup windows to communicate with parent window
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
   
-  // Special handling for OAuth callback
   if (req.path === '/api/gsc/oauth-callback') {
-    res.removeHeader('X-Frame-Options');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   }
   
   next();
 });
 
-// Helmet for security headers
+// Helmet
 app.use(helmet({
-  crossOriginOpenerPolicy: false, // We set this manually above
-  crossOriginEmbedderPolicy: false, // We set this manually above
+  crossOriginOpenerPolicy: false,
+  crossOriginEmbedderPolicy: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -167,11 +183,10 @@ app.use(helmet({
   }
 }));
 
-// Basic middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: false }));
+// =============================================================================
+// 6. INPUT SANITIZATION
+// =============================================================================
 
-// Simple input sanitization middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
   const sanitizeString = (str: any): any => {
     if (typeof str !== 'string') return str;
@@ -201,7 +216,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// SESSION CONFIGURATION
+// 7. SESSION
 // =============================================================================
 
 app.use(session({
@@ -213,7 +228,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     domain: undefined
   },
@@ -221,7 +236,7 @@ app.use(session({
 }));
 
 // =============================================================================
-// LOGGING MIDDLEWARE
+// 8. LOGGING
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -255,47 +270,25 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// CORS CONFIGURATION - PERMISSIVE FOR VERCEL
+// 9. API REDIRECT HANDLER
 // =============================================================================
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin;
-  
-  if (!origin) {
-    return next();
-  }
-
-  // Always allow localhost and Cloudflare tunnel
-  const alwaysAllowed = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'https://leaders-necklace-themselves-collective.trycloudflare.com',
-  ];
-
-  // Check if origin should be allowed
-  const isVercel = origin.includes('vercel.app');
-  const isAllowedExact = alwaysAllowed.includes(origin);
-  const isAllowed = isAllowedExact || isVercel;
-
-  if (isAllowed) {
-    // Set permissive CORS headers
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
-    res.setHeader('Access-Control-Max-Age', '86400');
-    
-    console.log(`✅ CORS allowed: ${req.method} ${req.path} from ${origin}`);
-  } else {
-    console.warn(`❌ CORS blocked: ${req.method} ${req.path} from ${origin}`);
-  }
-
-  // Handle OPTIONS preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(isAllowed ? 204 : 403).end();
-  }
-
+app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
+  const originalRedirect = res.redirect.bind(res);
+  res.redirect = function(url: string | number, status?: any) {
+    if (typeof url === 'number') {
+      return res.status(url).json({ 
+        success: false, 
+        message: 'Unauthorized', 
+        redirect: status 
+      });
+    }
+    return res.status(302).json({ 
+      success: false, 
+      message: 'Redirect required', 
+      redirect: url 
+    });
+  };
   next();
 });
 
@@ -308,7 +301,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     // Register all API routes
     const server = await registerRoutes(app);
     
-    // Manual trigger endpoint for testing scheduler
+    // Register auto-schedules router
+    app.use("/api/user/auto-schedules", autoSchedulesRouter);
+    
+    // Manual trigger endpoint
     app.post('/api/admin/trigger-scheduler', async (req: Request, res: Response) => {
       try {
         if (!req.user) {
@@ -329,7 +325,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       }
     });
 
-    // Global error handler (must be after routes)
+    // Global error handler
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
@@ -347,12 +343,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       });
     });
 
-    // Setup Vite for development or serve static files for production
+    // Setup Vite for development
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } 
 
-    // Health check endpoint
+    // Health check
     app.get('/health', (_req: Request, res: Response) => {
       res.json({
         status: 'healthy',
@@ -362,7 +358,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       });
     });
 
-    // 404 handler for unmatched routes
+    // 404 handler
     app.use('*', (_req: Request, res: Response) => {
       res.status(404).json({
         success: false,
@@ -370,22 +366,19 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       });
     });
 
-    // Server configuration
+    // Start server
     const port = parseInt(process.env.PORT || '5000', 10);
     const host = process.env.HOST || "0.0.0.0";
 
-    server.listen({
-      port,
-      host,
-    }, () => {
+    server.listen({ port, host }, () => {
       log(`🚀 Server running on http://${host}:${port}`);
       log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       log(`🔐 Session store: PostgreSQL`);
       log(`🛡️ Security: Helmet + Rate Limiting enabled`);
       log(`📡 API available at: http://${host}:${port}/api`);
       
-      schedulerService.startScheduler(1); // Check every 1 minute
-      log(`⏰ Content scheduler started - checking every minute for scheduled content`);
+      schedulerService.startScheduler(1);
+      log(`⏰ Content scheduler started`);
       
       if (process.env.NODE_ENV === 'development') {
         log(`🛠️  Development mode: Vite dev server enabled`);
@@ -397,8 +390,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     process.exit(1);
   }
 })();
-
-app.use("/api/user/auto-schedules", autoSchedulesRouter);
 
 // =============================================================================
 // GRACEFUL SHUTDOWN
