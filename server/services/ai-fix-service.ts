@@ -3822,10 +3822,40 @@ private extractTextFromHTML(html: string): string {
 
 
 
-  if (!improved) {
-  const provider = await this.selectAIProvider(userId);
-  if (provider) {
-    const systemPrompt = `Rewrite content for better readability (target: 60+ Flesch score, 8th-9th grade level).
+
+
+  private async improveReadability(
+  creds: WordPressCredentials,
+  fixes: AIFix[],
+  userId?: string
+): Promise<{ applied: AIFix[]; errors: string[] }> {
+  return this.fixWordPressContent(
+    creds,
+    fixes,
+    async (content, fix) => {
+      const contentHtml = content.content?.rendered || content.content || "";
+      const $ = cheerio.load(contentHtml, this.getCheerioConfig());
+
+      let improved = false;
+
+      $('p').each((_, elem) => {
+        const text = $(elem).text();
+        if (text.length > 400) {
+          const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+          if (sentences.length > 2) {
+            const mid = Math.floor(sentences.length / 2);
+            const p1 = sentences.slice(0, mid).join(' ');
+            const p2 = sentences.slice(mid).join(' ');
+            $(elem).replaceWith(`<p>${p1}</p><p>${p2}</p>`);
+            improved = true;
+          }
+        }
+      });
+
+      if (!improved) {
+        const provider = await this.selectAIProvider(userId);
+        if (provider) {
+          const systemPrompt = `Rewrite content for better readability (target: 60+ Flesch score, 8th-9th grade level).
 
 Rules:
 - Use shorter sentences (15-20 words max)
@@ -3835,30 +3865,50 @@ Rules:
 - Break up dense paragraphs
 - Return ONLY the rewritten HTML`;
 
-    const userPrompt = `Improve readability of this content:
+          const userPrompt = `Improve readability of this content:
 
 ${contentHtml}
 
 Make it clearer and easier to read while keeping all key information.`;
 
-    // Use image-protected wrapper
-    const rewritten = await this.callAIWithImageProtection(
-      provider,
-      systemPrompt,
-      userPrompt,
-      contentHtml,
-      3000,
-      0.6,
-      userId
-    );
+          // Use image-protected wrapper
+          const rewritten = await this.callAIWithImageProtection(
+            provider,
+            systemPrompt,
+            userPrompt,
+            contentHtml,
+            3000,
+            0.6,
+            userId
+          );
 
-    return {
-      updated: true,
-      data: { content: rewritten },
-      description: "Improved readability (simpler language, shorter sentences)"
-    };
-  }
+          return {
+            updated: true,
+            data: { content: rewritten },
+            description: "Improved readability (simpler language, shorter sentences)"
+          };
+        }
+      }
+
+      if (improved) {
+        return {
+          updated: true,
+          data: { content: this.extractHtmlContent($) },
+          description: "Broke up long paragraphs for better readability"
+        };
+      }
+
+      return {
+        updated: false,
+        data: {},
+        description: "Content readability already acceptable"
+      };
+    },
+    userId
+  );
 }
+
+  
 //   private async improveReadability(
 //     creds: WordPressCredentials,
 //     fixes: AIFix[],
