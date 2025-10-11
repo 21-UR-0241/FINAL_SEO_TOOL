@@ -253,54 +253,47 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   next();
 });
+
 // =============================================================================
-// CORS CONFIGURATION
+// CORS CONFIGURATION - PERMISSIVE FOR VERCEL
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
   
-  const allowedOrigins = [
+  if (!origin) {
+    return next();
+  }
+
+  // Always allow localhost and Cloudflare tunnel
+  const alwaysAllowed = [
     'http://localhost:5173',
     'http://localhost:3000',
     'http://localhost:5000',
     'https://leaders-necklace-themselves-collective.trycloudflare.com',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean) as string[];
+  ];
 
-  // Check if origin is allowed
-  const isAllowed = origin && (
-    allowedOrigins.includes(origin) || 
-    origin.endsWith('.vercel.app') ||
-    origin.includes('vercel.app')
-  );
+  // Check if origin should be allowed
+  const isVercel = origin.includes('vercel.app');
+  const isAllowedExact = alwaysAllowed.includes(origin);
+  const isAllowed = isAllowedExact || isVercel;
 
-  if (isAllowed && origin) {
-    // Set CORS headers
+  if (isAllowed) {
+    // Set permissive CORS headers
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
-    res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
+    res.setHeader('Access-Control-Max-Age', '86400');
     
-    // Log CORS requests in development
-    if (process.env.NODE_ENV === 'development') {
-      log(`✅ CORS: Allowed ${req.method} from ${origin}`);
-    }
-  } else if (origin) {
-    log(`⚠️ CORS: Blocked ${req.method} from ${origin}`);
+    console.log(`✅ CORS allowed: ${req.method} ${req.path} from ${origin}`);
+  } else {
+    console.warn(`❌ CORS blocked: ${req.method} ${req.path} from ${origin}`);
   }
 
-  // Handle preflight requests
+  // Handle OPTIONS preflight
   if (req.method === 'OPTIONS') {
-    if (isAllowed && origin) {
-      return res.status(200).end();
-    } else {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Origin not allowed' 
-      });
-    }
+    return res.status(isAllowed ? 204 : 403).end();
   }
 
   next();
