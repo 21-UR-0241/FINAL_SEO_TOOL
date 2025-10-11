@@ -2637,19 +2637,21 @@ Provide honest assessment with actionable improvements.`;
     }
   }
 
-  private async improveContent(
-    content: string,
-    title: string,
-    improvements: string[],
-    userId?: string
-  ): Promise<string> {
-    const provider = await this.selectAIProvider(userId);
-    if (!provider) {
-      return this.applyBasicContentImprovements(content);
-    }
 
-    try {
-      const systemPrompt = `You are an expert content writer improving content quality.
+
+  private async improveContent(
+  content: string,
+  title: string,
+  improvements: string[],
+  userId?: string
+): Promise<string> {
+  const provider = await this.selectAIProvider(userId);
+  if (!provider) {
+    return this.applyBasicContentImprovements(content);
+  }
+
+  try {
+    const systemPrompt = `You are an expert content writer improving content quality.
 
 CRITICAL RULES:
 - Return ONLY the improved HTML content
@@ -2661,7 +2663,7 @@ CRITICAL RULES:
 - Keep all existing images and links intact
 - Maintain original tone and style`;
 
-      const userPrompt = `Improve this content based on these suggestions:
+    const userPrompt = `Improve this content based on these suggestions:
 ${improvements.map((imp, i) => `${i + 1}. ${imp}`).join("\n")}
 
 Title: ${title}
@@ -2669,23 +2671,74 @@ Content: ${content}
 
 Improve it significantly while keeping it natural.`;
 
-      const improved = await this.callAIProvider(
-        provider,
-        systemPrompt,
-        userPrompt,
-        3000,
-        0.7,
-        userId
-      );
+    // Use image-protected wrapper
+    const improved = await this.callAIWithImageProtection(
+      provider,
+      systemPrompt,
+      userPrompt,
+      content,
+      3000,
+      0.7,
+      userId
+    );
 
-      const cleaned = this.removeAIArtifacts(improved);
-      const humanized = this.humanizeContent(cleaned);
-      return this.cleanAndValidateContent(humanized);
-    } catch (error: any) {
-      this.addLog(`Content improvement failed: ${error.message}`, "warning");
-      return this.applyBasicContentImprovements(content);
-    }
+    const humanized = this.humanizeContent(improved);
+    return humanized;
+    
+  } catch (error: any) {
+    this.addLog(`Content improvement failed: ${error.message}`, "warning");
+    return this.applyBasicContentImprovements(content);
   }
+}
+//   private async improveContent(
+//     content: string,
+//     title: string,
+//     improvements: string[],
+//     userId?: string
+//   ): Promise<string> {
+//     const provider = await this.selectAIProvider(userId);
+//     if (!provider) {
+//       return this.applyBasicContentImprovements(content);
+//     }
+
+//     try {
+//       const systemPrompt = `You are an expert content writer improving content quality.
+
+// CRITICAL RULES:
+// - Return ONLY the improved HTML content
+// - NO preambles, explanations, or meta-commentary
+// - Start directly with HTML tags
+// - Write naturally like a human expert
+// - Improve readability, structure, and value
+// - Add relevant examples and details
+// - Keep all existing images and links intact
+// - Maintain original tone and style`;
+
+//       const userPrompt = `Improve this content based on these suggestions:
+// ${improvements.map((imp, i) => `${i + 1}. ${imp}`).join("\n")}
+
+// Title: ${title}
+// Content: ${content}
+
+// Improve it significantly while keeping it natural.`;
+
+//       const improved = await this.callAIProvider(
+//         provider,
+//         systemPrompt,
+//         userPrompt,
+//         3000,
+//         0.7,
+//         userId
+//       );
+
+//       const cleaned = this.removeAIArtifacts(improved);
+//       const humanized = this.humanizeContent(cleaned);
+//       return this.cleanAndValidateContent(humanized);
+//     } catch (error: any) {
+//       this.addLog(`Content improvement failed: ${error.message}`, "warning");
+//       return this.applyBasicContentImprovements(content);
+//     }
+//   }
 
   private async optimizeKeywordDistribution(
     content: string,
@@ -2708,6 +2761,90 @@ Improve it significantly while keeping it natural.`;
 
     return this.extractHtmlContent($);
   }
+
+
+/**
+ * Universal wrapper that protects images when sending ANY content to AI for modification
+ */
+private async callAIWithImageProtection(
+  provider: string,
+  systemPrompt: string,
+  userPrompt: string,
+  originalContent: string,
+  maxTokens: number = 3000,
+  temperature: number = 0.7,
+  userId?: string
+): Promise<string> {
+  // Extract and protect images
+  const originalImages = this.extractImages(originalContent);
+  
+  if (originalImages.length > 0) {
+    this.addLog(`🛡️ Protecting ${originalImages.length} images before AI processing`, "info");
+  }
+  
+  // Create placeholders
+  const imageMap = new Map<string, typeof originalImages[0]>();
+  let contentForAI = originalContent;
+  
+  originalImages.forEach((img, index) => {
+    const placeholder = `IMAGE_PLACEHOLDER_${index}_PRESERVED`;
+    imageMap.set(placeholder, img);
+    contentForAI = contentForAI.replace(img.element, `[${placeholder}]`);
+  });
+  
+  // Add image preservation instruction to system prompt
+  const enhancedSystemPrompt = originalImages.length > 0
+    ? `${systemPrompt}\n\n⚠️ CRITICAL: PRESERVE ALL [IMAGE_PLACEHOLDER_*_PRESERVED] markers EXACTLY as they appear. DO NOT remove or modify them.`
+    : systemPrompt;
+  
+  // Replace original content with placeholder version in user prompt
+  const enhancedUserPrompt = userPrompt.replace(originalContent, contentForAI);
+  
+  // Call AI
+  const response = await this.callAIProvider(
+    provider,
+    enhancedSystemPrompt,
+    enhancedUserPrompt,
+    maxTokens,
+    temperature,
+    userId
+  );
+  
+  let cleaned = this.cleanAndValidateContent(response);
+  
+  // Restore images
+  if (originalImages.length > 0) {
+    this.addLog(`🔄 Restoring ${originalImages.length} images after AI processing`, "info");
+    
+    let restoredCount = 0;
+    for (const [placeholder, img] of imageMap) {
+      const marker = `[${placeholder}]`;
+      if (cleaned.includes(marker)) {
+        cleaned = cleaned.split(marker).join(img.element);
+        restoredCount++;
+        this.addLog(`✅ Restored: ${img.src.substring(0, 60)}...`, "success");
+      } else {
+        this.addLog(`⚠️ Marker missing, reinserting: ${img.src.substring(0, 60)}...`, "warning");
+        const $ = cheerio.load(cleaned, this.getCheerioConfig());
+        const firstP = $('p').first();
+        if (firstP.length) {
+          firstP.after(img.element);
+        } else {
+          $('body').prepend(img.element);
+        }
+        cleaned = $.html();
+      }
+    }
+    
+    this.addLog(`✅ Image restoration complete: ${restoredCount}/${originalImages.length} from placeholders`, "success");
+    
+    // Final safety check
+    cleaned = this.ensureImagesPreserved(cleaned, originalImages);
+  }
+  
+  return cleaned;
+}
+
 
 
 private async expandThinContent(
@@ -2833,7 +2970,6 @@ private async expandThinContent(
   );
 }
 
-
 private async expandContentWithAI(
   title: string,
   currentContent: string,
@@ -2859,19 +2995,22 @@ private async expandContentWithAI(
   const originalImages = this.extractImages(currentContent);
   this.addLog(`Protecting ${originalImages.length} images before AI processing`, "info");
   
-  // Replace images with text placeholders that AI won't remove
+  // Create a map of simple placeholders to images
+  const imageMap = new Map<string, typeof originalImages[0]>();
   let contentForAI = currentContent;
-  for (const img of originalImages) {
-    const placeholder = `[IMAGE_PRESERVED:${img.src.substring(img.src.length - 30)}]`;
-    contentForAI = contentForAI.replace(img.element, placeholder);
-  }
+  
+  originalImages.forEach((img, index) => {
+    const placeholder = `IMAGE_PLACEHOLDER_${index}_PRESERVED`;
+    imageMap.set(placeholder, img);
+    contentForAI = contentForAI.replace(img.element, `[${placeholder}]`);
+  });
 
   const systemPrompt = `You are an expert content writer who creates comprehensive, valuable content.
 
 CRITICAL REQUIREMENTS:
 1. The final output MUST be AT LEAST ${minimumWords} words (target: ${targetWordCount} words)
 2. PRESERVE 100% of the existing content - NEVER remove or significantly alter existing text
-3. PRESERVE ALL [IMAGE_PRESERVED:...] placeholders EXACTLY as they appear - DO NOT remove or modify them
+3. PRESERVE ALL [IMAGE_PLACEHOLDER_*_PRESERVED] markers EXACTLY as they appear - DO NOT remove or modify them
 4. ADD substantial new sections and paragraphs to reach the word count
 5. Quality over quantity - but you MUST hit the word count target
 6. Return ONLY the expanded HTML content - NO preambles, explanations, or meta-commentary
@@ -2905,38 +3044,18 @@ Title: ${title}
 Current Content:
 ${contentForAI}
 
-CRITICAL: Do NOT remove or modify any [IMAGE_PRESERVED:...] placeholders - they mark where images belong!
+CRITICAL: Do NOT remove or modify any [IMAGE_PLACEHOLDER_*_PRESERVED] markers - they mark where images belong!
 
 EXPANSION REQUIREMENTS:
 1. Keep ALL existing content intact
-2. Keep ALL [IMAGE_PRESERVED:...] placeholders intact
-3. Add ${isRetry ? 'SUBSTANTIAL' : 'comprehensive'} new sections covering:
-   ${isRetry ? `
-   • Deep-dive analysis of key concepts
-   • Multiple detailed examples with specific scenarios
-   • Expert perspectives and industry insights
-   • Common challenges and detailed solutions
-   • Advanced tips and best practices
-   • Comparative analysis and alternatives
-   • Future trends and predictions
-   • Real-world case studies
-   ` : `
-   • Detailed explanations of key points
-   • Practical examples and real-world applications
-   • Step-by-step guides and tutorials
-   • Common questions and comprehensive answers
-   • Benefits, challenges, and solutions
-   • Expert tips and best practices
-   • Related concepts and deeper context
-   `}
-
+2. Keep ALL [IMAGE_PLACEHOLDER_*_PRESERVED] markers intact
+3. Add ${isRetry ? 'SUBSTANTIAL' : 'comprehensive'} new sections
 4. Organize new content with proper HTML structure (h2, h3, p tags)
 5. Ensure natural flow and readability
-6. Make content genuinely valuable and informative
 
 ${isRetry ? '⚠️ IMPORTANT: This is a retry - you MUST be more aggressive with expansion to reach the word count!' : ''}
 
-Remember: The expanded content MUST be at least ${minimumWords} words. Do not under-deliver on word count.`;
+Remember: The expanded content MUST be at least ${minimumWords} words.`;
 
   const response = await this.callAIProvider(
     provider,
@@ -2952,13 +3071,13 @@ Remember: The expanded content MUST be at least ${minimumWords} words. Do not un
   // ⭐ CRITICAL FIX: Restore images from placeholders
   this.addLog(`Restoring ${originalImages.length} images after AI processing`, "info");
   
-  for (const img of originalImages) {
-    const placeholder = `[IMAGE_PRESERVED:${img.src.substring(img.src.length - 30)}]`;
-    if (cleaned.includes(placeholder)) {
-      cleaned = cleaned.replace(new RegExp(placeholder, 'g'), img.element);
+  for (const [placeholder, img] of imageMap) {
+    const marker = `[${placeholder}]`;
+    if (cleaned.includes(marker)) {
+      cleaned = cleaned.split(marker).join(img.element); // Safe string replacement
       this.addLog(`✅ Restored image: ${img.src.substring(0, 60)}...`, "success");
     } else {
-      this.addLog(`⚠️ Placeholder not found, reinserting: ${img.src.substring(0, 60)}...`, "warning");
+      this.addLog(`⚠️ Marker not found, reinserting: ${img.src.substring(0, 60)}...`, "warning");
       // Insert after first paragraph
       const $ = cheerio.load(cleaned, this.getCheerioConfig());
       const firstP = $('p').first();
@@ -2993,7 +3112,6 @@ Remember: The expanded content MUST be at least ${minimumWords} words. Do not un
 
   return cleaned;
 }
-
 
 // private async expandContentWithAI(
 //   title: string,
@@ -3168,28 +3286,30 @@ Remember: The expanded content MUST be at least ${minimumWords} words. Do not un
 //     return cleaned;
 //   }
 
-  private async improveEAT(
-    creds: WordPressCredentials,
-    fixes: AIFix[],
-    userId?: string
-  ): Promise<{ applied: AIFix[]; errors: string[] }> {
-    return this.fixWordPressContent(
-      creds,
-      fixes,
-      async (content, fix) => {
-        const title = content.title?.rendered || content.title || "";
-        const contentHtml = content.content?.rendered || content.content || "";
-        
-        const provider = await this.selectAIProvider(userId);
-        if (!provider) {
-          return {
-            updated: false,
-            data: {},
-            description: "AI provider not available"
-          };
-        }
 
-        const systemPrompt = `You are enhancing content with E-E-A-T signals (Experience, Expertise, Authoritativeness, Trustworthiness).
+
+private async improveEAT(
+  creds: WordPressCredentials,
+  fixes: AIFix[],
+  userId?: string
+): Promise<{ applied: AIFix[]; errors: string[] }> {
+  return this.fixWordPressContent(
+    creds,
+    fixes,
+    async (content, fix) => {
+      const title = content.title?.rendered || content.title || "";
+      const contentHtml = content.content?.rendered || content.content || "";
+      
+      const provider = await this.selectAIProvider(userId);
+      if (!provider) {
+        return {
+          updated: false,
+          data: {},
+          description: "AI provider not available"
+        };
+      }
+
+      const systemPrompt = `You are enhancing content with E-E-A-T signals (Experience, Expertise, Authoritativeness, Trustworthiness).
 
 Add to the existing content:
 1. Expert insights and data points
@@ -3200,31 +3320,90 @@ Add to the existing content:
 
 CRITICAL: Return ONLY the enhanced HTML content. NO preambles or explanations.`;
 
-        const userPrompt = `Enhance this content with trustworthiness and expertise signals:
+      const userPrompt = `Enhance this content with trustworthiness and expertise signals:
 
 Title: ${title}
 Content: ${contentHtml.substring(0, 2000)}
 
 Add credible elements while maintaining the original structure.`;
 
-        const enhanced = await this.callAIProvider(
-          provider,
-          systemPrompt,
-          userPrompt,
-          3000,
-          0.7,
-          userId
-        );
+      // Use image-protected wrapper
+      const enhanced = await this.callAIWithImageProtection(
+        provider,
+        systemPrompt,
+        userPrompt,
+        contentHtml,
+        3000,
+        0.7,
+        userId
+      );
 
-        return {
-          updated: true,
-          data: { content: this.cleanAndValidateContent(enhanced) },
-          description: "Enhanced with expertise and trustworthiness signals"
-        };
-      },
-      userId
-    );
-  }
+      return {
+        updated: true,
+        data: { content: enhanced },
+        description: "Enhanced with expertise and trustworthiness signals"
+      };
+    },
+    userId
+  );
+}
+//   private async improveEAT(
+//     creds: WordPressCredentials,
+//     fixes: AIFix[],
+//     userId?: string
+//   ): Promise<{ applied: AIFix[]; errors: string[] }> {
+//     return this.fixWordPressContent(
+//       creds,
+//       fixes,
+//       async (content, fix) => {
+//         const title = content.title?.rendered || content.title || "";
+//         const contentHtml = content.content?.rendered || content.content || "";
+        
+//         const provider = await this.selectAIProvider(userId);
+//         if (!provider) {
+//           return {
+//             updated: false,
+//             data: {},
+//             description: "AI provider not available"
+//           };
+//         }
+
+//         const systemPrompt = `You are enhancing content with E-E-A-T signals (Experience, Expertise, Authoritativeness, Trustworthiness).
+
+// Add to the existing content:
+// 1. Expert insights and data points
+// 2. References to credible sources
+// 3. Author perspective or experience
+// 4. Clear, well-researched explanations
+// 5. Transparent and verifiable information
+
+// CRITICAL: Return ONLY the enhanced HTML content. NO preambles or explanations.`;
+
+//         const userPrompt = `Enhance this content with trustworthiness and expertise signals:
+
+// Title: ${title}
+// Content: ${contentHtml.substring(0, 2000)}
+
+// Add credible elements while maintaining the original structure.`;
+
+//         const enhanced = await this.callAIProvider(
+//           provider,
+//           systemPrompt,
+//           userPrompt,
+//           3000,
+//           0.7,
+//           userId
+//         );
+
+//         return {
+//           updated: true,
+//           data: { content: this.cleanAndValidateContent(enhanced) },
+//           description: "Enhanced with expertise and trustworthiness signals"
+//         };
+//       },
+//       userId
+//     );
+//   }
 
   private async generateSchemaMarkup(
     contentType: string,
@@ -3640,38 +3819,13 @@ private extractTextFromHTML(html: string): string {
     return null;
   }
 
-  private async improveReadability(
-    creds: WordPressCredentials,
-    fixes: AIFix[],
-    userId?: string
-  ): Promise<{ applied: AIFix[]; errors: string[] }> {
-    return this.fixWordPressContent(
-      creds,
-      fixes,
-      async (content, fix) => {
-        const contentHtml = content.content?.rendered || content.content || "";
-        const $ = cheerio.load(contentHtml, this.getCheerioConfig());
 
-        let improved = false;
 
-        $('p').each((_, elem) => {
-          const text = $(elem).text();
-          if (text.length > 400) {
-            const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-            if (sentences.length > 2) {
-              const mid = Math.floor(sentences.length / 2);
-              const p1 = sentences.slice(0, mid).join(' ');
-              const p2 = sentences.slice(mid).join(' ');
-              $(elem).replaceWith(`<p>${p1}</p><p>${p2}</p>`);
-              improved = true;
-            }
-          }
-        });
 
-        if (!improved) {
-          const provider = await this.selectAIProvider(userId);
-          if (provider) {
-            const systemPrompt = `Rewrite content for better readability (target: 60+ Flesch score, 8th-9th grade level).
+  if (!improved) {
+  const provider = await this.selectAIProvider(userId);
+  if (provider) {
+    const systemPrompt = `Rewrite content for better readability (target: 60+ Flesch score, 8th-9th grade level).
 
 Rules:
 - Use shorter sentences (15-20 words max)
@@ -3681,46 +3835,111 @@ Rules:
 - Break up dense paragraphs
 - Return ONLY the rewritten HTML`;
 
-            const userPrompt = `Improve readability of this content:
+    const userPrompt = `Improve readability of this content:
 
 ${contentHtml}
 
 Make it clearer and easier to read while keeping all key information.`;
 
-            const rewritten = await this.callAIProvider(
-              provider,
-              systemPrompt,
-              userPrompt,
-              3000,
-              0.6,
-              userId
-            );
-
-            return {
-              updated: true,
-              data: { content: this.cleanAndValidateContent(rewritten) },
-              description: "Improved readability (simpler language, shorter sentences)"
-            };
-          }
-        }
-
-        if (improved) {
-          return {
-            updated: true,
-            data: { content: this.extractHtmlContent($) },
-            description: "Broke up long paragraphs for better readability"
-          };
-        }
-
-        return {
-          updated: false,
-          data: {},
-          description: "Content readability already acceptable"
-        };
-      },
+    // Use image-protected wrapper
+    const rewritten = await this.callAIWithImageProtection(
+      provider,
+      systemPrompt,
+      userPrompt,
+      contentHtml,
+      3000,
+      0.6,
       userId
     );
+
+    return {
+      updated: true,
+      data: { content: rewritten },
+      description: "Improved readability (simpler language, shorter sentences)"
+    };
   }
+}
+//   private async improveReadability(
+//     creds: WordPressCredentials,
+//     fixes: AIFix[],
+//     userId?: string
+//   ): Promise<{ applied: AIFix[]; errors: string[] }> {
+//     return this.fixWordPressContent(
+//       creds,
+//       fixes,
+//       async (content, fix) => {
+//         const contentHtml = content.content?.rendered || content.content || "";
+//         const $ = cheerio.load(contentHtml, this.getCheerioConfig());
+
+//         let improved = false;
+
+//         $('p').each((_, elem) => {
+//           const text = $(elem).text();
+//           if (text.length > 400) {
+//             const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+//             if (sentences.length > 2) {
+//               const mid = Math.floor(sentences.length / 2);
+//               const p1 = sentences.slice(0, mid).join(' ');
+//               const p2 = sentences.slice(mid).join(' ');
+//               $(elem).replaceWith(`<p>${p1}</p><p>${p2}</p>`);
+//               improved = true;
+//             }
+//           }
+//         });
+
+//         if (!improved) {
+//           const provider = await this.selectAIProvider(userId);
+//           if (provider) {
+//             const systemPrompt = `Rewrite content for better readability (target: 60+ Flesch score, 8th-9th grade level).
+
+// Rules:
+// - Use shorter sentences (15-20 words max)
+// - Replace complex words with simpler alternatives
+// - Use active voice
+// - Add transition words
+// - Break up dense paragraphs
+// - Return ONLY the rewritten HTML`;
+
+//             const userPrompt = `Improve readability of this content:
+
+// ${contentHtml}
+
+// Make it clearer and easier to read while keeping all key information.`;
+
+//             const rewritten = await this.callAIProvider(
+//               provider,
+//               systemPrompt,
+//               userPrompt,
+//               3000,
+//               0.6,
+//               userId
+//             );
+
+//             return {
+//               updated: true,
+//               data: { content: this.cleanAndValidateContent(rewritten) },
+//               description: "Improved readability (simpler language, shorter sentences)"
+//             };
+//           }
+//         }
+
+//         if (improved) {
+//           return {
+//             updated: true,
+//             data: { content: this.extractHtmlContent($) },
+//             description: "Broke up long paragraphs for better readability"
+//           };
+//         }
+
+//         return {
+//           updated: false,
+//           data: {},
+//           description: "Content readability already acceptable"
+//         };
+//       },
+//       userId
+//     );
+//   }
 
   // ==================== ISSUE MANAGEMENT ====================
 
