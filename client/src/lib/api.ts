@@ -287,9 +287,8 @@ export const api = {
   },
 
   async deleteActivityLog(logId: string): Promise<any> {
-    const response = await fetch(`/api/user/activity-logs/${logId}`, {
+   const response = await fetchWithCredentials(`/api/user/activity-logs/${logId}`, {
       method: "DELETE",
-      credentials: "include",
     });
 
     if (!response.ok) {
@@ -301,15 +300,10 @@ export const api = {
   },
 
   async bulkDeleteActivityLogs(logIds: string[]): Promise<any> {
-    const response = await fetch("/api/user/activity-logs/bulk-delete", {
+    const response = await fetchWithCredentials("/api/user/activity-logs/bulk-delete", {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
       body: JSON.stringify({ ids: logIds }),
     });
-
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || "Failed to delete activity logs");
@@ -325,10 +319,9 @@ export const api = {
         ? `/api/user/activity-logs/clear-all?websiteId=${websiteId}`
         : "/api/user/activity-logs/clear-all";
 
-    const response = await fetch(url, {
-      method: "DELETE",
-      credentials: "include",
-    });
+   const response = await fetchWithCredentials(url, {
+  method: "DELETE",
+});
 
     const data = await response.json();
 
@@ -968,11 +961,13 @@ export const api = {
     formData.append("websiteId", websiteId);
     if (contentId) formData.append("contentId", contentId);
 
-    const response = await fetch("/api/user/content/upload-images", {
-      method: "POST",
-      credentials: "include", // IMPORTANT
-      body: formData,
-    });
+    const fullUrl = `${API_BASE_URL}/api/user/content/upload-images`;
+
+const response = await fetch(fullUrl, {
+  method: "POST",
+  credentials: "include",
+  body: formData, // Don't set Content-Type for FormData
+});
 
     if (!response.ok) {
       const error = await response
