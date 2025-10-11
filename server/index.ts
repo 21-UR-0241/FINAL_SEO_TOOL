@@ -253,33 +253,54 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   next();
 });
-
 // =============================================================================
 // CORS CONFIGURATION
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  
   const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
     'http://localhost:5000',
     'https://leaders-necklace-themselves-collective.trycloudflare.com',
     process.env.FRONTEND_URL,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
-  const origin = req.headers.origin;
-  
-  // Allow all Vercel deployments or specific origins
-  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app'))) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization');
+  // Check if origin is allowed
+  const isAllowed = origin && (
+    allowedOrigins.includes(origin) || 
+    origin.endsWith('.vercel.app') ||
+    origin.includes('vercel.app')
+  );
+
+  if (isAllowed && origin) {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+    res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
+    
+    // Log CORS requests in development
+    if (process.env.NODE_ENV === 'development') {
+      log(`✅ CORS: Allowed ${req.method} from ${origin}`);
+    }
+  } else if (origin) {
+    log(`⚠️ CORS: Blocked ${req.method} from ${origin}`);
   }
 
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
+    if (isAllowed && origin) {
+      return res.status(200).end();
+    } else {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Origin not allowed' 
+      });
+    }
   }
 
   next();
