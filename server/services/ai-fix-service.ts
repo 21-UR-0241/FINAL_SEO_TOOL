@@ -2855,14 +2855,26 @@ private async expandContentWithAI(
     "info"
   );
 
+  // ⭐ CRITICAL FIX: Extract and protect images BEFORE sending to AI
+  const originalImages = this.extractImages(currentContent);
+  this.addLog(`Protecting ${originalImages.length} images before AI processing`, "info");
+  
+  // Replace images with text placeholders that AI won't remove
+  let contentForAI = currentContent;
+  for (const img of originalImages) {
+    const placeholder = `[IMAGE_PRESERVED:${img.src.substring(img.src.length - 30)}]`;
+    contentForAI = contentForAI.replace(img.element, placeholder);
+  }
+
   const systemPrompt = `You are an expert content writer who creates comprehensive, valuable content.
 
 CRITICAL REQUIREMENTS:
 1. The final output MUST be AT LEAST ${minimumWords} words (target: ${targetWordCount} words)
 2. PRESERVE 100% of the existing content - NEVER remove or significantly alter existing text
-3. ADD substantial new sections and paragraphs to reach the word count
-4. Quality over quantity - but you MUST hit the word count target
-5. Return ONLY the expanded HTML content - NO preambles, explanations, or meta-commentary
+3. PRESERVE ALL [IMAGE_PRESERVED:...] placeholders EXACTLY as they appear - DO NOT remove or modify them
+4. ADD substantial new sections and paragraphs to reach the word count
+5. Quality over quantity - but you MUST hit the word count target
+6. Return ONLY the expanded HTML content - NO preambles, explanations, or meta-commentary
 
 EXPANSION STRATEGY:
 ${isRetry ? `
@@ -2891,11 +2903,14 @@ WORD COUNT VALIDATION:
 Title: ${title}
 
 Current Content:
-${currentContent}
+${contentForAI}
+
+CRITICAL: Do NOT remove or modify any [IMAGE_PRESERVED:...] placeholders - they mark where images belong!
 
 EXPANSION REQUIREMENTS:
 1. Keep ALL existing content intact
-2. Add ${isRetry ? 'SUBSTANTIAL' : 'comprehensive'} new sections covering:
+2. Keep ALL [IMAGE_PRESERVED:...] placeholders intact
+3. Add ${isRetry ? 'SUBSTANTIAL' : 'comprehensive'} new sections covering:
    ${isRetry ? `
    • Deep-dive analysis of key concepts
    • Multiple detailed examples with specific scenarios
@@ -2915,9 +2930,9 @@ EXPANSION REQUIREMENTS:
    • Related concepts and deeper context
    `}
 
-3. Organize new content with proper HTML structure (h2, h3, p tags)
-4. Ensure natural flow and readability
-5. Make content genuinely valuable and informative
+4. Organize new content with proper HTML structure (h2, h3, p tags)
+5. Ensure natural flow and readability
+6. Make content genuinely valuable and informative
 
 ${isRetry ? '⚠️ IMPORTANT: This is a retry - you MUST be more aggressive with expansion to reach the word count!' : ''}
 
@@ -2927,12 +2942,37 @@ Remember: The expanded content MUST be at least ${minimumWords} words. Do not un
     provider,
     systemPrompt,
     userPrompt,
-    isRetry ? 6000 : 5000, // More tokens for retry
+    isRetry ? 6000 : 5000,
     0.7,
     userId
   );
 
-  const cleaned = this.cleanAndValidateContent(response);
+  let cleaned = this.cleanAndValidateContent(response);
+  
+  // ⭐ CRITICAL FIX: Restore images from placeholders
+  this.addLog(`Restoring ${originalImages.length} images after AI processing`, "info");
+  
+  for (const img of originalImages) {
+    const placeholder = `[IMAGE_PRESERVED:${img.src.substring(img.src.length - 30)}]`;
+    if (cleaned.includes(placeholder)) {
+      cleaned = cleaned.replace(new RegExp(placeholder, 'g'), img.element);
+      this.addLog(`✅ Restored image: ${img.src.substring(0, 60)}...`, "success");
+    } else {
+      this.addLog(`⚠️ Placeholder not found, reinserting: ${img.src.substring(0, 60)}...`, "warning");
+      // Insert after first paragraph
+      const $ = cheerio.load(cleaned, this.getCheerioConfig());
+      const firstP = $('p').first();
+      if (firstP.length) {
+        firstP.after(img.element);
+      } else {
+        $('body').prepend(img.element);
+      }
+      cleaned = $.html();
+    }
+  }
+  
+  // Final validation with image preservation
+  cleaned = this.ensureImagesPreserved(cleaned, originalImages);
   
   // Validate word count
   const finalWordCount = this.extractTextFromHTML(cleaned)
@@ -2953,6 +2993,127 @@ Remember: The expanded content MUST be at least ${minimumWords} words. Do not un
 
   return cleaned;
 }
+
+
+// private async expandContentWithAI(
+//   title: string,
+//   currentContent: string,
+//   provider: string,
+//   userId?: string,
+//   minimumWords: number = 800,
+//   idealWords: number = 1200,
+//   isRetry: boolean = false
+// ): Promise<string> {
+//   const currentWordCount = this.extractTextFromHTML(currentContent)
+//     .split(/\s+/)
+//     .filter(w => w.length > 0).length;
+  
+//   const wordsNeeded = Math.max(minimumWords - currentWordCount, 400);
+//   const targetWordCount = Math.max(idealWords, currentWordCount + wordsNeeded);
+
+//   this.addLog(
+//     `Content expansion: ${currentWordCount} words → target ${targetWordCount} words (minimum ${minimumWords})`,
+//     "info"
+//   );
+
+//   const systemPrompt = `You are an expert content writer who creates comprehensive, valuable content.
+
+// CRITICAL REQUIREMENTS:
+// 1. The final output MUST be AT LEAST ${minimumWords} words (target: ${targetWordCount} words)
+// 2. PRESERVE 100% of the existing content - NEVER remove or significantly alter existing text
+// 3. ADD substantial new sections and paragraphs to reach the word count
+// 4. Quality over quantity - but you MUST hit the word count target
+// 5. Return ONLY the expanded HTML content - NO preambles, explanations, or meta-commentary
+
+// EXPANSION STRATEGY:
+// ${isRetry ? `
+// ⚠️ RETRY ATTEMPT - Previous expansion was insufficient
+// - Be MORE aggressive with expansion
+// - Add MORE detailed sections
+// - Include MORE examples and explanations
+// ` : `
+// - Add detailed explanations and context
+// - Include practical examples and use cases
+// - Add expert insights and industry perspectives
+// - Provide step-by-step guidance where relevant
+// - Address common questions and concerns
+// - Include relevant statistics and data points
+// - Add comparison and analysis sections
+// `}
+
+// WORD COUNT VALIDATION:
+// - Current: ${currentWordCount} words
+// - Need to add: ${wordsNeeded}+ words
+// - Target total: ${targetWordCount} words
+// - Absolute minimum: ${minimumWords} words`;
+
+//   const userPrompt = `Expand this ${currentWordCount}-word content to AT LEAST ${minimumWords} words (ideally ${targetWordCount} words):
+
+// Title: ${title}
+
+// Current Content:
+// ${currentContent}
+
+// EXPANSION REQUIREMENTS:
+// 1. Keep ALL existing content intact
+// 2. Add ${isRetry ? 'SUBSTANTIAL' : 'comprehensive'} new sections covering:
+//    ${isRetry ? `
+//    • Deep-dive analysis of key concepts
+//    • Multiple detailed examples with specific scenarios
+//    • Expert perspectives and industry insights
+//    • Common challenges and detailed solutions
+//    • Advanced tips and best practices
+//    • Comparative analysis and alternatives
+//    • Future trends and predictions
+//    • Real-world case studies
+//    ` : `
+//    • Detailed explanations of key points
+//    • Practical examples and real-world applications
+//    • Step-by-step guides and tutorials
+//    • Common questions and comprehensive answers
+//    • Benefits, challenges, and solutions
+//    • Expert tips and best practices
+//    • Related concepts and deeper context
+//    `}
+
+// 3. Organize new content with proper HTML structure (h2, h3, p tags)
+// 4. Ensure natural flow and readability
+// 5. Make content genuinely valuable and informative
+
+// ${isRetry ? '⚠️ IMPORTANT: This is a retry - you MUST be more aggressive with expansion to reach the word count!' : ''}
+
+// Remember: The expanded content MUST be at least ${minimumWords} words. Do not under-deliver on word count.`;
+
+//   const response = await this.callAIProvider(
+//     provider,
+//     systemPrompt,
+//     userPrompt,
+//     isRetry ? 6000 : 5000, // More tokens for retry
+//     0.7,
+//     userId
+//   );
+
+//   const cleaned = this.cleanAndValidateContent(response);
+  
+//   // Validate word count
+//   const finalWordCount = this.extractTextFromHTML(cleaned)
+//     .split(/\s+/)
+//     .filter(w => w.length > 0).length;
+  
+//   this.addLog(
+//     `AI expansion result: ${currentWordCount} → ${finalWordCount} words (${isRetry ? 'retry' : 'initial'} attempt)`,
+//     finalWordCount >= minimumWords ? "success" : "warning"
+//   );
+
+//   // Validate content wasn't reduced
+//   if (finalWordCount < currentWordCount) {
+//     throw new Error(
+//       `Content expansion failed: ${currentWordCount} → ${finalWordCount} words. AI removed content instead of adding.`
+//     );
+//   }
+
+//   return cleaned;
+// }
 
 
 //   private async expandContentWithAI(
