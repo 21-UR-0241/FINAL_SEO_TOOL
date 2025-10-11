@@ -57,6 +57,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
+import { API_URL } from "@/config/api";
 
 export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
@@ -71,6 +72,7 @@ export default function AdminPanel() {
   const [loadingUserDetails, setLoadingUserDetails] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
   const { toast } = useToast();
+  
 
   useEffect(() => {
     fetchData();
@@ -85,11 +87,11 @@ export default function AdminPanel() {
   const fetchData = async () => {
     try {
       const [statsRes, usersRes, apiUsageRes, userApiUsageRes] = await Promise.all([
-        fetch('/api/admin/statistics', { credentials: 'include' }),
-        fetch('/api/admin/users', { credentials: 'include' }),
-        fetch('/api/admin/system-api-usage', { credentials: 'include' }),
-        fetch('/api/admin/users-api-usage', { credentials: 'include' })
-      ]);
+            fetch(`${API_URL}/api/admin/statistics`, { credentials: 'include' }),
+            fetch(`${API_URL}/api/admin/users`, { credentials: 'include' }),
+            fetch(`${API_URL}/api/admin/system-api-usage`, { credentials: 'include' }),
+            fetch(`${API_URL}/api/admin/users-api-usage`, { credentials: 'include' })
+          ]);
 
       if (!statsRes.ok || !usersRes.ok || !apiUsageRes.ok || !userApiUsageRes.ok) {
         if (statsRes.status === 403 || usersRes.status === 403 || apiUsageRes.status === 403 || userApiUsageRes.status === 403) {
@@ -129,10 +131,10 @@ export default function AdminPanel() {
   const fetchUserDetails = async (userId: string) => {
     setLoadingUserDetails(true);
     try {
-      const res = await fetch(`/api/admin/users/${userId}/api-usage`, { 
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}/api-usage`, { 
         credentials: 'include' 
       });
-      
+            
       if (!res.ok) {
         throw new Error(`Failed to fetch user details: ${res.status} ${res.statusText}`);
       }
@@ -163,13 +165,12 @@ export default function AdminPanel() {
   const toggleAdminStatus = async (userId: string, currentStatus: boolean) => {
     setUpdatingUser(userId);
     try {
-      const res = await fetch(`/api/admin/users/${userId}/admin-status`, {
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}/admin-status`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isAdmin: !currentStatus })
       });
-
       if (!res.ok) {
         const contentType = res.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
@@ -203,7 +204,7 @@ export default function AdminPanel() {
     if (!deleteUserId) return;
 
     try {
-      const res = await fetch(`/api/admin/users/${deleteUserId}`, {
+      const res = await fetch(`${API_URL}/api/admin/users/${deleteUserId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -248,7 +249,7 @@ export default function AdminPanel() {
     setDownloadingReport(userId);
     try {
       // Fetch detailed user data
-      const res = await fetch(`/api/admin/users/${userId}/api-usage`, { 
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}/api-usage`, { 
         credentials: 'include' 
       });
       
