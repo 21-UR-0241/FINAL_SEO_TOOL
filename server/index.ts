@@ -1,4 +1,3 @@
-
 //server/index.ts
 import express from "express";
 import { type Request, Response, NextFunction } from "express";
@@ -215,7 +214,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // ← Changed
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     domain: undefined
   },
   rolling: true
@@ -261,21 +260,22 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const allowedOrigins = [
-    'http://localhost:5173', // Vite dev server
-    'http://localhost:3000', // Alternative dev port
-    'http://localhost:5000', // Backend port
-    'https://leaders-necklace-themselves-collective.trycloudflare.com', // Your Cloudflare tunnel
-    process.env.FRONTEND_URL, // Production frontend URL
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://leaders-necklace-themselves-collective.trycloudflare.com',
+    process.env.FRONTEND_URL,
   ].filter(Boolean);
 
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
   
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization');
+  // Allow all Vercel deployments or specific origins
+  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization');
+  }
 
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
