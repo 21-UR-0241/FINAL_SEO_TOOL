@@ -26,25 +26,31 @@ import {
 } from "lucide-react";
 import AutoContentScheduler from "./auto-content-scheduler";
 import { sanitizeHtmlContent, sanitizeFormInput } from "@/utils/sanitize-HTML";
+import { API_URL } from "@/config/api";
 
 // API utility functions
 const api = {
   async getWebsites() {
-    const response = await fetch("/api/user/websites");
+    const response = await fetch(`${API_URL}/api/user/websites`, {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch websites");
     return response.json();
   },
 
   async getWebsiteContent(websiteId) {
-    const response = await fetch(`/api/user/websites/${websiteId}/content`);
+    const response = await fetch(`${API_URL}/api/user/websites/${websiteId}/content`, {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch content");
     return response.json();
   },
 
   async generateContent(data) {
-    const response = await fetch("/api/user/content/generate", {
+    const response = await fetch(`${API_URL}/api/user/content/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -55,9 +61,10 @@ const api = {
   },
 
   async updateContent(contentId, data) {
-    const response = await fetch(`/api/user/content/${contentId}`, {
+    const response = await fetch(`${API_URL}/api/user/content/${contentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -68,9 +75,10 @@ const api = {
   },
 
   async publishContent(contentId) {
-    const response = await fetch(`/api/user/content/${contentId}/publish`, {
+    const response = await fetch(`${API_URL}/api/user/content/${contentId}/publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
     });
 
     if (!response.ok) {
@@ -92,9 +100,11 @@ const api = {
 
   async getActivityLogs(websiteId) {
     const url = websiteId
-      ? `/api/user/activity-logs?websiteId=${websiteId}`
-      : "/api/user/activity-logs";
-    const response = await fetch(url);
+      ? `${API_URL}/api/user/activity-logs?websiteId=${websiteId}`
+      : `${API_URL}/api/user/activity-logs`;
+    const response = await fetch(url, {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch activity logs");
     return response.json();
   },
@@ -105,8 +115,9 @@ const api = {
     formData.append("websiteId", websiteId);
     if (contentId) formData.append("contentId", contentId);
 
-    const response = await fetch("/api/user/content/upload-images", {
+    const response = await fetch(`${API_URL}/api/user/content/upload-images`, {
       method: "POST",
+      credentials: "include",
       body: formData,
     });
 
@@ -119,15 +130,18 @@ const api = {
     if (websiteId) params.append("websiteId", websiteId);
     if (contentId) params.append("contentId", contentId);
 
-    const response = await fetch(`/api/user/content/images?${params}`);
+    const response = await fetch(`${API_URL}/api/user/content/images?${params}`, {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch images");
     return response.json();
   },
 
   async replaceContentImage(contentId, oldImageUrl, newImageUrl, newAltText) {
-    const response = await fetch("/api/user/content/replace-image", {
+    const response = await fetch(`${API_URL}/api/user/content/replace-image`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         contentId,
         oldImageUrl,
@@ -140,9 +154,10 @@ const api = {
   },
 
   async deleteContent(contentId) {
-    const response = await fetch(`/api/user/content/${contentId}`, {
+    const response = await fetch(`${API_URL}/api/user/content/${contentId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
     });
 
     if (!response.ok) {
@@ -153,7 +168,6 @@ const api = {
     return response.json();
   },
 };
-
 // Utility functions
 const getStatusColor = (status) => {
   switch (status) {
