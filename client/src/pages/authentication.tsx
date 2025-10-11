@@ -13,6 +13,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, EyeOff, Lock, User, Mail, LogOut } from "lucide-react";
+import { API_URL } from "@/config/api";
+
 
 /* ─────────────────────────────────────────────────────────────
    INLINE SANITIZERS (gentle-on-change, stricter-on-submit)
@@ -80,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch("/api/auth/me", {
+      const response = await fetch(`${API_URL}/api/auth/me`, {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
@@ -99,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (username: string, password: string) => {
-    const response = await fetch("/api/auth/login", {
+    const response = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -126,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     name?: string,
     verificationCode?: string 
   ) => {
-    const response = await fetch("/api/auth/signup", {
+    const response = await fetch(`${API_URL}/api/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -149,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch("/api/auth/logout", {
+      await fetch(`${API_URL}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -280,7 +282,7 @@ export function AuthPage() {
 
     try {
       // Send verification code to email
-      const response = await fetch("/api/auth/send-verification", {
+      const response = await fetch(`${API_URL}/api/auth/send-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -340,7 +342,7 @@ export function AuthPage() {
     setError("");
 
     try {
-      const response = await fetch("/api/auth/send-verification", {
+      const response = await fetch(`${API_URL}/api/auth/send-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
