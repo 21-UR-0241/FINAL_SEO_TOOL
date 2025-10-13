@@ -25,11 +25,15 @@ import {
 } from "lucide-react";
 
 // Enhanced API with crawling support
+// Add this at the very top, after imports
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+// Enhanced API with crawling support
 const api = {
   async getContentImages(websiteId?: string) {
     const url = websiteId
-      ? `/api/images/content-images?websiteId=${websiteId}`
-      : "/api/images/content-images";
+      ? `${API_BASE_URL}/api/images/content-images?websiteId=${websiteId}`
+      : `${API_BASE_URL}/api/images/content-images`;
 
     try {
       const response = await fetch(url);
@@ -57,7 +61,7 @@ const api = {
 
   async crawlWebsiteImages(url: string, options: any) {
     try {
-      const response = await fetch("/api/images/crawl", {
+      const response = await fetch(`${API_BASE_URL}/api/images/crawl`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, options }),
@@ -81,10 +85,10 @@ const api = {
     imageUrls?: Record<string, string>
   ) {
     try {
-      const response = await fetch("/api/images/batch-process", {
+      const response = await fetch(`${API_BASE_URL}/api/images/batch-process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageIds, options, imageUrls }), // Add imageUrls here
+        body: JSON.stringify({ imageIds, options, imageUrls }),
       });
 
       const contentType = response.headers.get("content-type");
@@ -106,7 +110,7 @@ const api = {
 
   async getWebsites() {
     try {
-      const response = await fetch("/api/user/websites");
+      const response = await fetch(`${API_BASE_URL}/api/user/websites`);
       const contentType = response.headers.get("content-type");
 
       if (!response.ok) {
@@ -127,7 +131,7 @@ const api = {
   async getImageStatus(contentId: string) {
     try {
       const response = await fetch(
-        `/api/images/batch-process?contentId=${contentId}`
+        `${API_BASE_URL}/api/images/batch-process?contentId=${contentId}`
       );
 
       if (!response.ok) {
