@@ -2221,6 +2221,261 @@ app.delete("/api/admin/users/:userId", requireAdmin, async (req: Request, res: R
   }
 });
 
+// // Get system API key usage (admin only)
+// app.get("/api/admin/system-api-usage", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     // Get all AI usage tracking grouped by provider
+//     const systemUsage = await db
+//       .select({
+//         model: aiUsageTracking.model,
+//         operation: aiUsageTracking.operation,
+//         totalTokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         totalCostCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         usageCount: sql<number>`COUNT(*)::integer`,
+//         lastUsed: sql<Date>`MAX(${aiUsageTracking.createdAt})`,
+//       })
+//       .from(aiUsageTracking)
+//       .groupBy(aiUsageTracking.model, aiUsageTracking.operation)
+//       .orderBy(desc(sql`SUM(${aiUsageTracking.costUsd})`));
+
+//     // Get usage by time period (last 30 days)
+//     const thirtyDaysAgo = new Date();
+//     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+//     const dailyUsage = await db
+//       .select({
+//         date: sql<string>`DATE(${aiUsageTracking.createdAt})`,
+//         totalTokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         totalCostCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         requests: sql<number>`COUNT(*)::integer`,
+//       })
+//       .from(aiUsageTracking)
+//       .where(gte(aiUsageTracking.createdAt, thirtyDaysAgo))
+//       .groupBy(sql`DATE(${aiUsageTracking.createdAt})`)
+//       .orderBy(desc(sql`DATE(${aiUsageTracking.createdAt})`));
+
+//     // Get current month usage
+//     const startOfMonth = new Date();
+//     startOfMonth.setDate(1);
+//     startOfMonth.setHours(0, 0, 0, 0);
+
+//     const [monthlyStats] = await db
+//       .select({
+//         totalTokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         totalCostCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         totalRequests: sql<number>`COUNT(*)::integer`,
+//       })
+//       .from(aiUsageTracking)
+//       .where(gte(aiUsageTracking.createdAt, startOfMonth));
+
+//     // Check which system keys are configured
+//     const systemKeysStatus = {
+//       openai: !!process.env.OPENAI_API_KEY,
+//       anthropic: !!process.env.ANTHROPIC_API_KEY,
+//       google: !!process.env.GOOGLE_AI_API_KEY,
+//       googlePageSpeed: !!process.env.GOOGLE_PAGESPEED_API_KEY,
+//       cloudinary: !!process.env.CLOUDINARY_API_KEY,
+//     };
+
+//     // Calculate estimated costs per provider
+//     const providerCosts = systemUsage.reduce((acc: any, usage: any) => {
+//       const provider = usage.model.includes('gpt') ? 'openai' : 
+//                       usage.model.includes('claude') ? 'anthropic' : 
+//                       usage.model.includes('gemini') ? 'google' : 'other';
+      
+//       if (!acc[provider]) {
+//         acc[provider] = { tokens: 0, costCents: 0, requests: 0 };
+//       }
+      
+//       acc[provider].tokens += usage.totalTokens;
+//       acc[provider].costCents += usage.totalCostCents;
+//       acc[provider].requests += usage.usageCount;
+      
+//       return acc;
+//     }, {});
+
+//     res.json({
+//       systemKeysStatus,
+//       usageByModel: systemUsage,
+//       dailyUsage,
+//       monthlyStats: monthlyStats || { totalTokens: 0, totalCostCents: 0, totalRequests: 0 },
+//       providerCosts,
+//       currentDate: new Date().toISOString(),
+//       billingPeriod: {
+//         start: startOfMonth.toISOString(),
+//         end: new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0).toISOString()
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Failed to fetch system API usage:", error);
+//     res.status(500).json({ message: "Failed to fetch system API usage" });
+//   }
+// });
+
+// // Get per-user API usage (admin only)
+// app.get("/api/admin/users-api-usage", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     // Get usage grouped by user
+//     const userUsage = await db
+//       .select({
+//         userId: aiUsageTracking.userId,
+//         username: users.username,
+//         email: users.email,
+//         totalTokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         totalCostCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         requestCount: sql<number>`COUNT(*)::integer`,
+//         lastUsed: sql<Date>`MAX(${aiUsageTracking.createdAt})`,
+//       })
+//       .from(aiUsageTracking)
+//       .innerJoin(users, eq(aiUsageTracking.userId, users.id))
+//       .groupBy(aiUsageTracking.userId, users.username, users.email)
+//       .orderBy(desc(sql`SUM(${aiUsageTracking.costUsd})`));
+
+//     // Get detailed breakdown for each user
+//     const userBreakdowns = await Promise.all(
+//       userUsage.map(async (user) => {
+//         const breakdown = await db
+//           .select({
+//             model: aiUsageTracking.model,
+//             operation: aiUsageTracking.operation,
+//             tokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//             costCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//             requests: sql<number>`COUNT(*)::integer`,
+//           })
+//           .from(aiUsageTracking)
+//           .where(eq(aiUsageTracking.userId, user.userId))
+//           .groupBy(aiUsageTracking.model, aiUsageTracking.operation);
+
+//         return {
+//           ...user,
+//           breakdown
+//         };
+//       })
+//     );
+
+//     // Get current month usage per user
+//     const startOfMonth = new Date();
+//     startOfMonth.setDate(1);
+//     startOfMonth.setHours(0, 0, 0, 0);
+
+//     const monthlyUserUsage = await db
+//       .select({
+//         userId: aiUsageTracking.userId,
+//         username: users.username,
+//         monthlyTokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         monthlyCostCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         monthlyRequests: sql<number>`COUNT(*)::integer`,
+//       })
+//       .from(aiUsageTracking)
+//       .innerJoin(users, eq(aiUsageTracking.userId, users.id))
+//       .where(gte(aiUsageTracking.createdAt, startOfMonth))
+//       .groupBy(aiUsageTracking.userId, users.username)
+//       .orderBy(desc(sql`SUM(${aiUsageTracking.costUsd})`));
+
+//     res.json({
+//       userUsage: userBreakdowns,
+//       monthlyUserUsage,
+//       totalUsers: userUsage.length,
+//       billingPeriod: {
+//         start: startOfMonth.toISOString(),
+//         end: new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0).toISOString()
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Failed to fetch per-user API usage:", error);
+//     res.status(500).json({ message: "Failed to fetch per-user API usage" });
+//   }
+// });
+
+// // Get specific user's API usage details (admin only)
+// app.get("/api/admin/users/:userId/api-usage", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const { userId } = req.params;
+    
+//     // Get user info
+//     const user = await storage.getUser(userId);
+//     if (!user) {
+//       res.status(404).json({ message: "User not found" });
+//       return;
+//     }
+
+//     // Get usage summary
+//     const [summary] = await db
+//       .select({
+//         totalTokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         totalCostCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         totalRequests: sql<number>`COUNT(*)::integer`,
+//         firstUsed: sql<Date>`MIN(${aiUsageTracking.createdAt})`,
+//         lastUsed: sql<Date>`MAX(${aiUsageTracking.createdAt})`,
+//       })
+//       .from(aiUsageTracking)
+//       .where(eq(aiUsageTracking.userId, userId));
+
+//     // Get usage by model
+//     const modelUsage = await db
+//       .select({
+//         model: aiUsageTracking.model,
+//         tokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         costCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         requests: sql<number>`COUNT(*)::integer`,
+//       })
+//       .from(aiUsageTracking)
+//       .where(eq(aiUsageTracking.userId, userId))
+//       .groupBy(aiUsageTracking.model)
+//       .orderBy(desc(sql`SUM(${aiUsageTracking.costUsd})`));
+
+//     // Get usage by operation
+//     const operationUsage = await db
+//       .select({
+//         operation: aiUsageTracking.operation,
+//         tokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         costCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         requests: sql<number>`COUNT(*)::integer`,
+//       })
+//       .from(aiUsageTracking)
+//       .where(eq(aiUsageTracking.userId, userId))
+//       .groupBy(aiUsageTracking.operation)
+//       .orderBy(desc(sql`COUNT(*)`));
+
+//     // Get daily usage for last 30 days
+//     const thirtyDaysAgo = new Date();
+//     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+//     const dailyUsage = await db
+//       .select({
+//         date: sql<string>`DATE(${aiUsageTracking.createdAt})`,
+//         tokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)::integer`,
+//         costCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)::integer`,
+//         requests: sql<number>`COUNT(*)::integer`,
+//       })
+//       .from(aiUsageTracking)
+//       .where(
+//         and(
+//           eq(aiUsageTracking.userId, userId),
+//           gte(aiUsageTracking.createdAt, thirtyDaysAgo)
+//         )
+//       )
+//       .groupBy(sql`DATE(${aiUsageTracking.createdAt})`)
+//       .orderBy(desc(sql`DATE(${aiUsageTracking.createdAt})`));
+
+//     res.json({
+//       user: {
+//         id: user.id,
+//         username: user.username,
+//         email: user.email,
+//       },
+//       summary,
+//       modelUsage,
+//       operationUsage,
+//       dailyUsage,
+//     });
+//   } catch (error) {
+//     console.error("Failed to fetch user API usage:", error);
+//     res.status(500).json({ message: "Failed to fetch user API usage" });
+//   }
+// });
+
+
 
 // Add this endpoint to your Express server after the existing /api/admin/users-api-usage endpoint
 
@@ -2938,6 +3193,67 @@ app.get("/api/admin/system-api-usage", requireAdmin, async (req: Request, res: R
     }
   });
 
+//   app.get("/api/user/api-keys/status", requireAuth, async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const userId = req.user!.id;
+//     const userKeys = await storage.getUserApiKeys(userId);
+    
+//     const providers: any = {
+//       openai: { configured: false, keyName: null, status: "not_configured", usage: null },
+//       anthropic: { configured: false, keyName: null, status: "not_configured", usage: null },
+//       google_pagespeed: { configured: false, keyName: null, status: "not_configured", usage: null }
+//     };
+    
+//     // Check user keys
+//     for (const key of userKeys) {
+//       if (key.isActive && providers[key.provider as keyof typeof providers]) {
+//         const providerStatus = providers[key.provider as keyof typeof providers];
+//         const usageStats = await storage.getApiKeyUsageStats(userId, key.provider);
+        
+//         providerStatus.configured = true;
+//         providerStatus.keyName = key.keyName;
+//         providerStatus.status = key.validationStatus === 'valid' ? 'active' : 'invalid';
+//         providerStatus.keyId = key.id;
+//         providerStatus.usage = {
+//           totalUsageCount: key.usageCount || 0,
+//           totalTokens: usageStats.userKeyUsage.tokens,
+//           totalCostCents: usageStats.userKeyUsage.costCents,
+//           lastUsed: key.lastUsed,
+//         };
+//       }
+//     }
+    
+//     // Check system keys and add their usage
+//     for (const [provider, envVar] of Object.entries({
+//       openai: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR,
+//       anthropic: process.env.ANTHROPIC_API_KEY,
+//       google_pagespeed: process.env.GOOGLE_PAGESPEED_API_KEY
+//     })) {
+//       if (envVar && !providers[provider].configured) {
+//         const usageStats = await storage.getApiKeyUsageStats(userId, provider);
+//         providers[provider] = {
+//           configured: true,
+//           keyName: `System ${provider.replace('_', ' ')} Key`,
+//           status: "system",
+//           keyId: `system-${provider}`,
+//           usage: {
+//             totalUsageCount: usageStats.systemKeyUsage.operations,
+//             totalTokens: usageStats.systemKeyUsage.tokens,
+//             totalCostCents: usageStats.systemKeyUsage.costCents,
+//             lastUsed: null,
+//           }
+//         };
+//       }
+//     }
+    
+//     res.json({ providers });
+//   } catch (error) {
+//     console.error("Failed to fetch API key status:", error);
+//     res.status(500).json({ message: "Failed to fetch API key status" });
+//   }
+// });
+
+// Fixed API Key Status Endpoint
 // This replaces the existing /api/user/api-keys/status endpoint in your routes file
 
 app.get("/api/user/api-keys/status", requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -5614,105 +5930,7 @@ function convertLocalTimeToUTC(localTime: string, timezone: string): string {
   // ===========================================================================
   // AI FIX ROUTES
   // ===========================================================================
-  // Start AI fix job (returns immediately)
-app.post('/api/user/websites/:id/ai-fix', async (req, res) => {
-  try {
-    const { id: websiteId } = req.params;
-    const { dryRun = false } = req.body;
-    const userId = req.user?.id;
-
-    // Create a job ID
-    const jobId = randomUUID();
-    
-    // Store job status
-    await storage.createJob({
-      id: jobId,
-      userId,
-      websiteId,
-      type: 'ai-fix',
-      status: 'queued',
-      metadata: { dryRun }
-    });
-
-    // Start the job asynchronously (don't await)
-    aiFixService.analyzeAndFixWebsite(websiteId, userId, dryRun, {
-      fixTypes: req.body.fixTypes,
-      maxChanges: req.body.maxChanges,
-      skipBackup: req.body.skipBackup,
-      enableReanalysis: req.body.enableReanalysis,
-    }).then(result => {
-      // Update job status on completion
-      storage.updateJob(jobId, {
-        status: result.success ? 'completed' : 'failed',
-        result,
-        completedAt: new Date()
-      });
-    }).catch(error => {
-      storage.updateJob(jobId, {
-        status: 'failed',
-        error: error.message,
-        completedAt: new Date()
-      });
-    });
-
-    // Return immediately with job ID
-    res.json({
-      success: true,
-      jobId,
-      message: 'AI fix job started',
-      statusUrl: `/api/jobs/${jobId}`
-    });
-
-  } catch (error: any) {
-    const origin = req.headers.origin as string | undefined;
-    if (origin && isOriginAllowed(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
-
-// Check job status
-app.get('/api/jobs/:jobId', async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    const job = await storage.getJob(jobId);
-    
-    if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Job not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      job: {
-        id: job.id,
-        status: job.status,
-        progress: job.progress || 0,
-        result: job.result,
-        error: job.error,
-        createdAt: job.createdAt,
-        completedAt: job.completedAt
-      }
-    });
-
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
-
-
-
+  
   app.post("/api/user/websites/:id/ai-fix", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user!.id;
