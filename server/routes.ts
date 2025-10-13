@@ -5930,7 +5930,105 @@ function convertLocalTimeToUTC(localTime: string, timezone: string): string {
   // ===========================================================================
   // AI FIX ROUTES
   // ===========================================================================
-  
+  // Start AI fix job (returns immediately)
+app.post('/api/user/websites/:id/ai-fix', async (req, res) => {
+  try {
+    const { id: websiteId } = req.params;
+    const { dryRun = false } = req.body;
+    const userId = req.user?.id;
+
+    // Create a job ID
+    const jobId = randomUUID();
+    
+    // Store job status
+    await storage.createJob({
+      id: jobId,
+      userId,
+      websiteId,
+      type: 'ai-fix',
+      status: 'queued',
+      metadata: { dryRun }
+    });
+
+    // Start the job asynchronously (don't await)
+    aiFixService.analyzeAndFixWebsite(websiteId, userId, dryRun, {
+      fixTypes: req.body.fixTypes,
+      maxChanges: req.body.maxChanges,
+      skipBackup: req.body.skipBackup,
+      enableReanalysis: req.body.enableReanalysis,
+    }).then(result => {
+      // Update job status on completion
+      storage.updateJob(jobId, {
+        status: result.success ? 'completed' : 'failed',
+        result,
+        completedAt: new Date()
+      });
+    }).catch(error => {
+      storage.updateJob(jobId, {
+        status: 'failed',
+        error: error.message,
+        completedAt: new Date()
+      });
+    });
+
+    // Return immediately with job ID
+    res.json({
+      success: true,
+      jobId,
+      message: 'AI fix job started',
+      statusUrl: `/api/jobs/${jobId}`
+    });
+
+  } catch (error: any) {
+    const origin = req.headers.origin as string | undefined;
+    if (origin && isOriginAllowed(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Check job status
+app.get('/api/jobs/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = await storage.getJob(jobId);
+    
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      job: {
+        id: job.id,
+        status: job.status,
+        progress: job.progress || 0,
+        result: job.result,
+        error: job.error,
+        createdAt: job.createdAt,
+        completedAt: job.completedAt
+      }
+    });
+
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+
+
   app.post("/api/user/websites/:id/ai-fix", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user!.id;

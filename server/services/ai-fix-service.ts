@@ -2292,38 +2292,7 @@ private ensureImagesPreserved(
   return $final.html() || content;
 }
 
-  // private extractImages(html: string): Array<{ src: string; element: string }> {
-  //   const images: Array<{ src: string; element: string }> = [];
-  //   const imgRegex = /<img[^>]*>/gi;
-  //   const matches = html.match(imgRegex) || [];
 
-  //   for (const match of matches) {
-  //     const srcMatch = match.match(/src=["']([^"']+)["']/i);
-  //     if (srcMatch) {
-  //       images.push({
-  //         src: srcMatch[1],
-  //         element: match,
-  //       });
-  //     }
-  //   }
-  //   return images;
-  // }
-
-  // private ensureImagesPreserved(
-  //   processedContent: string,
-  //   originalImages: Array<{ src: string; element: string }>
-  // ): string {
-  //   for (const img of originalImages) {
-  //     if (
-  //       img.src.includes("cloudinary") &&
-  //       !processedContent.includes(img.src)
-  //     ) {
-  //       console.warn(`⚠️ Cloudinary image lost during processing: ${img.src}`);
-  //       processedContent = img.element + "\n" + processedContent;
-  //     }
-  //   }
-  //   return processedContent;
-  // }
 
   private async fetchPriorityContent(
     creds: WordPressCredentials,
@@ -2690,55 +2659,7 @@ Improve it significantly while keeping it natural.`;
     return this.applyBasicContentImprovements(content);
   }
 }
-//   private async improveContent(
-//     content: string,
-//     title: string,
-//     improvements: string[],
-//     userId?: string
-//   ): Promise<string> {
-//     const provider = await this.selectAIProvider(userId);
-//     if (!provider) {
-//       return this.applyBasicContentImprovements(content);
-//     }
 
-//     try {
-//       const systemPrompt = `You are an expert content writer improving content quality.
-
-// CRITICAL RULES:
-// - Return ONLY the improved HTML content
-// - NO preambles, explanations, or meta-commentary
-// - Start directly with HTML tags
-// - Write naturally like a human expert
-// - Improve readability, structure, and value
-// - Add relevant examples and details
-// - Keep all existing images and links intact
-// - Maintain original tone and style`;
-
-//       const userPrompt = `Improve this content based on these suggestions:
-// ${improvements.map((imp, i) => `${i + 1}. ${imp}`).join("\n")}
-
-// Title: ${title}
-// Content: ${content}
-
-// Improve it significantly while keeping it natural.`;
-
-//       const improved = await this.callAIProvider(
-//         provider,
-//         systemPrompt,
-//         userPrompt,
-//         3000,
-//         0.7,
-//         userId
-//       );
-
-//       const cleaned = this.removeAIArtifacts(improved);
-//       const humanized = this.humanizeContent(cleaned);
-//       return this.cleanAndValidateContent(humanized);
-//     } catch (error: any) {
-//       this.addLog(`Content improvement failed: ${error.message}`, "warning");
-//       return this.applyBasicContentImprovements(content);
-//     }
-//   }
 
   private async optimizeKeywordDistribution(
     content: string,
@@ -3113,181 +3034,6 @@ Remember: The expanded content MUST be at least ${minimumWords} words.`;
   return cleaned;
 }
 
-// private async expandContentWithAI(
-//   title: string,
-//   currentContent: string,
-//   provider: string,
-//   userId?: string,
-//   minimumWords: number = 800,
-//   idealWords: number = 1200,
-//   isRetry: boolean = false
-// ): Promise<string> {
-//   const currentWordCount = this.extractTextFromHTML(currentContent)
-//     .split(/\s+/)
-//     .filter(w => w.length > 0).length;
-  
-//   const wordsNeeded = Math.max(minimumWords - currentWordCount, 400);
-//   const targetWordCount = Math.max(idealWords, currentWordCount + wordsNeeded);
-
-//   this.addLog(
-//     `Content expansion: ${currentWordCount} words → target ${targetWordCount} words (minimum ${minimumWords})`,
-//     "info"
-//   );
-
-//   const systemPrompt = `You are an expert content writer who creates comprehensive, valuable content.
-
-// CRITICAL REQUIREMENTS:
-// 1. The final output MUST be AT LEAST ${minimumWords} words (target: ${targetWordCount} words)
-// 2. PRESERVE 100% of the existing content - NEVER remove or significantly alter existing text
-// 3. ADD substantial new sections and paragraphs to reach the word count
-// 4. Quality over quantity - but you MUST hit the word count target
-// 5. Return ONLY the expanded HTML content - NO preambles, explanations, or meta-commentary
-
-// EXPANSION STRATEGY:
-// ${isRetry ? `
-// ⚠️ RETRY ATTEMPT - Previous expansion was insufficient
-// - Be MORE aggressive with expansion
-// - Add MORE detailed sections
-// - Include MORE examples and explanations
-// ` : `
-// - Add detailed explanations and context
-// - Include practical examples and use cases
-// - Add expert insights and industry perspectives
-// - Provide step-by-step guidance where relevant
-// - Address common questions and concerns
-// - Include relevant statistics and data points
-// - Add comparison and analysis sections
-// `}
-
-// WORD COUNT VALIDATION:
-// - Current: ${currentWordCount} words
-// - Need to add: ${wordsNeeded}+ words
-// - Target total: ${targetWordCount} words
-// - Absolute minimum: ${minimumWords} words`;
-
-//   const userPrompt = `Expand this ${currentWordCount}-word content to AT LEAST ${minimumWords} words (ideally ${targetWordCount} words):
-
-// Title: ${title}
-
-// Current Content:
-// ${currentContent}
-
-// EXPANSION REQUIREMENTS:
-// 1. Keep ALL existing content intact
-// 2. Add ${isRetry ? 'SUBSTANTIAL' : 'comprehensive'} new sections covering:
-//    ${isRetry ? `
-//    • Deep-dive analysis of key concepts
-//    • Multiple detailed examples with specific scenarios
-//    • Expert perspectives and industry insights
-//    • Common challenges and detailed solutions
-//    • Advanced tips and best practices
-//    • Comparative analysis and alternatives
-//    • Future trends and predictions
-//    • Real-world case studies
-//    ` : `
-//    • Detailed explanations of key points
-//    • Practical examples and real-world applications
-//    • Step-by-step guides and tutorials
-//    • Common questions and comprehensive answers
-//    • Benefits, challenges, and solutions
-//    • Expert tips and best practices
-//    • Related concepts and deeper context
-//    `}
-
-// 3. Organize new content with proper HTML structure (h2, h3, p tags)
-// 4. Ensure natural flow and readability
-// 5. Make content genuinely valuable and informative
-
-// ${isRetry ? '⚠️ IMPORTANT: This is a retry - you MUST be more aggressive with expansion to reach the word count!' : ''}
-
-// Remember: The expanded content MUST be at least ${minimumWords} words. Do not under-deliver on word count.`;
-
-//   const response = await this.callAIProvider(
-//     provider,
-//     systemPrompt,
-//     userPrompt,
-//     isRetry ? 6000 : 5000, // More tokens for retry
-//     0.7,
-//     userId
-//   );
-
-//   const cleaned = this.cleanAndValidateContent(response);
-  
-//   // Validate word count
-//   const finalWordCount = this.extractTextFromHTML(cleaned)
-//     .split(/\s+/)
-//     .filter(w => w.length > 0).length;
-  
-//   this.addLog(
-//     `AI expansion result: ${currentWordCount} → ${finalWordCount} words (${isRetry ? 'retry' : 'initial'} attempt)`,
-//     finalWordCount >= minimumWords ? "success" : "warning"
-//   );
-
-//   // Validate content wasn't reduced
-//   if (finalWordCount < currentWordCount) {
-//     throw new Error(
-//       `Content expansion failed: ${currentWordCount} → ${finalWordCount} words. AI removed content instead of adding.`
-//     );
-//   }
-
-//   return cleaned;
-// }
-
-
-//   private async expandContentWithAI(
-//     title: string,
-//     currentContent: string,
-//     provider: string,
-//     userId?: string
-//   ): Promise<string> {
-//     const currentWordCount = this.extractTextFromHTML(currentContent).split(/\s+/).length;
-    
-//     const systemPrompt = `You are a content expansion specialist.
-
-// CRITICAL RULES:
-// 1. PRESERVE 100% of existing content - never remove anything
-// 2. ADD new paragraphs, sections, and examples
-// 3. Target: ${Math.max(1000, currentWordCount + 400)}-${Math.max(1500, currentWordCount + 700)} words
-// 4. Return ONLY expanded HTML
-// 5. NO preambles or explanations
-
-// The expanded content MUST be longer than ${currentWordCount} words.`;
-
-//     const userPrompt = `Expand this ${currentWordCount}-word content to at least 1000 words by ADDING valuable information:
-
-// Title: ${title}
-// Existing Content: ${currentContent}
-
-// IMPORTANT: 
-// - Keep EVERYTHING that exists
-// - ADD new sections on:
-//   * Practical examples and use cases
-//   * Expert insights and data
-//   * Common questions and answers
-//   * Step-by-step guidance
-//   * Additional context and background`;
-
-//     const expanded = await this.callAIProvider(
-//       provider,
-//       systemPrompt,
-//       userPrompt,
-//       4000,
-//       0.7,
-//       userId
-//     );
-
-//     const cleaned = this.cleanAndValidateContent(expanded);
-//     const newWordCount = this.extractTextFromHTML(cleaned).split(/\s+/).length;
-    
-//     if (newWordCount <= currentWordCount) {
-//       throw new Error(`Content expansion failed: ${currentWordCount} → ${newWordCount} words. AI may have removed content instead of adding.`);
-//     }
-    
-//     return cleaned;
-//   }
-
-
-
 private async improveEAT(
   creds: WordPressCredentials,
   fixes: AIFix[],
@@ -3347,63 +3093,6 @@ Add credible elements while maintaining the original structure.`;
     userId
   );
 }
-//   private async improveEAT(
-//     creds: WordPressCredentials,
-//     fixes: AIFix[],
-//     userId?: string
-//   ): Promise<{ applied: AIFix[]; errors: string[] }> {
-//     return this.fixWordPressContent(
-//       creds,
-//       fixes,
-//       async (content, fix) => {
-//         const title = content.title?.rendered || content.title || "";
-//         const contentHtml = content.content?.rendered || content.content || "";
-        
-//         const provider = await this.selectAIProvider(userId);
-//         if (!provider) {
-//           return {
-//             updated: false,
-//             data: {},
-//             description: "AI provider not available"
-//           };
-//         }
-
-//         const systemPrompt = `You are enhancing content with E-E-A-T signals (Experience, Expertise, Authoritativeness, Trustworthiness).
-
-// Add to the existing content:
-// 1. Expert insights and data points
-// 2. References to credible sources
-// 3. Author perspective or experience
-// 4. Clear, well-researched explanations
-// 5. Transparent and verifiable information
-
-// CRITICAL: Return ONLY the enhanced HTML content. NO preambles or explanations.`;
-
-//         const userPrompt = `Enhance this content with trustworthiness and expertise signals:
-
-// Title: ${title}
-// Content: ${contentHtml.substring(0, 2000)}
-
-// Add credible elements while maintaining the original structure.`;
-
-//         const enhanced = await this.callAIProvider(
-//           provider,
-//           systemPrompt,
-//           userPrompt,
-//           3000,
-//           0.7,
-//           userId
-//         );
-
-//         return {
-//           updated: true,
-//           data: { content: this.cleanAndValidateContent(enhanced) },
-//           description: "Enhanced with expertise and trustworthiness signals"
-//         };
-//       },
-//       userId
-//     );
-//   }
 
   private async generateSchemaMarkup(
     contentType: string,
@@ -3719,12 +3408,7 @@ private removeHtmlLabel(content: string): string {
   return cleaned.trim();
 }
 
-  // private cleanAndValidateContent(content: string): string {
-  //   if (!content) return "";
 
-  //   let cleaned = this.removeHtmlLabel(content);
-  //   return cleaned;
-  // }
 
   private applyBasicContentImprovements(content: string): string {
     const $ = cheerio.load(content, this.getCheerioConfig());
@@ -3907,88 +3591,6 @@ Make it clearer and easier to read while keeping all key information.`;
   );
 }
   
-//   private async improveReadability(
-//     creds: WordPressCredentials,
-//     fixes: AIFix[],
-//     userId?: string
-//   ): Promise<{ applied: AIFix[]; errors: string[] }> {
-//     return this.fixWordPressContent(
-//       creds,
-//       fixes,
-//       async (content, fix) => {
-//         const contentHtml = content.content?.rendered || content.content || "";
-//         const $ = cheerio.load(contentHtml, this.getCheerioConfig());
-
-//         let improved = false;
-
-//         $('p').each((_, elem) => {
-//           const text = $(elem).text();
-//           if (text.length > 400) {
-//             const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-//             if (sentences.length > 2) {
-//               const mid = Math.floor(sentences.length / 2);
-//               const p1 = sentences.slice(0, mid).join(' ');
-//               const p2 = sentences.slice(mid).join(' ');
-//               $(elem).replaceWith(`<p>${p1}</p><p>${p2}</p>`);
-//               improved = true;
-//             }
-//           }
-//         });
-
-//         if (!improved) {
-//           const provider = await this.selectAIProvider(userId);
-//           if (provider) {
-//             const systemPrompt = `Rewrite content for better readability (target: 60+ Flesch score, 8th-9th grade level).
-
-// Rules:
-// - Use shorter sentences (15-20 words max)
-// - Replace complex words with simpler alternatives
-// - Use active voice
-// - Add transition words
-// - Break up dense paragraphs
-// - Return ONLY the rewritten HTML`;
-
-//             const userPrompt = `Improve readability of this content:
-
-// ${contentHtml}
-
-// Make it clearer and easier to read while keeping all key information.`;
-
-//             const rewritten = await this.callAIProvider(
-//               provider,
-//               systemPrompt,
-//               userPrompt,
-//               3000,
-//               0.6,
-//               userId
-//             );
-
-//             return {
-//               updated: true,
-//               data: { content: this.cleanAndValidateContent(rewritten) },
-//               description: "Improved readability (simpler language, shorter sentences)"
-//             };
-//           }
-//         }
-
-//         if (improved) {
-//           return {
-//             updated: true,
-//             data: { content: this.extractHtmlContent($) },
-//             description: "Broke up long paragraphs for better readability"
-//           };
-//         }
-
-//         return {
-//           updated: false,
-//           data: {},
-//           description: "Content readability already acceptable"
-//         };
-//       },
-//       userId
-//     );
-//   }
-
   // ==================== ISSUE MANAGEMENT ====================
 
   private async resetStuckFixingIssues(

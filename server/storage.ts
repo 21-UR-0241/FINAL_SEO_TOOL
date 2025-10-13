@@ -769,10 +769,6 @@ async deleteWebsite(id: string): Promise<boolean> {
     throw error;
   }
 }
-  // async deleteWebsite(id: string): Promise<boolean> {
-  //   const result = await db.delete(websites).where(eq(websites.id, id));
-  //   return (result.rowCount ?? 0) > 0;
-  // }
 
   async validateWebsiteOwnership(websiteId: string, userId: string): Promise<boolean> {
     const website = await this.getUserWebsite(websiteId, userId);
@@ -986,16 +982,6 @@ async updateContentImage(imageId: string, updates: Partial<{
   
   return updated || null;
 }
-
-// Get images by user (for dashboard/analytics)
-// async getUserContentImages(userId: string, limit: number = 50): Promise<ContentImage[]> {
-//   return db
-//     .select()
-//     .from(contentImages)
-//     .where(eq(contentImages.userId, userId))
-//     .orderBy(desc(contentImages.createdAt))
-//     .limit(limit);
-// }
 
 // Delete content images (cascade when content is deleted)
 async deleteContentImages(contentId: string): Promise<void> {
@@ -1572,34 +1558,6 @@ async bulkDeleteReports(reportIds: string[], userId: string): Promise<number> {
   }
 
 
-
-
-
-
-
-
-
-
-
-// Get all client reports for a user across all their websites
-// async getUserClientReports(userId: string): Promise<ClientReport[]> {
-//   try {
-//     const reports = await db
-//       .select({
-//         report: clientReports
-//       })
-//       .from(clientReports)
-//       .innerJoin(websites, eq(clientReports.websiteId, websites.id))
-//       .where(eq(websites.userId, userId))
-//       .orderBy(desc(clientReports.generatedAt));
-    
-//     return reports.map(r => r.report);
-//   } catch (error) {
-//     console.error(`Error fetching user client reports:`, error);
-//     throw error;
-//   }
-// }
-
   // Enhanced Security and Management Features
   async createContentApproval(approval: InsertContentApproval & { userId: string }): Promise<ContentApproval> {
     const [approvalRecord] = await db
@@ -1645,56 +1603,7 @@ async bulkDeleteReports(reportIds: string[], userId: string): Promise<number> {
   return usageRecord;
 }
 
-// async getApiKeyUsageStats(userId: string, provider: string): Promise<{
-//   totalTokens: number;
-//   totalCostCents: number;
-//   operationsCount: number;
-//   userKeyUsage: {
-//     tokens: number;
-//     costCents: number;
-//     operations: number;
-//   };
-//   systemKeyUsage: {
-//     tokens: number;
-//     costCents: number;
-//     operations: number;
-//   };
-// }> {
-//   const usage = await db
-//     .select({
-//       keyType: aiUsageTracking.keyType,
-//       totalTokens: sql<number>`COALESCE(SUM(${aiUsageTracking.tokensUsed}), 0)`,
-//       totalCostCents: sql<number>`COALESCE(SUM(${aiUsageTracking.costUsd}), 0)`,
-//       operationsCount: sql<number>`COUNT(*)`,
-//     })
-//     .from(aiUsageTracking)
-//     .where(
-//       and(
-//         eq(aiUsageTracking.userId, userId),
-//         sql`${aiUsageTracking.model} LIKE ${provider === 'openai' ? 'gpt%' : provider === 'anthropic' ? 'claude%' : '%'}`
-//       )
-//     )
-//     .groupBy(aiUsageTracking.keyType);
 
-//   const userUsage = usage.find(u => u.keyType === 'user') || { totalTokens: 0, totalCostCents: 0, operationsCount: 0 };
-//   const systemUsage = usage.find(u => u.keyType === 'system') || { totalTokens: 0, totalCostCents: 0, operationsCount: 0 };
-
-//   return {
-//     totalTokens: Number(userUsage.totalTokens) + Number(systemUsage.totalTokens),
-//     totalCostCents: Number(userUsage.totalCostCents) + Number(systemUsage.totalCostCents),
-//     operationsCount: Number(userUsage.operationsCount) + Number(systemUsage.operationsCount),
-//     userKeyUsage: {
-//       tokens: Number(userUsage.totalTokens),
-//       costCents: Number(userUsage.totalCostCents),
-//       operations: Number(userUsage.operationsCount),
-//     },
-//     systemKeyUsage: {
-//       tokens: Number(systemUsage.totalTokens),
-//       costCents: Number(systemUsage.totalCostCents),
-//       operations: Number(systemUsage.operationsCount),
-//     },
-//   };
-// }
 
   async createSeoAudit(audit: InsertSeoAudit & { userId: string }): Promise<SeoAudit> {
     const [auditRecord] = await db
@@ -1715,16 +1624,6 @@ async bulkDeleteReports(reportIds: string[], userId: string): Promise<number> {
       .orderBy(desc(contentSchedule.scheduledDate));
   }
 
-  // async createContentSchedule(schedule: InsertContentSchedule & { userId: string }): Promise<ContentSchedule> {
-  //   const [scheduleRecord] = await db
-  //     .insert(contentSchedule)
-  //     .values({
-  //       ...schedule,
-  //       userId: schedule.userId
-  //     })
-  //     .returning();
-  //   return scheduleRecord;
-  // }
 
   async createBackup(backup: InsertBackup & { userId: string }): Promise<Backup> {
     const [backupRecord] = await db
@@ -1960,17 +1859,6 @@ async isContentScheduled(contentId: string): Promise<boolean> {
   return !!schedule;
 }
 
-
-
-
-
-
-
-
-
-
-// Final working version with required topic field
-// Place this in your DatabaseStorage class in storage.ts
 
 async createContentSchedule(data: {
   contentId?: string;
@@ -3940,6 +3828,44 @@ async getScheduledTasks(websiteId: string, userId: string): Promise<ScheduledTas
             task.userId === userId &&
             task.status === 'pending'
   );
+}
+
+
+
+
+async createJob(job: {
+  id: string;
+  userId: string;
+  websiteId: string;
+  type: string;
+  status: string;
+  metadata?: any;
+}) {
+  const result = await this.db.insert(jobs).values({
+    ...job,
+    createdAt: new Date()
+  });
+  return result;
+}
+
+async updateJob(jobId: string, updates: {
+  status?: string;
+  progress?: number;
+  result?: any;
+  error?: string;
+  logs?: any[];
+  completedAt?: Date;
+}) {
+  await this.db.update(jobs)
+    .set(updates)
+    .where(eq(jobs.id, jobId));
+}
+
+async getJob(jobId: string) {
+  const result = await this.db.query.jobs.findFirst({
+    where: eq(jobs.id, jobId)
+  });
+  return result;
 }
   
 

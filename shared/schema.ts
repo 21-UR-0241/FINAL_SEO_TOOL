@@ -1528,6 +1528,22 @@ export const insertGscPerformanceDataSchema = createInsertSchema(gscPerformanceD
 // TYPE EXPORTS - CORE USER
 // ============================================================================
 
+export const jobs = pgTable('jobs', {
+  id: uuid('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  websiteId: text('website_id').notNull(),
+  type: text('type').notNull(), // 'ai-fix', 'seo-analysis', etc.
+  status: text('status').notNull(), // 'queued', 'running', 'completed', 'failed'
+  progress: integer('progress').default(0), // 0-100
+  metadata: jsonb('metadata'), // Initial job parameters
+  result: jsonb('result'), // Final result data
+  error: text('error'), // Error message if failed
+  logs: jsonb('logs'), // Array of log messages
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  completedAt: timestamp('completed_at'),
+});
+
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UpsertUser = typeof users.$inferInsert;

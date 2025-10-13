@@ -350,6 +350,41 @@ app.use('/api/gsc/auth', authLimiter);
 app.use('/api/gsc/auth-url', authLimiter);
 app.use('/api/gsc/oauth-callback', authLimiter);
 
+
+
+// =============================================================================
+// REQUEST TIMEOUT HANDLER (before routes)
+// =============================================================================
+
+app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  // Set timeout for long-running operations
+  const timeout = req.path.includes('/ai-fix') ? 300000 : 60000; // 5 min for AI fix, 1 min for others
+  
+  req.setTimeout(timeout);
+  res.setTimeout(timeout);
+  
+  const timeoutHandler = () => {
+    if (!res.headersSent) {
+      // Ensure CORS headers on timeout
+      const origin = req.headers.origin as string | undefined;
+      if (origin && isOriginAllowed(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+      
+      res.status(504).json({
+        success: false,
+        message: 'Request timeout - operation took too long',
+        error: 'The operation exceeded the maximum allowed time. For AI fixes, this usually means the operation is still running in the background.',
+      });
+    }
+  };
+  
+  req.on('timeout', timeoutHandler);
+  res.on('timeout', timeoutHandler);
+  
+  next();
+});
 // =============================================================================
 // LOGGING (lightweight)
 // =============================================================================
