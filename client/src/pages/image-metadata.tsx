@@ -24,10 +24,8 @@ import {
   Download,
 } from "lucide-react";
 
-// Enhanced API with crawling support
-// Add this at the very top, after imports
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://final-seo-tool.onrender.com';
-// Enhanced API with crawling support
+
 const api = {
   async getContentImages(websiteId?: string) {
     const url = websiteId
@@ -35,7 +33,9 @@ const api = {
       : `${API_BASE_URL}/api/images/content-images`;
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        credentials: 'include',  // ← ADD THIS
+      });
       const contentType = response.headers.get("content-type");
 
       if (!response.ok) {
@@ -63,6 +63,7 @@ const api = {
       const response = await fetch(`${API_BASE_URL}/api/images/crawl`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',  // ← ADD THIS
         body: JSON.stringify({ url, options }),
       });
 
@@ -87,6 +88,7 @@ const api = {
       const response = await fetch(`${API_BASE_URL}/api/images/batch-process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',  // ← ADD THIS
         body: JSON.stringify({ imageIds, options, imageUrls }),
       });
 
@@ -109,7 +111,9 @@ const api = {
 
   async getWebsites() {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/user/websites`);
+      const response = await fetch(`${API_BASE_URL}/api/user/websites`, {
+        credentials: 'include',  // ← ADD THIS
+      });
       const contentType = response.headers.get("content-type");
 
       if (!response.ok) {
@@ -130,7 +134,10 @@ const api = {
   async getImageStatus(contentId: string) {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/images/batch-process?contentId=${contentId}`
+        `${API_BASE_URL}/api/images/batch-process?contentId=${contentId}`,
+        {
+          credentials: 'include',  // ← ADD THIS
+        }
       );
 
       if (!response.ok) {
@@ -144,6 +151,7 @@ const api = {
     }
   },
 };
+
 
 // Utility functions
 const formatFileSize = (bytes: number) => {
