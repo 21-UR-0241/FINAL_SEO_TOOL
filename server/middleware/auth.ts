@@ -32,9 +32,8 @@
 //   return res.status(401).json({ error: 'Authentication required' });
 // };
 
-
 import { Request, Response, NextFunction } from "express";
-import { db } from "../db/index.js";
+import { db } from "../db";
 
 // Extend Express Request type to include user
 declare global {
