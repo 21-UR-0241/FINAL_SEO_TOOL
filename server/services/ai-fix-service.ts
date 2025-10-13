@@ -5,7 +5,7 @@ import { wordPressAuthService } from "server/services/wordpress-auth";
 import { storage } from "server/storage";
 import { seoService } from "./seo-service";
 import * as cheerio from "cheerio";
-import { randomUUID } from "crypto";
+import crypto from "crypto";
 import { apiKeyEncryptionService } from "./api-key-encryption";
 
 // Types and Interfaces
