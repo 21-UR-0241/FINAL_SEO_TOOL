@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import cors from 'cors';
 import { schedulerService } from './services/scheduler-service.js';
+import { addCorsHeaders, isOriginAllowed } from './services/cors-utils.js';
 
 // =============================================================================
 // TYPE DECLARATIONS
@@ -100,32 +101,6 @@ const app = express();
 
 // Trust the first proxy (Render/other platforms)
 app.set('trust proxy', 1);
-
-// =============================================================================
-/* CORS CONFIG - EXPORTED FOR USE IN ROUTES */
-// =============================================================================
-
-const ALLOWED_ORIGIN_LIST = [
-  'https://final-seo-tool-a3yfd06px-nitros-projects-deeabea9.vercel.app', // prod
-  'http://localhost:3000', // dev
-];
-
-// Allow any *.vercel.app (supports multi-label previews)
-const vercelPreviewRegex = /^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i;
-
-// Helper function to check if origin is allowed - EXPORTED
-export function isOriginAllowed(origin: string | undefined): boolean {
-  if (!origin) return true; // allow curl/server-to-server/no-origin
-  return ALLOWED_ORIGIN_LIST.includes(origin) || vercelPreviewRegex.test(origin);
-}
-
-// Helper to add CORS headers - EXPORTED
-export function addCorsHeaders(res: Response, origin: string | undefined): void {
-  if (origin && isOriginAllowed(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
-}
 
 // =============================================================================
 /* HANDLE OPTIONS REQUESTS FIRST - BEFORE ANY OTHER MIDDLEWARE */
