@@ -5,9 +5,29 @@ import { wordPressAuthService } from "server/services/wordpress-auth";
 import { storage } from "server/storage";
 import { seoService } from "./seo-service";
 import * as cheerio from "cheerio";
-import crypto from "crypto";
+import { randomUUID } from "crypto";
 import { apiKeyEncryptionService } from "./api-key-encryption";
 
+
+const generateUniqueId = (): string => {
+  // Check if crypto.randomUUID is available (modern browsers)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback implementation for environments without crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// If you need to use it globally in the file, you can also create a polyfill:
+if (typeof window !== 'undefined' && typeof crypto !== 'undefined' && !crypto.randomUUID) {
+  // @ts-ignore
+  crypto.randomUUID = generateUniqueId;
+}
 // Types and Interfaces
 export interface AIFixResult {
   success: boolean;
@@ -2291,7 +2311,6 @@ private ensureImagesPreserved(
 
   return $final.html() || content;
 }
-
 
 
   private async fetchPriorityContent(

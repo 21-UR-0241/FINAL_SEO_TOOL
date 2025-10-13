@@ -27,7 +27,6 @@ import multer from 'multer';
 import { cloudinaryStorage } from "./services/cloudinary-storage";
 import {db} from './db'
 import { emailService } from './services/email-service';
-import { addCorsHeaders, isOriginAllowed } from './services/cors-utils.js';
 
 //added
 import { schedulerService } from './services/scheduler-service';
@@ -4763,6 +4762,170 @@ function convertUTCToLocalTime(utcDate: Date | string, timezone: string): string
     return new Date(utcDate).toISOString();
   }
 }
+
+  // app.get("/api/user/content-schedule", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  //   try {
+  //     const userId = req.user!.id;
+      
+  //     const websites = await storage.getUserWebsites(userId);
+  //     const allScheduledContent = [];
+      
+  //     for (const website of websites) {
+  //       const schedules = await storage.getContentScheduleWithDetails(website.id);
+  //       const schedulesWithWebsite = schedules.map(schedule => ({
+  //         ...schedule,
+  //         websiteName: website.name,
+  //         websiteUrl: website.url
+  //       }));
+  //       allScheduledContent.push(...schedulesWithWebsite);
+  //     }
+      
+  //     allScheduledContent.sort((a, b) => 
+  //       new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
+  //     );
+      
+  //     res.json(allScheduledContent);
+  //   } catch (error) {
+  //     console.error("Failed to fetch user's scheduled content:", error);
+  //     res.status(500).json({ message: "Failed to fetch scheduled content" });
+  //   }
+  // });
+
+  // app.post("/api/system/publish-scheduled-content", async (req: Request, res: Response): Promise<void> => {
+  //   try {
+  //     console.log('🕐 Running scheduled content publication check...');
+      
+  //     const overdueContent = await storage.getPendingScheduledContent();
+      
+  //     const results = [];
+      
+  //     for (const schedule of overdueContent) {
+  //       try {
+  //         console.log(`📤 Publishing scheduled content: ${schedule.contentId}`);
+          
+  //         const content = await storage.getContent(schedule.contentId);
+  //         if (!content) {
+  //           console.error(`Content not found: ${schedule.contentId}`);
+  //           continue;
+  //         }
+          
+  //         const website = await storage.getUserWebsite(content.websiteId, content.userId);
+  //         if (!website) {
+  //           console.error(`Website not found: ${content.websiteId}`);
+  //           continue;
+  //         }
+          
+  //         try {
+  //           const wpCredentials = {
+  //             url: website.url,
+  //             username: website.wpUsername || 'admin',
+  //             applicationPassword: website.wpApplicationPassword
+  //           };
+            
+  //           const postData = {
+  //             title: content.title,
+  //             content: content.body,
+  //             excerpt: content.excerpt || '',
+  //             status: 'publish' as const,
+  //             meta: {
+  //               description: content.metaDescription || content.excerpt || '',
+  //               title: content.metaTitle || content.title
+  //             }
+  //           };
+            
+  //           const wpResult = await wordpressService.publishPost(wpCredentials, postData);
+            
+  //           await storage.updateContent(content.id, {
+  //             status: "published",
+  //             publishDate: new Date(),
+  //             wordpressPostId: wpResult.id,
+  //             wordpressUrl: wpResult.link,
+  //             publishError: null
+  //           });
+            
+  //           await storage.updateContentSchedule(schedule.id, { status: 'published' });
+            
+  //           await storage.createActivityLog({
+  //             userId: content.userId,
+  //             websiteId: content.websiteId,
+  //             type: "scheduled_content_published",
+  //             description: `Scheduled content published: "${content.title}"`,
+  //             metadata: { 
+  //               scheduleId: schedule.id,
+  //               contentId: content.id,
+  //               wordpressPostId: wpResult.id,
+  //               wordpressUrl: wpResult.link
+  //             }
+  //           });
+            
+  //           results.push({
+  //             scheduleId: schedule.id,
+  //             contentId: content.id,
+  //             success: true,
+  //             wordpressPostId: wpResult.id,
+  //             wordpressUrl: wpResult.link
+  //           });
+            
+  //           console.log(`✅ Successfully published: ${content.title}`);
+            
+  //         } catch (publishError) {
+  //           console.error(`Failed to publish content ${content.id}:`, publishError);
+            
+  //           await storage.updateContentSchedule(schedule.id, { status: 'failed' });
+            
+  //           await storage.updateContent(content.id, {
+  //             status: "publish_failed",
+  //             publishError: publishError instanceof Error ? publishError.message : 'Unknown error'
+  //           });
+            
+  //           await storage.createActivityLog({
+  //             userId: content.userId,
+  //             websiteId: content.websiteId,
+  //             type: "scheduled_content_failed",
+  //             description: `Failed to publish scheduled content: "${content.title}"`,
+  //             metadata: { 
+  //               scheduleId: schedule.id,
+  //               contentId: content.id,
+  //               error: publishError instanceof Error ? publishError.message : 'Unknown error'
+  //             }
+  //           });
+            
+  //           results.push({
+  //             scheduleId: schedule.id,
+  //             contentId: content.id,
+  //             success: false,
+  //             error: publishError instanceof Error ? publishError.message : 'Unknown error'
+  //           });
+  //         }
+          
+  //       } catch (error) {
+  //         console.error(`Error processing schedule ${schedule.id}:`, error);
+  //         results.push({
+  //           scheduleId: schedule.id,
+  //           success: false,
+  //           error: error instanceof Error ? error.message : 'Unknown error'
+  //         });
+  //       }
+  //     }
+      
+  //     console.log(`🎯 Processed ${overdueContent.length} scheduled items, ${results.filter(r => r.success).length} published successfully`);
+      
+  //     res.json({
+  //       success: true,
+  //       processed: overdueContent.length,
+  //       published: results.filter(r => r.success).length,
+  //       failed: results.filter(r => !r.success).length,
+  //       results
+  //     });
+      
+  //   } catch (error) {
+  //     console.error("Scheduled publishing process failed:", error);
+  //     res.status(500).json({ 
+  //       message: "Failed to process scheduled content",
+  //       error: error instanceof Error ? error.message : 'Unknown error'
+  //     });
+  //   }
+  // });
 
 app.get("/api/user/content-schedule", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
