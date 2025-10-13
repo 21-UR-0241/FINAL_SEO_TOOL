@@ -12,14 +12,17 @@ import {
   X,
   Image,
   SearchCheck,
-  Shield, // Add this import
+  Shield,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { useState, createContext, useContext, useEffect } from "react"; // Add useEffect
+import { useState, createContext, useContext, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CompactSidebarUserMenu, UserMenu } from "@/pages/authentication";
 
-// Mobile sidebar context (keep your existing code)
+// ✅ Import API_URL from config
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+// Mobile sidebar context
 const MobileSidebarContext = createContext<{
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
@@ -57,12 +60,19 @@ const navigation = [
 // Shared sidebar content component
 function SidebarContent({ onLinkClick }: { onLinkClick?: () => void }) {
   const [location] = useLocation();
-  const [user, setUser] = useState<any>(null); // Add this state
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Add this useEffect to fetch user data
   useEffect(() => {
-    fetch("/api/auth/me", { credentials: "include" })
+    // ✅ Use full API URL with credentials
+    fetch(`${API_URL}/api/auth/me`, { 
+      credentials: "include",
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
       .then((res) => {
+        console.log('Auth check response:', res.status);
         if (res.ok) {
           return res.json();
         }
@@ -70,11 +80,15 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void }) {
       })
       .then((data) => {
         if (data) {
+          console.log('User loaded:', data);
           setUser(data);
         }
       })
       .catch((error) => {
         console.error("Failed to fetch user:", error);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, []);
 
@@ -94,7 +108,7 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void }) {
       <nav className="mt-8 flex-1 px-2 space-y-1">
         {navigation.map((item) => {
           // Skip admin-only items for non-admin users
-          if (item.adminOnly && !user?.isAdmin) {
+          if (item.adminOnly && (!user?.isAdmin || loading)) {
             return null;
           }
 
