@@ -102,7 +102,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 // =============================================================================
-/* CORS CONFIG - MOVED TO TOP LEVEL FOR ERROR HANDLER ACCESS */
+/* CORS CONFIG - EXPORTED FOR USE IN ROUTES */
 // =============================================================================
 
 const ALLOWED_ORIGIN_LIST = [
@@ -113,10 +113,18 @@ const ALLOWED_ORIGIN_LIST = [
 // Allow any *.vercel.app (supports multi-label previews)
 const vercelPreviewRegex = /^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i;
 
-// Helper function to check if origin is allowed
-function isOriginAllowed(origin: string | undefined): boolean {
+// Helper function to check if origin is allowed - EXPORTED
+export function isOriginAllowed(origin: string | undefined): boolean {
   if (!origin) return true; // allow curl/server-to-server/no-origin
   return ALLOWED_ORIGIN_LIST.includes(origin) || vercelPreviewRegex.test(origin);
+}
+
+// Helper to add CORS headers - EXPORTED
+export function addCorsHeaders(res: Response, origin: string | undefined): void {
+  if (origin && isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
 }
 
 // =============================================================================
@@ -316,12 +324,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   sessionMiddleware(req, res, (err) => {
     if (err) {
       console.error('❌ Session middleware error:', err);
-      
-      const origin = req.headers.origin as string | undefined;
-      if (origin && isOriginAllowed(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
+      addCorsHeaders(res, req.headers.origin as string | undefined);
       
       return res.status(500).json({
         success: false,
@@ -338,11 +341,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // =============================================================================
 
 const rateLimitHandler = (req: Request, res: Response) => {
-  const origin = req.headers.origin as string | undefined;
-  if (origin && isOriginAllowed(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
+  addCorsHeaders(res, req.headers.origin as string | undefined);
   
   res.status(429).json({
     success: false,
@@ -389,11 +388,7 @@ app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   
   const timeoutHandler = () => {
     if (!res.headersSent) {
-      const origin = req.headers.origin as string | undefined;
-      if (origin && isOriginAllowed(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
+      addCorsHeaders(res, req.headers.origin as string | undefined);
       
       res.status(504).json({
         success: false,
@@ -489,11 +484,7 @@ app.get('/api/cors-dump', (req, res) => {
 app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   const originalRedirect = res.redirect.bind(res);
   res.redirect = function (url: string | number, status?: any) {
-    const origin = req.headers.origin as string | undefined;
-    if (origin && isOriginAllowed(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
+    addCorsHeaders(res, req.headers.origin as string | undefined);
     
     if (typeof url === 'number') {
       return res.status(url).json({
@@ -564,11 +555,7 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
         statusCode: err.status || err.statusCode,
       });
 
-      const origin = req.headers.origin as string | undefined;
-      if (origin && isOriginAllowed(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
+      addCorsHeaders(res, req.headers.origin as string | undefined);
 
       const status = err.status || err.statusCode || 500;
       const message = err.message || 'Internal Server Error';
@@ -608,11 +595,7 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
     app.use('*', (req: Request, res: Response) => {
       console.log(`❌ 404: ${req.method} ${req.path}`);
       
-      const origin = req.headers.origin as string | undefined;
-      if (origin && isOriginAllowed(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
+      addCorsHeaders(res, req.headers.origin as string | undefined);
       
       res.status(404).json({
         success: false,
