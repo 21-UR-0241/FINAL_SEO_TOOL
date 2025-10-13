@@ -9,17 +9,6 @@ import { createServer } from 'http';
 import cors from 'cors';
 import { schedulerService } from './services/scheduler-service.js';
 
-
-// =============================================================================
-// SERVER START GUARD - PREVENT DUPLICATE STARTS
-// =============================================================================
-
-const SERVER_START_KEY = '__SERVER_STARTED__';
-if ((global as any)[SERVER_START_KEY]) {
-  console.log('⚠️  Server already started, skipping duplicate initialization');
-  process.exit(0);
-}
-(global as any)[SERVER_START_KEY] = true;
 // =============================================================================
 // TYPE DECLARATIONS
 // =============================================================================
@@ -309,11 +298,10 @@ const sessionMiddleware = session({
   saveUninitialized: false,
   name: 'ai-seo-session',
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // https only in prod
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    // IMPORTANT: do not set `domain` since Render and Vercel are different hosts
   },
   rolling: true,
 });
@@ -329,7 +317,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     if (err) {
       console.error('❌ Session middleware error:', err);
       
-      // Add CORS headers to error response
       const origin = req.headers.origin as string | undefined;
       if (origin && isOriginAllowed(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
@@ -351,7 +338,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // =============================================================================
 
 const rateLimitHandler = (req: Request, res: Response) => {
-  // Add CORS headers to rate limit response
   const origin = req.headers.origin as string | undefined;
   if (origin && isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -371,7 +357,7 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
-  skip: (req) => req.method === 'OPTIONS', // Skip OPTIONS requests
+  skip: (req) => req.method === 'OPTIONS',
 });
 
 const authLimiter = rateLimit({
@@ -382,7 +368,7 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
-  skip: (req) => req.method === 'OPTIONS', // Skip OPTIONS requests
+  skip: (req) => req.method === 'OPTIONS',
 });
 
 app.use('/api', generalLimiter);
@@ -396,15 +382,13 @@ app.use('/api/gsc/oauth-callback', authLimiter);
 // =============================================================================
 
 app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-  // Set timeout for long-running operations
-  const timeout = req.path.includes('/ai-fix') ? 300000 : 60000; // 5 min for AI fix, 1 min for others
+  const timeout = req.path.includes('/ai-fix') ? 300000 : 60000;
   
   req.setTimeout(timeout);
   res.setTimeout(timeout);
   
   const timeoutHandler = () => {
     if (!res.headersSent) {
-      // Ensure CORS headers on timeout
       const origin = req.headers.origin as string | undefined;
       if (origin && isOriginAllowed(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
@@ -486,7 +470,6 @@ app.get('/api/test-no-session', (_req: Request, res: Response) => {
   });
 });
 
-// Dump what CORS headers the response actually has (for debugging from the browser)
 app.get('/api/cors-dump', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({
@@ -506,7 +489,6 @@ app.get('/api/cors-dump', (req, res) => {
 app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   const originalRedirect = res.redirect.bind(res);
   res.redirect = function (url: string | number, status?: any) {
-    // Add CORS headers to redirect response
     const origin = req.headers.origin as string | undefined;
     if (origin && isOriginAllowed(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
@@ -550,21 +532,19 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
 
 (async () => {
   try {
-    // Dynamic routes import
     const { registerRoutes } = await import('./routes.js').catch(() => ({
       registerRoutes: async (x: any) => x,
     }));
 
     await registerRoutes(app);
 
-    // Health check
     app.get('/health', (_req: Request, res: Response) => {
       res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || 'development',
         uptime: process.uptime(),
-        port: process.env.PORT || '5000',
+        port: process.env.PORT || '10000',
         database: sessionPool ? 'connected' : 'disconnected',
         lastSchedulerTick: lastSchedulerTickISO,
         pid: process.pid,
@@ -572,7 +552,7 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
     });
 
     // =============================================================================
-    // GLOBAL ERROR HANDLER - WITH CORS HEADERS
+    // GLOBAL ERROR HANDLER
     // =============================================================================
 
     app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
@@ -584,7 +564,6 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
         statusCode: err.status || err.statusCode,
       });
 
-      // 🔥 ADD CORS HEADERS TO ERROR RESPONSES
       const origin = req.headers.origin as string | undefined;
       if (origin && isOriginAllowed(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
@@ -612,7 +591,6 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
       });
     });
 
-    // Vite in development
     if (app.get('env') === 'development') {
       try {
         const { setupVite } = await import('./vite.js');
@@ -624,13 +602,12 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
     }
 
     // =============================================================================
-    // 404 HANDLER - WITH CORS HEADERS
+    // 404 HANDLER
     // =============================================================================
 
     app.use('*', (req: Request, res: Response) => {
       console.log(`❌ 404: ${req.method} ${req.path}`);
       
-      // Add CORS headers to 404 response
       const origin = req.headers.origin as string | undefined;
       if (origin && isOriginAllowed(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
@@ -646,7 +623,7 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
     });
 
     // =============================================================================
-    // START HTTP SERVER (Render-friendly)
+    // START HTTP SERVER
     // =============================================================================
 
     const port = parseInt(process.env.PORT || '10000', 10);
@@ -665,7 +642,6 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
       log(`🧪 No-Session Test: http://${host}:${port}/api/test-no-session`);
 
       try {
-        // Start your scheduler; call markSchedulerTick() inside your tick(s)
         schedulerService.startScheduler(1);
         log(`⏰ Content scheduler started`);
       } catch (schedError) {
@@ -680,6 +656,7 @@ app.use('/api/user/websites/:id', (req, _res, next) => {
     httpServer.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`❌ Port ${port} is already in use`);
+        console.error(`⚠️  Check for duplicate server starts or circular imports`);
         process.exit(1);
       } else {
         console.error('❌ Server error:', error);
@@ -712,339 +689,6 @@ process.on('SIGINT', () => {
   });
 });
 
-// Give logs a moment to flush on fatal errors
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  setTimeout(() => process.exit(1), 300);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  setTimeout(() => process.exit(1), 300);
-});
-
-
-// =============================================================================
-// REQUEST TIMEOUT HANDLER (before routes)
-// =============================================================================
-
-app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-  // Set timeout for long-running operations
-  const timeout = req.path.includes('/ai-fix') ? 300000 : 60000; // 5 min for AI fix, 1 min for others
-  
-  req.setTimeout(timeout);
-  res.setTimeout(timeout);
-  
-  const timeoutHandler = () => {
-    if (!res.headersSent) {
-      // Ensure CORS headers on timeout
-      const origin = req.headers.origin as string | undefined;
-      if (origin && isOriginAllowed(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
-      
-      res.status(504).json({
-        success: false,
-        message: 'Request timeout - operation took too long',
-        error: 'The operation exceeded the maximum allowed time. For AI fixes, this usually means the operation is still running in the background.',
-      });
-    }
-  };
-  
-  req.on('timeout', timeoutHandler);
-  res.on('timeout', timeoutHandler);
-  
-  next();
-});
-// =============================================================================
-// LOGGING (lightweight)
-// =============================================================================
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined;
-
-  const originalResJson = res.json.bind(res);
-  res.json = function (bodyJson: any, ...args: any[]) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson(bodyJson, ...args);
-  };
-
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    if (path.startsWith('/api')) {
-      let line = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        const preview = JSON.stringify(capturedJsonResponse).substring(0, 100);
-        line += ` :: ${preview}${preview.length >= 100 ? '...' : ''}`;
-      }
-      log(line);
-    }
-  });
-
-  next();
-});
-
-// =============================================================================
-// SIMPLE TEST + DIAGNOSTIC ENDPOINTS
-// =============================================================================
-
-app.get('/api/cors-test', (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'CORS is working!',
-    origin: req.headers.origin,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.post('/api/cors-test', (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'CORS POST is working!',
-    origin: req.headers.origin,
-    body: req.body,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.get('/api/test-no-session', (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'No session required!',
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Dump what CORS headers the response actually has (for debugging from the browser)
-app.get('/api/cors-dump', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({
-    success: true,
-    origin: req.headers.origin,
-    sawAllowOrigin: !!res.getHeader('Access-Control-Allow-Origin'),
-    allowOrigin: res.getHeader('Access-Control-Allow-Origin') || null,
-    allowCreds: res.getHeader('Access-Control-Allow-Credentials') || null,
-    note: 'If sawAllowOrigin is false, this origin was not allowed by the CORS middleware.',
-  });
-});
-
-// =============================================================================
-// API REDIRECT HANDLER (JSON-ify redirects under /api/*)
-// =============================================================================
-
-app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-  const originalRedirect = res.redirect.bind(res);
-  res.redirect = function (url: string | number, status?: any) {
-    // Add CORS headers to redirect response
-    const origin = req.headers.origin as string | undefined;
-    if (origin && isOriginAllowed(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    
-    if (typeof url === 'number') {
-      return res.status(url).json({
-        success: false,
-        message: 'Unauthorized',
-        redirect: status,
-      });
-    }
-    return res.status(302).json({
-      success: false,
-      message: 'Redirect required',
-      redirect: url,
-    });
-  };
-  next();
-});
-
-// =============================================================================
-// SPECIFIC ROUTE DEBUGGING (optional)
-// =============================================================================
-
-app.use('/api/user/websites/:id', (req, _res, next) => {
-  console.log('🔍 Website-specific route hit:', {
-    id: req.params.id,
-    path: req.path,
-    method: req.method,
-    hasSession: !!req.session,
-    sessionId: req.session?.userId,
-  });
-  next();
-});
-
-// =============================================================================
-// SERVER STARTUP & ROUTES
-// =============================================================================
-
-(async () => {
-  try {
-    // Dynamic routes import
-    const { registerRoutes } = await import('./routes.js').catch(() => ({
-      registerRoutes: async (x: any) => x,
-    }));
-
-    await registerRoutes(app);
-
-    // Health check
-    app.get('/health', (_req: Request, res: Response) => {
-      res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-        uptime: process.uptime(),
-        port: process.env.PORT || '5000',
-        database: sessionPool ? 'connected' : 'disconnected',
-        lastSchedulerTick: lastSchedulerTickISO,
-        pid: process.pid,
-      });
-    });
-
-    // =============================================================================
-    // GLOBAL ERROR HANDLER - WITH CORS HEADERS
-    // =============================================================================
-
-    app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-      console.error('❌ Global Error Handler:', {
-        message: err.message,
-        stack: err.stack,
-        path: req.path,
-        method: req.method,
-        statusCode: err.status || err.statusCode,
-      });
-
-      // 🔥 ADD CORS HEADERS TO ERROR RESPONSES
-      const origin = req.headers.origin as string | undefined;
-      if (origin && isOriginAllowed(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
-
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || 'Internal Server Error';
-
-      const responseMessage =
-        process.env.NODE_ENV === 'production'
-          ? status >= 500
-            ? 'Internal Server Error'
-            : message
-          : message;
-
-      res.status(status).json({
-        success: false,
-        message: responseMessage,
-        ...(process.env.NODE_ENV === 'development' && {
-          stack: err.stack,
-          path: req.path,
-          method: req.method,
-        }),
-      });
-    });
-
-    // Vite in development
-    if (app.get('env') === 'development') {
-      try {
-        const { setupVite } = await import('./vite.js');
-        const httpServerVite = createServer(app);
-        await setupVite(app, httpServerVite);
-      } catch (_e) {
-        console.log('Vite setup not available or failed, continuing without it');
-      }
-    }
-
-    // =============================================================================
-    // 404 HANDLER - WITH CORS HEADERS
-    // =============================================================================
-
-    app.use('*', (req: Request, res: Response) => {
-      console.log(`❌ 404: ${req.method} ${req.path}`);
-      
-      // Add CORS headers to 404 response
-      const origin = req.headers.origin as string | undefined;
-      if (origin && isOriginAllowed(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      }
-      
-      res.status(404).json({
-        success: false,
-        message: 'Route not found',
-        path: req.path,
-        method: req.method,
-      });
-    });
-
-    // =============================================================================
-    // START HTTP SERVER (Render-friendly)
-    // =============================================================================
-
-    const port = parseInt(process.env.PORT || '10000', 10);
-    const host = '0.0.0.0';
-    const httpServer = createServer(app);
-
-    httpServer.listen(port, host, () => {
-      log(`🚀 Server running on http://${host}:${port}`);
-      log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      log(`🔐 Session store: PostgreSQL`);
-      log(`🛡️ Security: Helmet + Rate Limiting enabled`);
-      log(`📡 API available at: http://${host}:${port}/api`);
-      log(`🌐 CORS: Allowed origins + credentials`);
-      log(`🧪 CORS Test: http://${host}:${port}/api/cors-test`);
-      log(`🧪 CORS Dump: http://${host}:${port}/api/cors-dump`);
-      log(`🧪 No-Session Test: http://${host}:${port}/api/test-no-session`);
-
-      try {
-        // Start your scheduler; call markSchedulerTick() inside your tick(s)
-        schedulerService.startScheduler(1);
-        log(`⏰ Content scheduler started`);
-      } catch (schedError) {
-        console.error('⚠️  Scheduler failed to start:', schedError);
-      }
-
-      if (process.env.NODE_ENV === 'development') {
-        log(`🛠️  Development mode: Vite dev server + verbose logging enabled`);
-      }
-    });
-
-    httpServer.on('error', (error: any) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${port} is already in use`);
-        process.exit(1);
-      } else {
-        console.error('❌ Server error:', error);
-        process.exit(1);
-      }
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-})();
-
-// =============================================================================
-// GRACEFUL SHUTDOWN
-// =============================================================================
-
-process.on('SIGTERM', () => {
-  log('🔴 SIGTERM received, shutting down gracefully');
-  sessionPool.end(() => {
-    log('🔴 Database pool closed');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  log('🔴 SIGINT received, shutting down gracefully');
-  sessionPool.end(() => {
-    log('🔴 Database pool closed');
-    process.exit(0);
-  });
-});
-
-// Give logs a moment to flush on fatal errors
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught Exception:', error);
   setTimeout(() => process.exit(1), 300);
