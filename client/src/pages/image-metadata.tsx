@@ -26,8 +26,7 @@ import {
 
 // Enhanced API with crawling support
 // Add this at the very top, after imports
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://final-seo-tool.onrender.com';
 // Enhanced API with crawling support
 const api = {
   async getContentImages(websiteId?: string) {
