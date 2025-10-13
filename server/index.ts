@@ -9,6 +9,17 @@ import { createServer } from 'http';
 import cors from 'cors';
 import { schedulerService } from './services/scheduler-service.js';
 
+
+// =============================================================================
+// SERVER START GUARD - PREVENT DUPLICATE STARTS
+// =============================================================================
+
+const SERVER_START_KEY = '__SERVER_STARTED__';
+if ((global as any)[SERVER_START_KEY]) {
+  console.log('⚠️  Server already started, skipping duplicate initialization');
+  process.exit(0);
+}
+(global as any)[SERVER_START_KEY] = true;
 // =============================================================================
 // TYPE DECLARATIONS
 // =============================================================================
