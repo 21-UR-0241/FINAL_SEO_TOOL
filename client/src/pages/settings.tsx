@@ -41,8 +41,6 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-
-// Add these imports for the confirmation dialog
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,65 +51,61 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-// Sanitizer import
 import { Sanitizer } from "@/utils/inputSanitizer";
 
+// ✅ Get API URL from environment
+const API_URL = import.meta.env.VITE_API_URL || '';
+
+// Helper function for API calls with proper CORS
+const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+  const url = `${API_URL}${endpoint}`;
+  console.log('🔗 API Call:', url);
+  
+  const response = await fetch(url, {
+    ...options,
+    credentials: 'include', // ✅ Always include credentials
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ 
+      message: `HTTP ${response.status}: ${response.statusText}` 
+    }));
+    throw new Error(error.message || `Request failed: ${response.status}`);
+  }
+
+  return response.json();
+};
+
 const timezoneOptions = [
-  {
-    value: "America/New_York",
-    label: "Eastern Time (ET)",
-    offset: "UTC-5/UTC-4",
-  },
-  {
-    value: "America/Chicago",
-    label: "Central Time (CT)",
-    offset: "UTC-6/UTC-5",
-  },
-  {
-    value: "America/Denver",
-    label: "Mountain Time (MT)",
-    offset: "UTC-7/UTC-6",
-  },
-  {
-    value: "America/Los_Angeles",
-    label: "Pacific Time (PT)",
-    offset: "UTC-8/UTC-7",
-  },
+  { value: "America/New_York", label: "Eastern Time (ET)", offset: "UTC-5/UTC-4" },
+  { value: "America/Chicago", label: "Central Time (CT)", offset: "UTC-6/UTC-5" },
+  { value: "America/Denver", label: "Mountain Time (MT)", offset: "UTC-7/UTC-6" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)", offset: "UTC-8/UTC-7" },
   { value: "America/Phoenix", label: "Arizona (MST)", offset: "UTC-7" },
   { value: "America/Anchorage", label: "Alaska (AKST)", offset: "UTC-9/UTC-8" },
   { value: "Pacific/Honolulu", label: "Hawaii (HST)", offset: "UTC-10" },
   { value: "Europe/London", label: "London (GMT/BST)", offset: "UTC+0/UTC+1" },
-  {
-    value: "Europe/Paris",
-    label: "Central European (CET)",
-    offset: "UTC+1/UTC+2",
-  },
+  { value: "Europe/Paris", label: "Central European (CET)", offset: "UTC+1/UTC+2" },
   { value: "Europe/Berlin", label: "Berlin (CET)", offset: "UTC+1/UTC+2" },
   { value: "Europe/Moscow", label: "Moscow (MSK)", offset: "UTC+3" },
   { value: "Asia/Dubai", label: "Dubai (GST)", offset: "UTC+4" },
   { value: "Asia/Kolkata", label: "India (IST)", offset: "UTC+5:30" },
   { value: "Asia/Bangkok", label: "Bangkok (ICT)", offset: "UTC+7" },
   { value: "Asia/Shanghai", label: "China (CST)", offset: "UTC+8" },
-  { value: "Asia/Manila", label: "Philippine Time (PHT)", offset: "UTC+8" }, // Important for you!
+  { value: "Asia/Manila", label: "Philippine Time (PHT)", offset: "UTC+8" },
   { value: "Asia/Singapore", label: "Singapore (SGT)", offset: "UTC+8" },
   { value: "Asia/Tokyo", label: "Japan (JST)", offset: "UTC+9" },
   { value: "Asia/Seoul", label: "Seoul (KST)", offset: "UTC+9" },
-  {
-    value: "Australia/Sydney",
-    label: "Sydney (AEDT/AEST)",
-    offset: "UTC+11/UTC+10",
-  },
+  { value: "Australia/Sydney", label: "Sydney (AEDT/AEST)", offset: "UTC+11/UTC+10" },
   { value: "Australia/Perth", label: "Perth (AWST)", offset: "UTC+8" },
-  {
-    value: "Pacific/Auckland",
-    label: "Auckland (NZDT/NZST)",
-    offset: "UTC+13/UTC+12",
-  },
+  { value: "Pacific/Auckland", label: "Auckland (NZDT/NZST)", offset: "UTC+13/UTC+12" },
   { value: "UTC", label: "UTC", offset: "UTC+0" },
 ];
 
-// Keep existing interfaces...
 interface UserApiKey {
   id: string;
   provider: string;
@@ -131,24 +125,9 @@ interface ApiKeyFormData {
 
 interface ApiKeyStatus {
   providers: {
-    openai: {
-      configured: boolean;
-      keyName?: string;
-      lastValidated?: string;
-      status: string;
-    };
-    anthropic: {
-      configured: boolean;
-      keyName?: string;
-      lastValidated?: string;
-      status: string;
-    };
-    google_pagespeed: {
-      configured: boolean;
-      keyName?: string;
-      lastValidated?: string;
-      status: string;
-    };
+    openai: { configured: boolean; keyName?: string; lastValidated?: string; status: string };
+    anthropic: { configured: boolean; keyName?: string; lastValidated?: string; status: string };
+    google_pagespeed: { configured: boolean; keyName?: string; lastValidated?: string; status: string };
   };
 }
 
@@ -173,7 +152,6 @@ interface UserSettings {
   };
 }
 
-// Delete confirmation state type
 interface DeleteConfirmation {
   isOpen: boolean;
   type: "apiKey" | "website" | null;
@@ -185,17 +163,12 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("profile");
-
-  // Delete confirmation state
-  const [deleteConfirmation, setDeleteConfirmation] =
-    useState<DeleteConfirmation>({
-      isOpen: false,
-      type: null,
-      itemId: "",
-      itemName: "",
-    });
-
-  // API Key management state
+  const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
+    isOpen: false,
+    type: null,
+    itemId: "",
+    itemName: "",
+  });
   const [isAddingKey, setIsAddingKey] = useState(false);
   const [newKeyForm, setNewKeyForm] = useState<ApiKeyFormData>({
     provider: "",
@@ -204,8 +177,6 @@ export default function Settings() {
   });
   const [validatingKeys, setValidatingKeys] = useState<Set<string>>(new Set());
   const [showApiKey, setShowApiKey] = useState(false);
-
-  // Password state
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -213,22 +184,11 @@ export default function Settings() {
   });
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
 
-  // Fetch real user settings
-  const {
-    data: settings,
-    isLoading: settingsLoading,
-    error: settingsError,
-  } = useQuery<UserSettings>({
+  // ✅ Fetch user settings with proper error handling
+  const { data: settings, isLoading: settingsLoading, error: settingsError } = useQuery<UserSettings>({
     queryKey: ["/api/user/settings"],
-    queryFn: async () => {
-      const response = await fetch("/api/user/settings", {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch settings");
-      }
-      return response.json();
-    },
+    queryFn: () => apiCall("/api/user/settings"),
+    retry: 2,
   });
 
   const { data: websites } = useQuery({
@@ -236,135 +196,63 @@ export default function Settings() {
     queryFn: api.getWebsites,
   });
 
-  // Fetch user API keys
-  const { data: userApiKeys, refetch: refetchApiKeys } = useQuery<UserApiKey[]>(
-    {
-      queryKey: ["/api/user/api-keys"],
-      queryFn: async () => {
-        const response = await fetch("/api/user/api-keys", {
-          credentials: "include",
-        });
-        if (!response.ok) throw new Error("Failed to fetch API keys");
-        return response.json();
-      },
-    }
-  );
+  // ✅ Fetch user API keys
+  const { data: userApiKeys, refetch: refetchApiKeys } = useQuery<UserApiKey[]>({
+    queryKey: ["/api/user/api-keys"],
+    queryFn: () => apiCall("/api/user/api-keys"),
+  });
 
   const { data: apiKeyStatus } = useQuery<ApiKeyStatus>({
     queryKey: ["/api/user/api-keys/status"],
-    queryFn: async () => {
-      const response = await fetch("/api/user/api-keys/status", {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch API key status");
-      return response.json();
-    },
+    queryFn: () => apiCall("/api/user/api-keys/status"),
     refetchInterval: 30000,
   });
 
-  //added
-  // Replace your deleteWebsite mutation with this corrected version
-
+  // ✅ Delete website mutation
   const deleteWebsite = useMutation({
     mutationFn: async (websiteId: string) => {
-      const response = await fetch(`/api/user/websites/${websiteId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to delete website");
-      }
-
-      return response.json();
+      return apiCall(`/api/user/websites/${websiteId}`, { method: 'DELETE' });
     },
     onSuccess: () => {
-      // CRITICAL: Use the correct query key that matches your fetch query
       queryClient.invalidateQueries({ queryKey: ["/api/user/websites"] });
-
       toast({
         title: "Website Disconnected",
-        description:
-          "The website has been successfully removed from your account.",
+        description: "The website has been successfully removed from your account.",
       });
-
-      // Close the confirmation dialog
       closeDeleteConfirmation();
     },
     onError: (error: Error) => {
       toast({
         title: "Failed to Delete Website",
-        description:
-          error.message ||
-          "Could not disconnect the website. Please try again.",
+        description: error.message || "Could not disconnect the website. Please try again.",
         variant: "destructive",
       });
     },
   });
-  // Add these functions in your Settings component, after your state declarations
-  // and before the return statement:
 
-  // Function to open delete confirmation (looks like you already have this)
-  const openDeleteConfirmation = (
-    type: "apiKey" | "website",
-    itemId: string,
-    itemName: string
-  ) => {
-    setDeleteConfirmation({
-      isOpen: true,
-      type: type,
-      itemId: itemId,
-      itemName: itemName,
-    });
+  const openDeleteConfirmation = (type: "apiKey" | "website", itemId: string, itemName: string) => {
+    setDeleteConfirmation({ isOpen: true, type, itemId, itemName });
   };
 
-  // Function to close delete confirmation (THIS IS MISSING)
   const closeDeleteConfirmation = () => {
-    setDeleteConfirmation({
-      isOpen: false,
-      type: null,
-      itemId: "",
-      itemName: "",
-    });
+    setDeleteConfirmation({ isOpen: false, type: null, itemId: "", itemName: "" });
   };
 
-  // Function to handle delete confirmation (THIS IS MISSING)
   const handleConfirmDelete = () => {
     if (deleteConfirmation.type === "apiKey" && deleteConfirmation.itemId) {
-      deleteApiKey.mutate(deleteConfirmation.itemId, {
-        onSuccess: () => {
-          closeDeleteConfirmation();
-        },
-      });
-    } else if (
-      deleteConfirmation.type === "website" &&
-      deleteConfirmation.itemId
-    ) {
-      deleteWebsite.mutate(deleteConfirmation.itemId, {
-        onSuccess: () => {
-          closeDeleteConfirmation();
-        },
-      });
+      deleteApiKey.mutate(deleteConfirmation.itemId);
+    } else if (deleteConfirmation.type === "website" && deleteConfirmation.itemId) {
+      deleteWebsite.mutate(deleteConfirmation.itemId);
     }
   };
 
-  // Update settings mutation
+  // ✅ Update settings mutation
   const updateSettings = useMutation({
     mutationFn: async (newSettings: UserSettings) => {
-      const response = await fetch("/api/user/settings", {
+      return apiCall("/api/user/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(newSettings),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to update settings");
-      }
-
-      return response.json();
     },
     onSuccess: (updatedSettings) => {
       queryClient.setQueryData(["/api/user/settings"], updatedSettings);
@@ -376,27 +264,16 @@ export default function Settings() {
     onError: (error: Error) => {
       toast({
         title: "Save Failed",
-        description:
-          error.message || "Failed to save settings. Please try again.",
+        description: error.message || "Failed to save settings. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  // Reset settings mutation
+  // ✅ Reset settings mutation
   const resetSettings = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/user/settings", {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to reset settings");
-      }
-
-      return response.json();
+      return apiCall("/api/user/settings", { method: "DELETE" });
     },
     onSuccess: (result) => {
       queryClient.setQueryData(["/api/user/settings"], result.settings);
@@ -408,29 +285,19 @@ export default function Settings() {
     onError: (error: Error) => {
       toast({
         title: "Reset Failed",
-        description:
-          error.message || "Failed to reset settings. Please try again.",
+        description: error.message || "Failed to reset settings. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  // API key mutations
+  // ✅ API key mutations
   const addApiKey = useMutation({
     mutationFn: async (keyData: ApiKeyFormData) => {
-      const response = await fetch("/api/user/api-keys", {
+      return apiCall("/api/user/api-keys", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(keyData),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to add API key");
-      }
-
-      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -440,15 +307,12 @@ export default function Settings() {
       setIsAddingKey(false);
       setNewKeyForm({ provider: "", keyName: "", apiKey: "" });
       refetchApiKeys();
-      queryClient.invalidateQueries({
-        queryKey: ["/api/user/api-keys/status"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/api-keys/status"] });
     },
     onError: (error: Error) => {
       toast({
         title: "Failed to Add API Key",
-        description:
-          error.message || "Please check your API key and try again.",
+        description: error.message || "Please check your API key and try again.",
         variant: "destructive",
       });
     },
@@ -456,44 +320,22 @@ export default function Settings() {
 
   const validateApiKey = useMutation({
     mutationFn: async (keyId: string) => {
-      const response = await fetch(`/api/user/api-keys/${keyId}/validate`, {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to validate API key");
-      }
-
-      return response.json();
+      return apiCall(`/api/user/api-keys/${keyId}/validate`, { method: "POST" });
     },
-    onSuccess: (data, keyId) => {
+    onSuccess: (data) => {
       toast({
         title: data.isValid ? "Key Valid" : "Key Invalid",
-        description: data.isValid
-          ? "API key is working correctly."
-          : data.error,
+        description: data.isValid ? "API key is working correctly." : data.error,
         variant: data.isValid ? "default" : "destructive",
       });
       refetchApiKeys();
-      queryClient.invalidateQueries({
-        queryKey: ["/api/user/api-keys/status"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/api-keys/status"] });
     },
   });
 
   const deleteApiKey = useMutation({
     mutationFn: async (keyId: string) => {
-      const response = await fetch(`/api/user/api-keys/${keyId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to delete API key");
-      }
+      return apiCall(`/api/user/api-keys/${keyId}`, { method: "DELETE" });
     },
     onSuccess: () => {
       toast({
@@ -501,9 +343,8 @@ export default function Settings() {
         description: "The API key has been removed from your account.",
       });
       refetchApiKeys();
-      queryClient.invalidateQueries({
-        queryKey: ["/api/user/api-keys/status"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/api-keys/status"] });
+      closeDeleteConfirmation();
     },
     onError: (error: Error) => {
       toast({
@@ -514,7 +355,6 @@ export default function Settings() {
     },
   });
 
-  // Add password change mutation
   const changePassword = useMutation({
     mutationFn: api.changePassword,
     onSuccess: () => {
@@ -522,11 +362,7 @@ export default function Settings() {
         title: "Password Changed",
         description: "Your password has been successfully updated.",
       });
-      setPasswordData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setPasswordErrors([]);
     },
     onError: (error: Error) => {
@@ -538,7 +374,6 @@ export default function Settings() {
     },
   });
 
-  // UPDATED: handleSave with sanitization
   const handleSave = () => {
     if (settings) {
       const sanitizedSettings = {
@@ -552,14 +387,10 @@ export default function Settings() {
         automation: settings.automation,
         security: {
           twoFactorAuth: settings.security.twoFactorAuth,
-          sessionTimeout: Math.min(
-            168,
-            Math.max(1, settings.security.sessionTimeout)
-          ),
+          sessionTimeout: Math.min(168, Math.max(1, settings.security.sessionTimeout)),
           allowApiAccess: settings.security.allowApiAccess,
         },
       };
-
       updateSettings.mutate(sanitizedSettings);
     }
   };
@@ -568,11 +399,7 @@ export default function Settings() {
     resetSettings.mutate();
   };
 
-  const updateSetting = (
-    section: keyof UserSettings,
-    key: string,
-    value: any
-  ) => {
+  const updateSetting = (section: keyof UserSettings, key: string, value: any) => {
     if (!settings) return;
 
     let sanitizedValue = value;
@@ -583,14 +410,12 @@ export default function Settings() {
         case "company":
           sanitizedValue = Sanitizer.sanitizeText(value);
           break;
-
         case "email":
           const emailValidation = Sanitizer.validateEmail(value);
           if (!emailValidation.isValid && value !== "") {
             toast({
               title: "Invalid Email",
-              description:
-                emailValidation.error || "Please enter a valid email address",
+              description: emailValidation.error || "Please enter a valid email address",
               variant: "destructive",
             });
             return;
@@ -607,10 +432,7 @@ export default function Settings() {
 
     queryClient.setQueryData(["/api/user/settings"], {
       ...settings,
-      [section]: {
-        ...settings[section],
-        [key]: sanitizedValue,
-      },
+      [section]: { ...settings[section], [key]: sanitizedValue },
     });
   };
 
@@ -664,7 +486,7 @@ export default function Settings() {
   const handleValidateKey = (keyId: string) => {
     setValidatingKeys((prev) => new Set(prev).add(keyId));
     validateApiKey.mutate(keyId, {
-      onFinally: () => {
+      onSettled: () => {
         setValidatingKeys((prev) => {
           const newSet = new Set(prev);
           newSet.delete(keyId);
@@ -674,60 +496,30 @@ export default function Settings() {
     });
   };
 
-  // UPDATED: validatePasswordForm with enhanced validation
   const validatePasswordForm = (): boolean => {
     const errors: string[] = [];
 
-    if (!passwordData.currentPassword) {
-      errors.push("Current password is required");
-    }
-
-    if (!passwordData.newPassword) {
-      errors.push("New password is required");
-    }
-
-    if (!passwordData.confirmPassword) {
-      errors.push("Password confirmation is required");
-    }
-
+    if (!passwordData.currentPassword) errors.push("Current password is required");
+    if (!passwordData.newPassword) errors.push("New password is required");
+    if (!passwordData.confirmPassword) errors.push("Password confirmation is required");
     if (passwordData.newPassword && passwordData.newPassword.length > 200) {
       errors.push("Password is too long (maximum 200 characters)");
     }
-
-    if (
-      passwordData.newPassword &&
-      passwordData.confirmPassword &&
-      passwordData.newPassword !== passwordData.confirmPassword
-    ) {
+    if (passwordData.newPassword && passwordData.confirmPassword && 
+        passwordData.newPassword !== passwordData.confirmPassword) {
       errors.push("New password and confirmation do not match");
     }
-
     if (passwordData.newPassword && passwordData.newPassword.length < 8) {
       errors.push("New password must be at least 8 characters long");
     }
-
-    if (
-      passwordData.newPassword &&
-      passwordData.currentPassword &&
-      passwordData.newPassword === passwordData.currentPassword
-    ) {
+    if (passwordData.newPassword && passwordData.currentPassword && 
+        passwordData.newPassword === passwordData.currentPassword) {
       errors.push("New password must be different from current password");
     }
 
-    const weakPasswords = [
-      "password",
-      "12345678",
-      "qwerty",
-      "abc12345",
-      "password123",
-    ];
-    if (
-      passwordData.newPassword &&
-      weakPasswords.includes(passwordData.newPassword.toLowerCase())
-    ) {
-      errors.push(
-        "This password is too common. Please choose a stronger password"
-      );
+    const weakPasswords = ["password", "12345678", "qwerty", "abc12345", "password123"];
+    if (passwordData.newPassword && weakPasswords.includes(passwordData.newPassword.toLowerCase())) {
+      errors.push("This password is too common. Please choose a stronger password");
     }
 
     setPasswordErrors(errors);
@@ -743,23 +535,15 @@ export default function Settings() {
       });
       return;
     }
-
     changePassword.mutate(passwordData);
   };
 
-  // Helper functions
   const getStatusBadge = (status: string, provider: string) => {
-    const providerStatus =
-      apiKeyStatus?.providers?.[
-        provider as keyof typeof apiKeyStatus.providers
-      ];
+    const providerStatus = apiKeyStatus?.providers?.[provider as keyof typeof apiKeyStatus.providers];
 
     if (!providerStatus?.configured) {
-      return (
-        <Badge className="bg-gray-100 text-gray-800">Not Configured</Badge>
-      );
+      return <Badge className="bg-gray-100 text-gray-800">Not Configured</Badge>;
     }
-
     if (status === "valid") {
       return <Badge className="bg-green-100 text-green-800">✓ Active</Badge>;
     } else if (status === "invalid") {
@@ -771,27 +555,19 @@ export default function Settings() {
 
   const getProviderIcon = (provider: string) => {
     switch (provider) {
-      case "openai":
-        return <Bot className="w-6 h-6 text-green-600" />;
-      case "anthropic":
-        return <Bot className="w-6 h-6 text-blue-600" />;
-      case "google_pagespeed":
-        return <Globe className="w-6 h-6 text-orange-600" />;
-      default:
-        return <Key className="w-6 h-6 text-gray-400" />;
+      case "openai": return <Bot className="w-6 h-6 text-green-600" />;
+      case "anthropic": return <Bot className="w-6 h-6 text-blue-600" />;
+      case "google_pagespeed": return <Globe className="w-6 h-6 text-orange-600" />;
+      default: return <Key className="w-6 h-6 text-gray-400" />;
     }
   };
 
   const getProviderName = (provider: string) => {
     switch (provider) {
-      case "openai":
-        return "OpenAI GPT-4";
-      case "anthropic":
-        return "Anthropic Claude";
-      case "google_pagespeed":
-        return "Google PageSpeed Insights";
-      default:
-        return provider;
+      case "openai": return "OpenAI GPT-4";
+      case "anthropic": return "Anthropic Claude";
+      case "google_pagespeed": return "Google PageSpeed Insights";
+      default: return provider;
     }
   };
 
@@ -813,15 +589,18 @@ export default function Settings() {
       <div className="py-6">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="text-center py-12">
-            <p className="text-red-600">
-              Failed to load settings. Please refresh the page.
-            </p>
+            <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-red-500" />
+            <p className="text-red-600 font-medium">Failed to load settings</p>
+            <p className="text-gray-600 mt-2">Please refresh the page or try again later.</p>
+            <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] })} className="mt-4">
+              Retry
+            </Button>
           </div>
         </div>
       </div>
     );
   }
-
+  
   return (
     <div className="py-6">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8">
