@@ -3829,44 +3829,6 @@ async getScheduledTasks(websiteId: string, userId: string): Promise<ScheduledTas
             task.status === 'pending'
   );
 }
-
-
-
-
-async createJob(job: {
-  id: string;
-  userId: string;
-  websiteId: string;
-  type: string;
-  status: string;
-  metadata?: any;
-}) {
-  const result = await this.db.insert(jobs).values({
-    ...job,
-    createdAt: new Date()
-  });
-  return result;
-}
-
-async updateJob(jobId: string, updates: {
-  status?: string;
-  progress?: number;
-  result?: any;
-  error?: string;
-  logs?: any[];
-  completedAt?: Date;
-}) {
-  await this.db.update(jobs)
-    .set(updates)
-    .where(eq(jobs.id, jobId));
-}
-
-async getJob(jobId: string) {
-  const result = await this.db.query.jobs.findFirst({
-    where: eq(jobs.id, jobId)
-  });
-  return result;
-}
   
 
 }
