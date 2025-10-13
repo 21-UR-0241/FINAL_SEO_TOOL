@@ -589,7 +589,6 @@
 //   process.exit(1);
 // });
 
-
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
@@ -632,17 +631,43 @@ function log(message: string) {
 }
 
 // =============================================================================
-// SESSION STORE CONFIGURATION
+// SESSION STORE CONFIGURATION WITH ERROR HANDLING
 // =============================================================================
+
+const sessionPool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
+  max: 20,
+});
+
+// Test the connection on startup
+sessionPool.query('SELECT NOW()', (err) => {
+  if (err) {
+    console.error('❌ Failed to connect to session database:', err);
+    console.error('⚠️  Session functionality may be impaired');
+  } else {
+    console.log('✅ Session database connected successfully');
+  }
+});
+
+// Handle pool errors
+sessionPool.on('error', (err) => {
+  console.error('❌ Unexpected error on session database client:', err);
+});
 
 const PgSession = pgSession(session);
 const sessionStore = new PgSession({
-  pool: new Pool({ 
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  }),
+  pool: sessionPool,
   tableName: 'sessions',
   createTableIfMissing: false,
+});
+
+// Handle session store errors
+sessionStore.on('error', (error) => {
+  console.error('❌ Session store error:', error);
+  // Don't crash the server on session store errors
 });
 
 // =============================================================================
@@ -742,14 +767,56 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 4. BASIC MIDDLEWARE
+// 4. ABSOLUTE CORS GUARANTEE
 // =============================================================================
 
-app.use(express.json({ limit: '10mb' }));
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  const setCORS = () => {
+    if (origin && !res.headersSent) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Vary', 'Origin');
+    }
+  };
+  
+  // Set CORS immediately
+  setCORS();
+  
+  // Set CORS again before headers are sent
+  res.once('finish', setCORS);
+  res.once('close', setCORS);
+  
+  next();
+});
+
+// =============================================================================
+// 5. BASIC MIDDLEWARE WITH ERROR HANDLING
+// =============================================================================
+
+// JSON parsing with error handler
+app.use((req: Request, res: Response, next: NextFunction) => {
+  express.json({ limit: '10mb' })(req, res, (err: any) => {
+    if (err) {
+      console.error('❌ JSON parsing error:', err);
+      const origin = req.headers.origin;
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid JSON in request body' 
+      });
+    }
+    next();
+  });
+});
+
 app.use(express.urlencoded({ extended: false }));
 
 // =============================================================================
-// 5. CORS TEST ENDPOINTS
+// 6. CORS TEST ENDPOINTS
 // =============================================================================
 
 app.get('/api/cors-test', (req: Request, res: Response) => {
@@ -773,8 +840,19 @@ app.post('/api/cors-test', (req: Request, res: Response) => {
   });
 });
 
+// Test endpoint without session
+app.get('/api/test-no-session', (req: Request, res: Response) => {
+  console.log('🧪 Test endpoint (no session) hit');
+  res.json({ 
+    success: true, 
+    message: 'No session required!',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // =============================================================================
-// 6. RATE LIMITING
+// 7. RATE LIMITING
 // =============================================================================
 
 const rateLimitHandler = (req: Request, res: Response) => {
@@ -815,7 +893,7 @@ app.use('/api/gsc/auth-url', authLimiter);
 app.use('/api/gsc/oauth-callback', authLimiter);
 
 // =============================================================================
-// 7. SECURITY HEADERS
+// 8. SECURITY HEADERS (Relaxed for API endpoints)
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -829,6 +907,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Relaxed helmet for API routes
+app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })(req, res, next);
+});
+
+// Full helmet for non-API routes
 app.use(helmet({
   crossOriginOpenerPolicy: false,
   crossOriginEmbedderPolicy: false,
@@ -851,7 +939,7 @@ app.use(helmet({
 }));
 
 // =============================================================================
-// 8. INPUT SANITIZATION
+// 9. INPUT SANITIZATION
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -883,10 +971,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 9. SESSION
+// 10. SESSION WITH ERROR HANDLING
 // =============================================================================
 
-app.use(session({
+const sessionMiddleware = session({
   store: sessionStore,
   secret: process.env.SESSION_SECRET || 'your-super-secret-key-change-in-production',
   resave: false,
@@ -900,10 +988,30 @@ app.use(session({
     domain: undefined
   },
   rolling: true
-}));
+});
+
+// Wrap session middleware with error handler
+app.use((req: Request, res: Response, next: NextFunction) => {
+  sessionMiddleware(req, res, (err) => {
+    if (err) {
+      console.error('❌ Session middleware error:', err);
+      const origin = req.headers.origin;
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Session initialization error',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    }
+    next();
+  });
+});
 
 // =============================================================================
-// 10. LOGGING
+// 11. LOGGING
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -934,7 +1042,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 11. API REDIRECT HANDLER
+// 12. API REDIRECT HANDLER
 // =============================================================================
 
 app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
@@ -963,7 +1071,27 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 12. DEBUG MIDDLEWARE (Development Only)
+// 13. SPECIFIC ROUTE DEBUGGING
+// =============================================================================
+
+app.use('/api/user/websites/:id/*', (req, res, next) => {
+  console.log('🔍 Website-specific route hit:', {
+    id: req.params.id,
+    path: req.path,
+    method: req.method,
+    origin: req.headers.origin,
+    hasSession: !!req.session,
+    sessionId: req.session?.userId,
+    corsHeaders: {
+      allowOrigin: res.getHeader('access-control-allow-origin'),
+      allowCredentials: res.getHeader('access-control-allow-credentials')
+    }
+  });
+  next();
+});
+
+// =============================================================================
+// 14. DEBUG MIDDLEWARE (Development Only)
 // =============================================================================
 
 if (process.env.NODE_ENV === 'development') {
@@ -1013,7 +1141,8 @@ if (process.env.NODE_ENV === 'development') {
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || 'development',
         uptime: process.uptime(),
-        port: process.env.PORT || '5000'
+        port: process.env.PORT || '5000',
+        database: sessionPool ? 'connected' : 'disconnected'
       });
     });
 
@@ -1029,7 +1158,8 @@ if (process.env.NODE_ENV === 'development') {
         stack: err.stack,
         path: req.path,
         method: req.method,
-        origin: origin
+        origin: origin,
+        statusCode: err.status || err.statusCode
       });
       
       // CRITICAL: Force CORS headers on ALL errors
@@ -1081,6 +1211,7 @@ if (process.env.NODE_ENV === 'development') {
       
       console.log(`❌ 404: ${req.method} ${req.path}`);
       console.log(`   Origin: ${origin || 'none'}`);
+      console.log(`   Headers:`, req.headers);
       
       // Ensure CORS headers on 404
       if (origin) {
@@ -1120,10 +1251,15 @@ if (process.env.NODE_ENV === 'development') {
       log(`📡 API available at: http://${host}:${port}/api`);
       log(`🌐 CORS: Ultra-permissive mode (allows all origins)`);
       log(`🧪 CORS Test: http://${host}:${port}/api/cors-test`);
+      log(`🧪 No-Session Test: http://${host}:${port}/api/test-no-session`);
       
       // Start scheduler after server is listening
-      schedulerService.startScheduler(1);
-      log(`⏰ Content scheduler started`);
+      try {
+        schedulerService.startScheduler(1);
+        log(`⏰ Content scheduler started`);
+      } catch (schedError) {
+        console.error('⚠️  Scheduler failed to start:', schedError);
+      }
       
       if (process.env.NODE_ENV === 'development') {
         log(`🛠️  Development mode: Vite dev server + verbose logging enabled`);
@@ -1153,20 +1289,30 @@ if (process.env.NODE_ENV === 'development') {
 
 process.on('SIGTERM', () => {
   log('🔴 SIGTERM received, shutting down gracefully');
-  process.exit(0);
+  sessionPool.end(() => {
+    log('🔴 Database pool closed');
+    process.exit(0);
+  });
 });
 
 process.on('SIGINT', () => {
   log('🔴 SIGINT received, shutting down gracefully');
-  process.exit(0);
+  sessionPool.end(() => {
+    log('🔴 Database pool closed');
+    process.exit(0);
+  });
 });
 
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
+  sessionPool.end(() => {
+    process.exit(1);
+  });
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  sessionPool.end(() => {
+    process.exit(1);
+  });
 });
