@@ -840,77 +840,143 @@ class AIFixService {
     });
   }
 
-  private async applyFixes(
-    website: any,
-    fixes: AIFix[],
-    userId?: string
-  ): Promise<{ appliedFixes: AIFix[]; errors: string[] }> {
-    const creds = this.getWordPressCredentials(website);
-    await this.testWordPressConnection(creds);
 
-    const appliedFixes: AIFix[] = [];
-    const errors: string[] = [];
-    const fixesByType = this.groupFixesByType(fixes);
+private async applyFixes(
+  website: any,
+  fixes: AIFix[],
+  userId?: string
+): Promise<{ appliedFixes: AIFix[]; errors: string[] }> {
+  const creds = this.getWordPressCredentials(website);
+  await this.testWordPressConnection(creds);
 
-    this.addLog(`Processing fix types: ${Object.keys(fixesByType).join(", ")}`);
+  const appliedFixes: AIFix[] = [];
+  const errors: string[] = [];
+  const fixesByType = this.groupFixesByType(fixes);
 
-    for (const [fixType, typeFixes] of Object.entries(fixesByType)) {
-      this.addLog(`Processing ${typeFixes.length} fixes of type: ${fixType}`);
+  this.addLog(`Processing fix types: ${Object.keys(fixesByType).join(", ")}`);
 
-      try {
-        const strategy = this.getFixStrategy(fixType);
+  for (const [fixType, typeFixes] of Object.entries(fixesByType)) {
+    this.addLog(`Processing ${typeFixes.length} fixes of type: ${fixType}`);
 
-        if (!strategy) {
-          this.addLog(
-            `No fix strategy available for ${fixType} - marking as assumed compliant`,
-            "warning"
-          );
-          appliedFixes.push(
-            ...typeFixes.map((fix) => ({
-              ...fix,
-              success: true,
-              description: `Unable to process ${fixType} - marked as compliant`,
-              after: "Assumed compliant (strategy not available)",
-            }))
-          );
-          continue;
-        }
+    try {
+      const strategy = this.getFixStrategy(fixType);
 
-        // FIXED: Deduplicate before processing
-        const uniqueFixes = this.deduplicateFixesByIssue(typeFixes);
-        this.addLog(`Deduplicated to ${uniqueFixes.length} unique fix targets`);
-
-        const result = await strategy(creds, uniqueFixes, userId);
-
-        if (result.applied.length > 0) {
-          result.applied.forEach((fix) => {
-            this.addLog(
-              `${fix.success ? "✅" : "❌"} ${fixType}: ${fix.description}`,
-              fix.success ? "success" : "error"
-            );
-          });
-        }
-
-        appliedFixes.push(...result.applied);
-        errors.push(...result.errors);
-      } catch (error: any) {
-        this.addLog(`Error processing ${fixType}: ${error.message}`, "error");
-        const errorMessage = error.message || "Unknown error";
-        errors.push(`${fixType}: ${errorMessage}`);
+      if (!strategy) {
+        this.addLog(
+          `No fix strategy available for ${fixType} - marking as assumed compliant`,
+          "warning"
+        );
         appliedFixes.push(
           ...typeFixes.map((fix) => ({
             ...fix,
-            success: false,
-            description: `Failed to apply ${fixType}`,
-            error: errorMessage,
-            after: "Fix failed - see error log",
+            success: true,
+            description: `Unable to process ${fixType} - marked as compliant`,
+            after: "Assumed compliant (strategy not available)",
           }))
         );
+        continue;
       }
-    }
 
-    return { appliedFixes, errors };
+      // ⭐ KEY FIX: Deduplicate fixes BEFORE processing
+      const uniqueFixes = this.deduplicateFixesByIssue(typeFixes);
+      this.addLog(`Deduplicated to ${uniqueFixes.length} unique fix targets`);
+
+      // ⭐ KEY FIX: Pass ONLY unique fixes to strategy
+      const result = await strategy(creds, uniqueFixes, userId);
+
+      if (result.applied.length > 0) {
+        result.applied.forEach((fix) => {
+          this.addLog(
+            `${fix.success ? "✅" : "❌"} ${fixType}: ${fix.description}`,
+            fix.success ? "success" : "error"
+          );
+        });
+      }
+
+      appliedFixes.push(...result.applied);
+      errors.push(...result.errors);
+    } catch (error: any) {
+      this.addLog(`Error processing ${fixType}: ${error.message}`, "error");
+      const errorMessage = error.message || "Unknown error";
+      errors.push(`${fixType}: ${errorMessage}`);
+    }
   }
+
+  return { appliedFixes, errors };
+}
+
+
+  // private async applyFixes(
+  //   website: any,
+  //   fixes: AIFix[],
+  //   userId?: string
+  // ): Promise<{ appliedFixes: AIFix[]; errors: string[] }> {
+  //   const creds = this.getWordPressCredentials(website);
+  //   await this.testWordPressConnection(creds);
+
+  //   const appliedFixes: AIFix[] = [];
+  //   const errors: string[] = [];
+  //   const fixesByType = this.groupFixesByType(fixes);
+
+  //   this.addLog(`Processing fix types: ${Object.keys(fixesByType).join(", ")}`);
+
+  //   for (const [fixType, typeFixes] of Object.entries(fixesByType)) {
+  //     this.addLog(`Processing ${typeFixes.length} fixes of type: ${fixType}`);
+
+  //     try {
+  //       const strategy = this.getFixStrategy(fixType);
+
+  //       if (!strategy) {
+  //         this.addLog(
+  //           `No fix strategy available for ${fixType} - marking as assumed compliant`,
+  //           "warning"
+  //         );
+  //         appliedFixes.push(
+  //           ...typeFixes.map((fix) => ({
+  //             ...fix,
+  //             success: true,
+  //             description: `Unable to process ${fixType} - marked as compliant`,
+  //             after: "Assumed compliant (strategy not available)",
+  //           }))
+  //         );
+  //         continue;
+  //       }
+
+  //       // FIXED: Deduplicate before processing
+  //       const uniqueFixes = this.deduplicateFixesByIssue(typeFixes);
+  //       this.addLog(`Deduplicated to ${uniqueFixes.length} unique fix targets`);
+
+  //       const result = await strategy(creds, uniqueFixes, userId);
+
+  //       if (result.applied.length > 0) {
+  //         result.applied.forEach((fix) => {
+  //           this.addLog(
+  //             `${fix.success ? "✅" : "❌"} ${fixType}: ${fix.description}`,
+  //             fix.success ? "success" : "error"
+  //           );
+  //         });
+  //       }
+
+  //       appliedFixes.push(...result.applied);
+  //       errors.push(...result.errors);
+  //     } catch (error: any) {
+  //       this.addLog(`Error processing ${fixType}: ${error.message}`, "error");
+  //       const errorMessage = error.message || "Unknown error";
+  //       errors.push(`${fixType}: ${errorMessage}`);
+  //       appliedFixes.push(
+  //         ...typeFixes.map((fix) => ({
+  //           ...fix,
+  //           success: false,
+  //           description: `Failed to apply ${fixType}`,
+  //           error: errorMessage,
+  //           after: "Fix failed - see error log",
+  //         }))
+  //       );
+  //     }
+  //   }
+
+  //   return { appliedFixes, errors };
+  // }
 
   private getFixStrategy(fixType: string): ((creds: WordPressCredentials, fixes: AIFix[], userId?: string) => Promise<{ applied: AIFix[]; errors: string[] }>) | null {
     const normalizedType = fixType.replace(/__/g, "_").toLowerCase();
@@ -1274,63 +1340,6 @@ Write natural, descriptive alt text that helps both users and SEO.`;
     );
   }
 
-  // private async expandThinContent(
-  //   creds: WordPressCredentials,
-  //   fixes: AIFix[],
-  //   userId?: string
-  // ): Promise<{ applied: AIFix[]; errors: string[] }> {
-  //   return this.fixWordPressContent(
-  //     creds,
-  //     fixes,
-  //     async (content, fix) => {
-  //       const contentText = this.extractTextFromHTML(
-  //         content.content?.rendered || ""
-  //       );
-  //       const wordCount = contentText.split(/\s+/).length;
-
-  //       if (wordCount >= 800) {
-  //         return {
-  //           updated: false,
-  //           data: {},
-  //           description: `Content length already sufficient (${wordCount} words)`,
-  //         };
-  //       }
-
-  //       const provider = await this.selectAIProvider(userId);
-  //       if (!provider) {
-  //         return {
-  //           updated: false,
-  //           data: {},
-  //           description: "AI provider not available for content expansion",
-  //         };
-  //       }
-
-  //       try {
-  //         const expandedContent = await this.expandContentWithAI(
-  //           content.title?.rendered || content.title,
-  //           content.content?.rendered || "",
-  //           provider,
-  //           userId
-  //         );
-
-  //         const newWordCount = this.extractTextFromHTML(expandedContent).split(/\s+/).length;
-
-  //         return {
-  //           updated: true,
-  //           data: { content: expandedContent },
-  //           description: `Expanded content from ${wordCount} to ${newWordCount} words`,
-  //         };
-  //       } catch (error) {
-  //         return {
-  //           updated: false,
-  //           data: {},
-  //           description: "Failed to expand content",
-  //         };
-  //       }
-  //     },
-  //     userId
-  //   );
-  // }
 
   private async fixExternalLinkAttributes(
     creds: WordPressCredentials,
@@ -1932,151 +1941,322 @@ Write natural, descriptive alt text that helps both users and SEO.`;
 
   // ==================== HELPER METHODS ====================
 
-  // FIXED: Modified fixWordPressContent to prevent reprocessing the same content
-  private async fixWordPressContent(
-    creds: WordPressCredentials,
-    fixes: AIFix[],
-    fixProcessor: (
-      content: any,
-      fix: AIFix
-    ) => Promise<{
-      updated: boolean;
-      data: any;
-      description: string;
-    }>,
-    userId?: string,
-    processingOptions?: ProcessingOptions
-  ): Promise<{ applied: AIFix[]; errors: string[] }> {
-    const applied: AIFix[] = [];
-    const errors: string[] = [];
+private async fixWordPressContent(
+  creds: WordPressCredentials,
+  fixes: AIFix[],
+  fixProcessor: (
+    content: any,
+    fix: AIFix
+  ) => Promise<{
+    updated: boolean;
+    data: any;
+    description: string;
+  }>,
+  userId?: string,
+  processingOptions?: ProcessingOptions
+): Promise<{ applied: AIFix[]; errors: string[] }> {
+  const applied: AIFix[] = [];
+  const errors: string[] = [];
 
-    try {
-      const limits = processingOptions?.mode
-        ? this.getProcessingLimits(processingOptions.mode)
-        : { maxItems: 10, batchSize: 5, delayBetweenBatches: 1000 };
+  try {
+    const limits = processingOptions?.mode
+      ? this.getProcessingLimits(processingOptions.mode)
+      : { maxItems: 10, batchSize: 5, delayBetweenBatches: 1000 };
 
-      const maxItems = processingOptions?.maxItems || limits.maxItems;
-      const batchSize = processingOptions?.batchSize || limits.batchSize;
+    const maxItems = processingOptions?.maxItems || limits.maxItems;
+    const batchSize = processingOptions?.batchSize || limits.batchSize;
 
-      let allContent: any[];
-      if (
-        processingOptions?.mode === ProcessingMode.PRIORITY &&
-        processingOptions?.priorityUrls
-      ) {
-        allContent = await this.fetchPriorityContent(
-          creds,
-          processingOptions.priorityUrls
-        );
-      } else {
-        allContent = await this.getAllWordPressContent(creds, maxItems);
-      }
-
-      this.addLog(`Fetched ${allContent.length} content items to process`);
-
-      let processedCount = 0;
-      const processedContentIds = new Set<number>(); // Track processed content
-
-      for (let i = 0; i < allContent.length; i += batchSize) {
-        const batch = allContent.slice(i, Math.min(i + batchSize, allContent.length));
-        
-        for (const content of batch) {
-          // CRITICAL FIX: Only process each content item once
-          if (processedContentIds.has(content.id)) {
-            this.addLog(`Skipping already processed content ${content.id}`, "info");
-            continue;
-          }
-
-          const originalImages = this.extractImages(content.content?.rendered || "");
-          let contentWasUpdated = false;
-          let updateData: any = {};
-
-          // Process all fixes for this content, but only update WordPress once
-          for (const fix of fixes) {
-            try {
-              const result = await fixProcessor(content, fix);
-
-              // Track the fix result
-              applied.push({
-                ...fix,
-                description: result.description,
-                wordpressPostId: content.id,
-                success: result.updated,
-              });
-
-              // If this fix succeeded and we haven't updated yet
-              if (result.updated && !contentWasUpdated) {
-                if (result.data.content) {
-                  result.data.content = this.ensureImagesPreserved(
-                    result.data.content,
-                    originalImages
-                  );
-                }
-                updateData = { ...updateData, ...result.data };
-                contentWasUpdated = true;
-              }
-
-              if (result.updated) {
-                this.addLog(result.description, "success");
-              }
-
-            } catch (error) {
-              const errorMsg = `Fix failed for content ${content.id}: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`;
-              errors.push(errorMsg);
-              this.addLog(errorMsg, "error");
-            }
-          }
-
-          // Update WordPress only once per content item
-          if (contentWasUpdated && Object.keys(updateData).length > 0) {
-            try {
-              await this.updateWordPressContent(
-                creds,
-                content.id,
-                updateData,
-                content.contentType
-              );
-              processedContentIds.add(content.id);
-            } catch (error: any) {
-              errors.push(`WordPress update failed for ${content.id}: ${error.message}`);
-              this.addLog(`WordPress update failed for ${content.id}`, "error");
-            }
-          }
-
-          processedCount++;
-          if (processingOptions?.progressCallback) {
-            processingOptions.progressCallback(processedCount, allContent.length);
-          }
-        }
-
-        if (i + batchSize < allContent.length) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, limits.delayBetweenBatches)
-          );
-        }
-      }
-
-      if (applied.length === 0 && errors.length === 0) {
-        return {
-          applied: fixes.map((fix) => ({
-            ...fix,
-            success: true,
-            description: `Verified across ${allContent.length} page(s): Already meets requirements`,
-            after: "Already compliant",
-          })),
-          errors: [],
-        };
-      }
-
-      return { applied, errors };
-    } catch (error: any) {
-      const errorMsg = `WordPress content fix failed: ${error.message}`;
-      errors.push(errorMsg);
-      this.addLog(errorMsg, "error");
-      return { applied, errors };
+    let allContent: any[];
+    if (
+      processingOptions?.mode === ProcessingMode.PRIORITY &&
+      processingOptions?.priorityUrls
+    ) {
+      allContent = await this.fetchPriorityContent(
+        creds,
+        processingOptions.priorityUrls
+      );
+    } else {
+      allContent = await this.getAllWordPressContent(creds, maxItems);
     }
+
+    this.addLog(`Fetched ${allContent.length} content items to process`);
+
+    // ⭐ CRITICAL FIX: Track what content has been processed
+    const processedContentIds = new Set<number>();
+    const contentUpdatesByType = new Map<string, Map<number, any>>();
+    
+    let processedCount = 0;
+
+    // ⭐ CRITICAL FIX: Process each content item ONCE
+    for (let i = 0; i < allContent.length; i += batchSize) {
+      const batch = allContent.slice(i, Math.min(i + batchSize, allContent.length));
+      
+      for (const content of batch) {
+        // Skip if already processed
+        if (processedContentIds.has(content.id)) {
+          this.addLog(`Skipping already processed content ${content.id}`, "info");
+          continue;
+        }
+
+        const originalImages = this.extractImages(content.content?.rendered || "");
+        let contentNeedsUpdate = false;
+        let accumulatedUpdates: any = {};
+
+        // ⭐ CRITICAL FIX: Process ALL fixes for this content, but collect updates
+        for (const fix of fixes) {
+          try {
+            const result = await fixProcessor(content, fix);
+
+            // Always track the fix attempt
+            applied.push({
+              ...fix,
+              description: result.description,
+              wordpressPostId: content.id,
+              success: result.updated,
+            });
+
+            // Accumulate updates instead of applying immediately
+            if (result.updated) {
+              if (result.data.content) {
+                // Preserve images in the content
+                result.data.content = this.ensureImagesPreserved(
+                  result.data.content,
+                  originalImages
+                );
+                accumulatedUpdates.content = result.data.content;
+              }
+              if (result.data.title) {
+                accumulatedUpdates.title = result.data.title;
+              }
+              if (result.data.excerpt) {
+                accumulatedUpdates.excerpt = result.data.excerpt;
+              }
+              contentNeedsUpdate = true;
+              this.addLog(result.description, "success");
+            }
+
+          } catch (error) {
+            const errorMsg = `Fix failed for content ${content.id}: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`;
+            errors.push(errorMsg);
+            this.addLog(errorMsg, "error");
+          }
+        }
+
+        // ⭐ CRITICAL FIX: Update WordPress ONLY ONCE per content item
+        if (contentNeedsUpdate && Object.keys(accumulatedUpdates).length > 0) {
+          try {
+            this.addLog(
+              `Updating content ${content.id} with accumulated changes: ${Object.keys(accumulatedUpdates).join(', ')}`,
+              "info"
+            );
+            
+            await this.updateWordPressContent(
+              creds,
+              content.id,
+              accumulatedUpdates,
+              content.contentType
+            );
+            
+            processedContentIds.add(content.id);
+            this.addLog(`✅ Successfully updated content ${content.id}`, "success");
+          } catch (error: any) {
+            errors.push(`WordPress update failed for ${content.id}: ${error.message}`);
+            this.addLog(`WordPress update failed for ${content.id}`, "error");
+          }
+        }
+
+        processedCount++;
+        if (processingOptions?.progressCallback) {
+          processingOptions.progressCallback(processedCount, allContent.length);
+        }
+      }
+
+      if (i + batchSize < allContent.length) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, limits.delayBetweenBatches)
+        );
+      }
+    }
+
+    this.addLog(
+      `Processing complete: ${processedContentIds.size} content items updated`,
+      "success"
+    );
+
+    if (applied.length === 0 && errors.length === 0) {
+      return {
+        applied: fixes.map((fix) => ({
+          ...fix,
+          success: true,
+          description: `Verified across ${allContent.length} page(s): Already meets requirements`,
+          after: "Already compliant",
+        })),
+        errors: [],
+      };
+    }
+
+    return { applied, errors };
+  } catch (error: any) {
+    const errorMsg = `WordPress content fix failed: ${error.message}`;
+    errors.push(errorMsg);
+    this.addLog(errorMsg, "error");
+    return { applied, errors };
   }
+}
+
+
+
+  // FIXED: Modified fixWordPressContent to prevent reprocessing the same content
+  // private async fixWordPressContent(
+  //   creds: WordPressCredentials,
+  //   fixes: AIFix[],
+  //   fixProcessor: (
+  //     content: any,
+  //     fix: AIFix
+  //   ) => Promise<{
+  //     updated: boolean;
+  //     data: any;
+  //     description: string;
+  //   }>,
+  //   userId?: string,
+  //   processingOptions?: ProcessingOptions
+  // ): Promise<{ applied: AIFix[]; errors: string[] }> {
+  //   const applied: AIFix[] = [];
+  //   const errors: string[] = [];
+
+  //   try {
+  //     const limits = processingOptions?.mode
+  //       ? this.getProcessingLimits(processingOptions.mode)
+  //       : { maxItems: 10, batchSize: 5, delayBetweenBatches: 1000 };
+
+  //     const maxItems = processingOptions?.maxItems || limits.maxItems;
+  //     const batchSize = processingOptions?.batchSize || limits.batchSize;
+
+  //     let allContent: any[];
+  //     if (
+  //       processingOptions?.mode === ProcessingMode.PRIORITY &&
+  //       processingOptions?.priorityUrls
+  //     ) {
+  //       allContent = await this.fetchPriorityContent(
+  //         creds,
+  //         processingOptions.priorityUrls
+  //       );
+  //     } else {
+  //       allContent = await this.getAllWordPressContent(creds, maxItems);
+  //     }
+
+  //     this.addLog(`Fetched ${allContent.length} content items to process`);
+
+  //     let processedCount = 0;
+  //     const processedContentIds = new Set<number>(); // Track processed content
+
+  //     for (let i = 0; i < allContent.length; i += batchSize) {
+  //       const batch = allContent.slice(i, Math.min(i + batchSize, allContent.length));
+        
+  //       for (const content of batch) {
+  //         // CRITICAL FIX: Only process each content item once
+  //         if (processedContentIds.has(content.id)) {
+  //           this.addLog(`Skipping already processed content ${content.id}`, "info");
+  //           continue;
+  //         }
+
+  //         const originalImages = this.extractImages(content.content?.rendered || "");
+  //         let contentWasUpdated = false;
+  //         let updateData: any = {};
+
+  //         // Process all fixes for this content, but only update WordPress once
+  //         for (const fix of fixes) {
+  //           try {
+  //             const result = await fixProcessor(content, fix);
+
+  //             // Track the fix result
+  //             applied.push({
+  //               ...fix,
+  //               description: result.description,
+  //               wordpressPostId: content.id,
+  //               success: result.updated,
+  //             });
+
+  //             // If this fix succeeded and we haven't updated yet
+  //             if (result.updated && !contentWasUpdated) {
+  //               if (result.data.content) {
+  //                 result.data.content = this.ensureImagesPreserved(
+  //                   result.data.content,
+  //                   originalImages
+  //                 );
+  //               }
+  //               updateData = { ...updateData, ...result.data };
+  //               contentWasUpdated = true;
+  //             }
+
+  //             if (result.updated) {
+  //               this.addLog(result.description, "success");
+  //             }
+
+  //           } catch (error) {
+  //             const errorMsg = `Fix failed for content ${content.id}: ${
+  //               error instanceof Error ? error.message : "Unknown error"
+  //             }`;
+  //             errors.push(errorMsg);
+  //             this.addLog(errorMsg, "error");
+  //           }
+  //         }
+
+  //         // Update WordPress only once per content item
+  //         if (contentWasUpdated && Object.keys(updateData).length > 0) {
+  //           try {
+  //             await this.updateWordPressContent(
+  //               creds,
+  //               content.id,
+  //               updateData,
+  //               content.contentType
+  //             );
+  //             processedContentIds.add(content.id);
+  //           } catch (error: any) {
+  //             errors.push(`WordPress update failed for ${content.id}: ${error.message}`);
+  //             this.addLog(`WordPress update failed for ${content.id}`, "error");
+  //           }
+  //         }
+
+  //         processedCount++;
+  //         if (processingOptions?.progressCallback) {
+  //           processingOptions.progressCallback(processedCount, allContent.length);
+  //         }
+  //       }
+
+  //       if (i + batchSize < allContent.length) {
+  //         await new Promise((resolve) =>
+  //           setTimeout(resolve, limits.delayBetweenBatches)
+  //         );
+  //       }
+  //     }
+
+  //     if (applied.length === 0 && errors.length === 0) {
+  //       return {
+  //         applied: fixes.map((fix) => ({
+  //           ...fix,
+  //           success: true,
+  //           description: `Verified across ${allContent.length} page(s): Already meets requirements`,
+  //           after: "Already compliant",
+  //         })),
+  //         errors: [],
+  //       };
+  //     }
+
+  //     return { applied, errors };
+  //   } catch (error: any) {
+  //     const errorMsg = `WordPress content fix failed: ${error.message}`;
+  //     errors.push(errorMsg);
+  //     this.addLog(errorMsg, "error");
+  //     return { applied, errors };
+  //   }
+  // }
+
+
+
+
 
 
   private extractImages(html: string): Array<{ 
@@ -2786,7 +2966,6 @@ private async callAIWithImageProtection(
 }
 
 
-
 private async expandThinContent(
   creds: WordPressCredentials,
   fixes: AIFix[],
@@ -2796,14 +2975,11 @@ private async expandThinContent(
     creds,
     fixes,
     async (content, fix) => {
-      const contentText = this.extractTextFromHTML(
-        content.content?.rendered || ""
-      );
+      const contentHtml = content.content?.rendered || content.content || "";
+      const contentText = this.extractTextFromHTML(contentHtml);
       const wordCount = contentText.split(/\s+/).filter(w => w.length > 0).length;
       const TARGET_WORDS = 800;
-      const IDEAL_WORDS = 1200;
 
-      // Only skip if content is already substantial
       if (wordCount >= TARGET_WORDS) {
         return {
           updated: false,
@@ -2817,78 +2993,57 @@ private async expandThinContent(
         return {
           updated: false,
           data: {},
-          description: "AI provider not available for content expansion",
+          description: "AI provider not available",
         };
       }
 
       try {
-        this.addLog(`Expanding content from ${wordCount} words to ${TARGET_WORDS}+ words`, "info");
+        this.addLog(`Expanding content from ${wordCount} to ${TARGET_WORDS}+ words`, "info");
         
-        // First attempt: aggressive expansion
-        let expandedContent = await this.expandContentWithAI(
+        const expandedContent = await this.expandContentWithAI(
           content.title?.rendered || content.title,
-          content.content?.rendered || "",
+          contentHtml,
           provider,
           userId,
           TARGET_WORDS,
-          IDEAL_WORDS
+          1200
         );
 
-        let newWordCount = this.extractTextFromHTML(expandedContent)
+        const newWordCount = this.extractTextFromHTML(expandedContent)
           .split(/\s+/)
           .filter(w => w.length > 0).length;
 
-        // Retry if we didn't reach the target
-        let attempts = 1;
-        const MAX_ATTEMPTS = 2;
-
-        while (newWordCount < TARGET_WORDS && attempts < MAX_ATTEMPTS) {
-          attempts++;
+        // ⭐ CRITICAL FIX: Validate content wasn't shortened
+        if (newWordCount < wordCount) {
           this.addLog(
-            `Expansion attempt ${attempts}: Current ${newWordCount} words, target ${TARGET_WORDS}`,
-            "warning"
+            `❌ Rejecting expansion: content shortened from ${wordCount} to ${newWordCount}`,
+            "error"
           );
-
-          expandedContent = await this.expandContentWithAI(
-            content.title?.rendered || content.title,
-            expandedContent, // Use the already expanded content as base
-            provider,
-            userId,
-            TARGET_WORDS,
-            IDEAL_WORDS,
-            attempts > 1 // isRetry flag
-          );
-
-          newWordCount = this.extractTextFromHTML(expandedContent)
-            .split(/\s+/)
-            .filter(w => w.length > 0).length;
-        }
-
-        // Final validation
-        if (newWordCount < TARGET_WORDS) {
-          this.addLog(
-            `⚠️ Could not reach ${TARGET_WORDS} words after ${attempts} attempts (final: ${newWordCount} words)`,
-            "warning"
-          );
-          
-          // If we at least improved it, still apply
-          if (newWordCount > wordCount * 1.3) {
-            return {
-              updated: true,
-              data: { content: expandedContent },
-              description: `Expanded content from ${wordCount} to ${newWordCount} words (target: ${TARGET_WORDS})`,
-            };
-          }
-          
           return {
             updated: false,
             data: {},
-            description: `Could not sufficiently expand content (${wordCount} → ${newWordCount} words)`,
+            description: `Rejected: AI shortened content (${wordCount} → ${newWordCount} words)`,
           };
         }
 
+        if (newWordCount < TARGET_WORDS) {
+          this.addLog(
+            `⚠️ Could not reach ${TARGET_WORDS} words (final: ${newWordCount} words)`,
+            "warning"
+          );
+          
+          // Only apply if we improved by at least 30%
+          if (newWordCount < wordCount * 1.3) {
+            return {
+              updated: false,
+              data: {},
+              description: `Insufficient expansion: ${wordCount} → ${newWordCount} words`,
+            };
+          }
+        }
+
         this.addLog(
-          `✅ Successfully expanded content: ${wordCount} → ${newWordCount} words`,
+          `✅ Successfully expanded: ${wordCount} → ${newWordCount} words`,
           "success"
         );
 
@@ -2902,13 +3057,136 @@ private async expandThinContent(
         return {
           updated: false,
           data: {},
-          description: `Failed to expand content: ${error.message}`,
+          description: `Failed: ${error.message}`,
         };
       }
     },
     userId
   );
 }
+
+// private async expandThinContent(
+//   creds: WordPressCredentials,
+//   fixes: AIFix[],
+//   userId?: string
+// ): Promise<{ applied: AIFix[]; errors: string[] }> {
+//   return this.fixWordPressContent(
+//     creds,
+//     fixes,
+//     async (content, fix) => {
+//       const contentText = this.extractTextFromHTML(
+//         content.content?.rendered || ""
+//       );
+//       const wordCount = contentText.split(/\s+/).filter(w => w.length > 0).length;
+//       const TARGET_WORDS = 800;
+//       const IDEAL_WORDS = 1200;
+
+//       // Only skip if content is already substantial
+//       if (wordCount >= TARGET_WORDS) {
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `Content length already sufficient (${wordCount} words)`,
+//         };
+//       }
+
+//       const provider = await this.selectAIProvider(userId);
+//       if (!provider) {
+//         return {
+//           updated: false,
+//           data: {},
+//           description: "AI provider not available for content expansion",
+//         };
+//       }
+
+//       try {
+//         this.addLog(`Expanding content from ${wordCount} words to ${TARGET_WORDS}+ words`, "info");
+        
+//         // First attempt: aggressive expansion
+//         let expandedContent = await this.expandContentWithAI(
+//           content.title?.rendered || content.title,
+//           content.content?.rendered || "",
+//           provider,
+//           userId,
+//           TARGET_WORDS,
+//           IDEAL_WORDS
+//         );
+
+//         let newWordCount = this.extractTextFromHTML(expandedContent)
+//           .split(/\s+/)
+//           .filter(w => w.length > 0).length;
+
+//         // Retry if we didn't reach the target
+//         let attempts = 1;
+//         const MAX_ATTEMPTS = 2;
+
+//         while (newWordCount < TARGET_WORDS && attempts < MAX_ATTEMPTS) {
+//           attempts++;
+//           this.addLog(
+//             `Expansion attempt ${attempts}: Current ${newWordCount} words, target ${TARGET_WORDS}`,
+//             "warning"
+//           );
+
+//           expandedContent = await this.expandContentWithAI(
+//             content.title?.rendered || content.title,
+//             expandedContent, // Use the already expanded content as base
+//             provider,
+//             userId,
+//             TARGET_WORDS,
+//             IDEAL_WORDS,
+//             attempts > 1 // isRetry flag
+//           );
+
+//           newWordCount = this.extractTextFromHTML(expandedContent)
+//             .split(/\s+/)
+//             .filter(w => w.length > 0).length;
+//         }
+
+//         // Final validation
+//         if (newWordCount < TARGET_WORDS) {
+//           this.addLog(
+//             `⚠️ Could not reach ${TARGET_WORDS} words after ${attempts} attempts (final: ${newWordCount} words)`,
+//             "warning"
+//           );
+          
+//           // If we at least improved it, still apply
+//           if (newWordCount > wordCount * 1.3) {
+//             return {
+//               updated: true,
+//               data: { content: expandedContent },
+//               description: `Expanded content from ${wordCount} to ${newWordCount} words (target: ${TARGET_WORDS})`,
+//             };
+//           }
+          
+//           return {
+//             updated: false,
+//             data: {},
+//             description: `Could not sufficiently expand content (${wordCount} → ${newWordCount} words)`,
+//           };
+//         }
+
+//         this.addLog(
+//           `✅ Successfully expanded content: ${wordCount} → ${newWordCount} words`,
+//           "success"
+//         );
+
+//         return {
+//           updated: true,
+//           data: { content: expandedContent },
+//           description: `Expanded content from ${wordCount} to ${newWordCount} words`,
+//         };
+//       } catch (error: any) {
+//         this.addLog(`Content expansion failed: ${error.message}`, "error");
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `Failed to expand content: ${error.message}`,
+//         };
+//       }
+//     },
+//     userId
+//   );
+// }
 
 private async expandContentWithAI(
   title: string,
