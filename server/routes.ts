@@ -27,7 +27,7 @@ import multer from 'multer';
 import { cloudinaryStorage } from "./services/cloudinary-storage";
 import {db} from './db'
 import { emailService } from './services/email-service';
-import { addCorsHeaders } from './services/cors-utils.js';
+import { addCorsHeaders, isOriginAllowed } from './services/cors-utils.js';
 
 //added
 import { schedulerService } from './services/scheduler-service';
