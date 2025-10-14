@@ -1100,8 +1100,19 @@ console.log('🔍 API_BASE_URL:', API_BASE_URL);
 
 // Helper function to ensure all fetches include credentials
 const fetchWithCredentials = (url: string, options: RequestInit = {}) => {
+  // Ensure url starts with / for relative URLs
+  const normalizedUrl = url.startsWith('http') ? url : 
+                       url.startsWith('/') ? url : `/${url}`;
+  
   // Prepend API_BASE_URL if url is relative
-  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  const fullUrl = normalizedUrl.startsWith('http') ? normalizedUrl : `${API_BASE_URL}${normalizedUrl}`;
+  
+  // Debug log to see what URLs are being called
+  console.log('🌐 API Call:', {
+    input: url,
+    normalized: normalizedUrl,
+    final: fullUrl
+  });
   
   return fetch(fullUrl, {
     ...options,
@@ -1112,7 +1123,6 @@ const fetchWithCredentials = (url: string, options: RequestInit = {}) => {
     },
   });
 };
-
 // Complete user-scoped API client
 export const api = {
   getContentById: (contentId: string) =>
