@@ -917,7 +917,7 @@
 
 
 
-// server/routes/gsc.routes.ts - Complete version with sanitization
+// server/routes/gsc.routes.ts - Complete version with Vercel + Render fixes
 import { Router, Request, Response, NextFunction } from 'express';
 import { google } from 'googleapis';
 import { gscStorage } from '../services/gsc-storage';
@@ -964,9 +964,23 @@ const GSC_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.profile'
 ];
 
-// Helper function to get redirect URI
+// Helper function to get redirect URI - UPDATED for Vercel + Render
 const getRedirectUri = () => {
-  return process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/gsc/oauth-callback';
+  // Priority: explicit GOOGLE_REDIRECT_URI > constructed from API_URL > localhost
+  if (process.env.GOOGLE_REDIRECT_URI) {
+    console.log('📍 Using explicit redirect URI:', process.env.GOOGLE_REDIRECT_URI);
+    return process.env.GOOGLE_REDIRECT_URI;
+  }
+  
+  const apiUrl = process.env.API_URL || 'http://localhost:5000';
+  const redirectUri = `${apiUrl}/api/gsc/oauth-callback`;
+  console.log('📍 Constructed redirect URI:', redirectUri);
+  return redirectUri;
+};
+
+// Helper function to get client URL - NEW
+const getClientUrl = () => {
+  return process.env.CLIENT_URL || 'http://localhost:5173'; // Vite default port
 };
 
 // Input validation middleware for OAuth credentials
@@ -1063,6 +1077,7 @@ router.get('/auth-url', requireAuth, authLimiter, async (req: AuthenticatedReque
       state: userId
     });
     
+    console.log('✅ Generated auth URL:', authUrl);
     res.json({ authUrl });
   } catch (error) {
     console.error('GSC auth URL error:', error);
@@ -1120,6 +1135,7 @@ router.post('/auth-url', requireAuth, authLimiter, async (req: AuthenticatedRequ
       state: userId
     });
     
+    console.log('✅ Generated auth URL:', authUrl);
     res.json({ authUrl });
   } catch (error) {
     console.error('GSC auth URL error:', error);
@@ -1217,14 +1233,18 @@ router.post('/auth', requireAuth, authLimiter, async (req: AuthenticatedRequest,
   }
 });
 
+// UPDATED oauth-callback endpoint for Vercel + Render
 router.get('/oauth-callback', async (req: Request, res: Response) => {
   try {
+    // Set CORS headers for cross-origin popup
     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
     
     const { code, state, error } = req.query;
     
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    // Get client URL from environment
+    const clientUrl = getClientUrl();
+    console.log('🔗 OAuth callback - Client URL:', clientUrl);
     
     if (error) {
       const safeError = InputSanitizer.escapeHtml(error as string);
@@ -1234,27 +1254,35 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
         <head>
           <title>Authentication Error</title>
           <style>
-            body { font-family: system-ui; padding: 20px; text-align: center; }
+            body { 
+              font-family: system-ui; 
+              padding: 20px; 
+              text-align: center;
+              background: #fee;
+            }
             .error { color: #dc2626; }
           </style>
         </head>
         <body>
           <h2 class="error">Authentication Failed</h2>
           <p>${safeError}</p>
+          <p>This window will close automatically...</p>
           <script>
             const error = ${JSON.stringify(safeError)};
             
-            if (window.opener && !window.opener.closed) {
-              window.opener.postMessage({ 
-                type: 'GOOGLE_AUTH_ERROR', 
-                error: error 
-              }, '${clientUrl}');
-            }
+            console.log('Sending error to parent:', error);
             
-            localStorage.setItem('gsc_auth_error', JSON.stringify({
-              error: error,
-              timestamp: Date.now()
-            }));
+            if (window.opener && !window.opener.closed) {
+              try {
+                window.opener.postMessage({ 
+                  type: 'GOOGLE_AUTH_ERROR', 
+                  error: error 
+                }, '${clientUrl}');
+                console.log('Error message sent to:', '${clientUrl}');
+              } catch(e) {
+                console.error('Failed to send error message:', e);
+              }
+            }
             
             setTimeout(() => window.close(), 3000);
           </script>
@@ -1270,24 +1298,34 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
         <head>
           <title>Authentication Error</title>
           <style>
-            body { font-family: system-ui; padding: 20px; text-align: center; }
+            body { 
+              font-family: system-ui; 
+              padding: 20px; 
+              text-align: center;
+              background: #fee;
+            }
             .error { color: #dc2626; }
           </style>
         </head>
         <body>
           <h2 class="error">Missing Authorization Code</h2>
           <p>The authentication process didn't complete properly.</p>
+          <p>This window will close automatically...</p>
           <script>
+            console.log('No authorization code received');
+            
             if (window.opener && !window.opener.closed) {
-              window.opener.postMessage({ 
-                type: 'GOOGLE_AUTH_ERROR', 
-                error: 'Missing authorization code' 
-              }, '${clientUrl}');
+              try {
+                window.opener.postMessage({ 
+                  type: 'GOOGLE_AUTH_ERROR', 
+                  error: 'Missing authorization code' 
+                }, '${clientUrl}');
+                console.log('Error message sent to:', '${clientUrl}');
+              } catch(e) {
+                console.error('Failed to send error message:', e);
+              }
             }
-            localStorage.setItem('gsc_auth_error', JSON.stringify({
-              error: 'Missing authorization code',
-              timestamp: Date.now()
-            }));
+            
             setTimeout(() => window.close(), 3000);
           </script>
         </body>
@@ -1297,6 +1335,8 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
     
     const safeCode = InputSanitizer.escapeHtml(code as string);
     const safeState = state ? InputSanitizer.escapeHtml(state as string) : '';
+    
+    console.log('✅ OAuth callback successful, sending code to client');
     
     res.send(`
       <!DOCTYPE html>
@@ -1322,6 +1362,7 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 400px;
           }
           .success { color: #059669; }
           button {
@@ -1332,87 +1373,125 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-size: 14px;
           }
           button:hover { background: #5a67d8; }
+          .debug {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+            text-align: left;
+          }
         </style>
       </head>
       <body>
         <div class="container">
           <h2 class="success">✅ Authentication Successful!</h2>
           <p>Completing the authentication process...</p>
-          <p>This window should close automatically.</p>
+          <p id="status">Sending credentials...</p>
+          <div class="debug">
+            <strong>Debug Info:</strong><br>
+            Target: ${clientUrl}<br>
+            Status: <span id="debug-status">Initializing...</span>
+          </div>
           <button onclick="closeWindow()">Close Window</button>
         </div>
         <script>
           const code = ${JSON.stringify(safeCode)};
           const state = ${JSON.stringify(safeState)};
+          const clientUrl = '${clientUrl}';
+          
+          console.log('OAuth Callback Page Loaded');
+          console.log('Code received:', code ? 'Yes' : 'No');
+          console.log('Target client URL:', clientUrl);
+          console.log('Window opener exists:', !!window.opener);
+          
+          function updateStatus(message, isError = false) {
+            const statusEl = document.getElementById('status');
+            const debugEl = document.getElementById('debug-status');
+            statusEl.textContent = message;
+            debugEl.textContent = message;
+            debugEl.style.color = isError ? '#dc2626' : '#059669';
+            console.log('[Status]', message);
+          }
           
           function sendToOpener() {
-            if (window.opener && !window.opener.closed) {
-              ['${clientUrl}', window.location.origin, '*'].forEach(origin => {
-                try {
-                  window.opener.postMessage({ 
-                    type: 'GOOGLE_AUTH_SUCCESS', 
-                    code: code,
-                    state: state
-                  }, origin);
-                } catch(e) {}
-              });
+            if (!window.opener || window.opener.closed) {
+              updateStatus('Parent window not found', true);
+              console.error('Window opener is not available');
+              return false;
+            }
+            
+            try {
+              console.log('Sending auth success message to:', clientUrl);
+              
+              window.opener.postMessage({ 
+                type: 'GOOGLE_AUTH_SUCCESS', 
+                code: code,
+                state: state
+              }, clientUrl);
+              
+              updateStatus('Credentials sent successfully!');
+              console.log('✅ Message sent successfully to:', clientUrl);
+              return true;
+            } catch(e) {
+              updateStatus('Failed to send credentials: ' + e.message, true);
+              console.error('Failed to send message:', e);
+              return false;
             }
           }
           
-          function saveToStorage() {
-            try {
-              localStorage.setItem('gsc_auth_result', JSON.stringify({
-                type: 'GOOGLE_AUTH_SUCCESS',
-                code: code,
-                state: state,
-                timestamp: Date.now()
-              }));
-              
-              window.dispatchEvent(new StorageEvent('storage', {
-                key: 'gsc_auth_result',
-                newValue: JSON.stringify({
-                  type: 'GOOGLE_AUTH_SUCCESS',
-                  code: code,
-                  state: state,
-                  timestamp: Date.now()
-                })
-              }));
-            } catch(e) {}
-          }
-          
-          function broadcastMessage() {
-            try {
-              const channel = new BroadcastChannel('gsc_auth');
-              channel.postMessage({
-                type: 'GOOGLE_AUTH_SUCCESS',
-                code: code,
-                state: state
-              });
-              channel.close();
-            } catch(e) {}
-          }
-          
-          sendToOpener();
-          saveToStorage();
-          broadcastMessage();
+          // Send the message
+          const sent = sendToOpener();
           
           function closeWindow() {
+            console.log('Closing window...');
             window.close();
+            
+            // Fallback: redirect to client URL if window won't close
             setTimeout(() => {
-              window.location.href = '${clientUrl}';
+              if (!window.closed) {
+                console.log('Window did not close, redirecting...');
+                window.location.href = clientUrl;
+              }
             }, 100);
           }
           
-          setTimeout(closeWindow, 2000);
+          // Auto-close after 3 seconds if successful
+          if (sent) {
+            setTimeout(closeWindow, 3000);
+          }
         </script>
       </body>
       </html>
     `);
   } catch (error) {
     console.error('OAuth callback error:', error);
-    res.status(500).send('Authentication failed');
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Authentication Error</title>
+        <style>
+          body { 
+            font-family: system-ui; 
+            padding: 20px; 
+            text-align: center;
+            background: #fee;
+          }
+          .error { color: #dc2626; }
+        </style>
+      </head>
+      <body>
+        <h2 class="error">Authentication Failed</h2>
+        <p>An unexpected error occurred. Please try again.</p>
+        <button onclick="window.close()">Close Window</button>
+      </body>
+      </html>
+    `);
   }
 });
 
@@ -1445,19 +1524,17 @@ router.get('/accounts', requireAuth, async (req: AuthenticatedRequest, res: Resp
     
     console.log(`📋 Fetching GSC accounts for user: ${userId}`);
     
-    // Get all GSC accounts - returns GscAccount[] with id, email, tokenExpiry (ms), isActive
     const accounts = await gscStorage.getGscAccounts(userId);
     
-    // Transform to match frontend format (exclude sensitive data)
     const accountsData = accounts.map((account: any) => ({
-      id: account.id,  // ✅ FIXED: Use account.id (not account.gsc_account_id)
+      id: account.id,
       email: account.email,
       name: account.name,
       picture: account.picture,
-      isActive: account.isActive,  // ✅ FIXED: Already camelCase
-      tokenExpiry: account.tokenExpiry,  // ✅ FIXED: Already in milliseconds
-      hasRefreshToken: !!account.refreshToken,  // ✅ FIXED: Already camelCase
-      createdAt: account.created_at  // Keep snake_case as it comes from DB
+      isActive: account.isActive,
+      tokenExpiry: account.tokenExpiry,
+      hasRefreshToken: !!account.refreshToken,
+      createdAt: account.created_at
     }));
     
     console.log(`✅ Found ${accountsData.length} GSC accounts`);
@@ -1475,7 +1552,6 @@ router.get('/user/profile', requireAuth, async (req: AuthenticatedRequest, res: 
     
     console.log(`👤 Fetching complete profile for user: ${userId}`);
     
-    // Use the new getUserGscProfile method
     const profileData = await gscStorage.getUserGscProfile(userId);
     
     res.json({
@@ -1514,7 +1590,7 @@ router.post('/accounts/:accountId/verify', requireAuth, async (req: Authenticate
     }
     
     const timeUntilExpiry = account.tokenExpiry - Date.now();
-    const needsRefresh = timeUntilExpiry < 300000; // 5 minutes
+    const needsRefresh = timeUntilExpiry < 300000;
     
     if (needsRefresh && account.refreshToken) {
       try {
@@ -1597,10 +1673,8 @@ router.delete('/accounts/:accountId', requireAuth, async (req: AuthenticatedRequ
     
     console.log(`🗑️ Deleting GSC account with cascade: ${accountId}`);
     
-    // Delete account and all related data (uses cascade delete)
     await gscStorage.deleteGscAccount(userId, validation.sanitized);
     
-    // Remove from memory cache
     const cacheKey = `${userId}_${validation.sanitized}`;
     gscUserTokens.delete(cacheKey);
     

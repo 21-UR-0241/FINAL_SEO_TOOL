@@ -2249,6 +2249,15 @@
 
 
 
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Globe,
@@ -2261,14 +2270,10 @@ import {
   User,
   Trash2,
   FileText,
-  Link,
   TrendingUp,
   Clock,
   Search,
   BarChart,
-  LogOut,
-  Settings,
-  Shield,
   X,
   ChevronDown,
   ChevronRight,
@@ -2277,13 +2282,19 @@ import {
   Copy,
   Check,
   AlertTriangle,
-  Key,
   HelpCircle,
   Eye,
   EyeOff,
 } from "lucide-react";
 
-// Import sanitization utilities
+// Environment Configuration for Vite
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const CLIENT_URL = import.meta.env.VITE_CLIENT_URL || window.location.origin;
+
+console.log('🌍 API Base URL:', API_BASE_URL);
+console.log('🌍 Client URL:', CLIENT_URL);
+
+// Sanitization utilities
 const Sanitizer = {
   validateUrl: (url) => {
     if (!url || typeof url !== "string") {
@@ -2455,60 +2466,13 @@ const Sanitizer = {
   },
 };
 
-// Types
-interface GoogleAccount {
-  id: string;
-  email: string;
-  name: string;
-  picture?: string;
-  accessToken: string;
-  refreshToken: string;
-  tokenExpiry: number;
-  isActive: boolean;
-}
-
-interface SearchConsoleProperty {
-  siteUrl: string;
-  permissionLevel: string;
-  siteType: "SITE" | "DOMAIN";
-  verified: boolean;
-  accountId: string;
-}
-
-interface IndexingRequest {
-  url: string;
-  type: "URL_UPDATED" | "URL_DELETED";
-  notifyTime?: string;
-  status?: "pending" | "success" | "error";
-  message?: string;
-}
-
-interface PerformanceData {
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-  date?: string;
-}
-
-interface URLInspectionResult {
-  url: string;
-  indexStatus: "INDEXED" | "NOT_INDEXED" | "CRAWLED" | "DISCOVERED";
-  lastCrawlTime?: string;
-  pageFetchState?: string;
-  googleCanonical?: string;
-  userCanonical?: string;
-  sitemap?: string[];
-  referringUrls?: string[];
-  mobileUsability?: "MOBILE_FRIENDLY" | "NOT_MOBILE_FRIENDLY" | "NEUTRAL";
-  richResultsStatus?: string;
-}
-
-// API Service Class with Backend Integration
+// API Service Class
 class SearchConsoleAPI {
-  private static baseURL = "/api/gsc";
+  static baseURL = `${API_BASE_URL}/api/gsc`;
 
-  private static async fetchWithAuth(url: string, options: RequestInit = {}) {
+  static async fetchWithAuth(url, options = {}) {
+    console.log('🔗 API Request:', url);
+    
     const response = await fetch(url, {
       ...options,
       credentials: "include",
@@ -2532,60 +2496,7 @@ class SearchConsoleAPI {
     return response.json();
   }
 
-  // User & Account Management
-  static async getCurrentUser(): Promise<{ id: string; email?: string } | null> {
-    try {
-      const data = await this.fetchWithAuth(`${this.baseURL}/current-user`);
-      return data.user;
-    } catch (error: any) {
-      if (error.message?.includes('401') || error.message?.includes('Not authenticated')) {
-        return null;
-      }
-      throw error;
-    }
-  }
-
-  static async getAccounts(): Promise<any[]> {
-    try {
-      const accounts = await this.fetchWithAuth(`${this.baseURL}/accounts`);
-      return accounts;
-    } catch (error: any) {
-      console.error('Failed to fetch accounts:', error);
-      return [];
-    }
-  }
-
-  static async getUserProfile(): Promise<any> {
-    return this.fetchWithAuth(`${this.baseURL}/user/profile`);
-  }
-
-  static async verifyAccount(accountId: string): Promise<{
-    isValid: boolean;
-    needsReauth?: boolean;
-    refreshed?: boolean;
-    expiresIn?: number;
-    tokenExpiry?: number;
-  }> {
-    return this.fetchWithAuth(`${this.baseURL}/accounts/${accountId}/verify`, {
-      method: 'POST'
-    });
-  }
-
-  static async deleteAccount(accountId: string): Promise<void> {
-    await this.fetchWithAuth(`${this.baseURL}/accounts/${accountId}`, {
-      method: 'DELETE'
-    });
-  }
-
-  static async getAccountStatistics(accountId: string): Promise<any> {
-    return this.fetchWithAuth(`${this.baseURL}/accounts/${accountId}/statistics`);
-  }
-
-  // Existing methods
-  static async getAuthUrl(
-    clientId?: string,
-    clientSecret?: string
-  ): Promise<string> {
+  static async getAuthUrl(clientId, clientSecret) {
     const body =
       clientId && clientSecret
         ? JSON.stringify({ clientId, clientSecret })
@@ -2599,7 +2510,7 @@ class SearchConsoleAPI {
     return data.authUrl;
   }
 
-  static async authenticateAccount(code: string): Promise<GoogleAccount> {
+  static async authenticateAccount(code) {
     const data = await this.fetchWithAuth(`${this.baseURL}/auth`, {
       method: "POST",
       body: JSON.stringify({ code }),
@@ -2607,51 +2518,34 @@ class SearchConsoleAPI {
     return data.account;
   }
 
-  static async getProperties(
-    accountId: string
-  ): Promise<SearchConsoleProperty[]> {
+  static async getProperties(accountId) {
     return this.fetchWithAuth(
       `${this.baseURL}/properties?accountId=${accountId}`
     );
   }
 
-  static async requestIndexing(
-    accountId: string,
-    request: IndexingRequest
-  ): Promise<any> {
+  static async requestIndexing(accountId, request) {
     return this.fetchWithAuth(`${this.baseURL}/index`, {
       method: "POST",
       body: JSON.stringify({ accountId, ...request }),
     });
   }
 
-  static async inspectURL(
-    accountId: string,
-    siteUrl: string,
-    inspectionUrl: string
-  ): Promise<URLInspectionResult> {
+  static async inspectURL(accountId, siteUrl, inspectionUrl) {
     return this.fetchWithAuth(`${this.baseURL}/inspect`, {
       method: "POST",
       body: JSON.stringify({ accountId, siteUrl, inspectionUrl }),
     });
   }
 
-  static async submitSitemap(
-    accountId: string,
-    siteUrl: string,
-    sitemapUrl: string
-  ): Promise<any> {
+  static async submitSitemap(accountId, siteUrl, sitemapUrl) {
     return this.fetchWithAuth(`${this.baseURL}/sitemap`, {
       method: "POST",
       body: JSON.stringify({ accountId, siteUrl, sitemapUrl }),
     });
   }
 
-  static async getPerformance(
-    accountId: string,
-    siteUrl: string,
-    days: number = 28
-  ): Promise<PerformanceData[]> {
+  static async getPerformance(accountId, siteUrl, days = 28) {
     return this.fetchWithAuth(
       `${
         this.baseURL
@@ -2661,20 +2555,14 @@ class SearchConsoleAPI {
     );
   }
 
-  static async refreshToken(
-    accountId: string,
-    refreshToken: string
-  ): Promise<any> {
+  static async refreshToken(accountId, refreshToken) {
     return this.fetchWithAuth(`${this.baseURL}/refresh-token`, {
       method: "POST",
       body: JSON.stringify({ accountId, refreshToken }),
     });
   }
 
-  static async saveConfiguration(
-    clientId: string,
-    clientSecret: string
-  ): Promise<void> {
+  static async saveConfiguration(clientId, clientSecret) {
     await this.fetchWithAuth(`${this.baseURL}/configure`, {
       method: "POST",
       body: JSON.stringify({ clientId, clientSecret }),
@@ -2683,19 +2571,14 @@ class SearchConsoleAPI {
 }
 
 // OAuth Configuration Modal Component
-const OAuthConfigurationModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (clientId: string, clientSecret: string) => Promise<void>;
-  isLoading: boolean;
-}> = ({ isOpen, onClose, onSubmit, isLoading }) => {
+const OAuthConfigurationModal = ({ isOpen, onClose, onSubmit, isLoading }) => {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [showSecret, setShowSecret] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState([]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const validation = Sanitizer.validateOAuthCredentials(
@@ -2856,7 +2739,10 @@ const OAuthConfigurationModal: React.FC<{
                   <li>Enable the Google Search Console API and Indexing API</li>
                   <li>Go to "Credentials" and create OAuth 2.0 credentials</li>
                   <li>
-                    Set the redirect URI to your backend callback URL
+                    Set the redirect URI to:{" "}
+                    <code className="bg-gray-100 px-1 py-0.5 rounded text-xs break-all">
+                      {API_BASE_URL}/api/gsc/oauth-callback
+                    </code>
                   </li>
                   <li>Copy your Client ID and Client Secret</li>
                 </ol>
@@ -2873,7 +2759,6 @@ const OAuthConfigurationModal: React.FC<{
                 </div>
               </div>
             )}
-
 
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
               <button
@@ -2909,123 +2794,59 @@ const OAuthConfigurationModal: React.FC<{
   );
 };
 
-// Main Component with Backend Integration
-const GoogleSearchConsole: React.FC = () => {
-  const [accounts, setAccounts] = useState<GoogleAccount[]>([]);
-  const [properties, setProperties] = useState<SearchConsoleProperty[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<GoogleAccount | null>(
-    null
-  );
-  const [selectedProperty, setSelectedProperty] =
-    useState<SearchConsoleProperty | null>(null);
-  const [indexingQueue, setIndexingQueue] = useState<IndexingRequest[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [loadingUser, setLoadingUser] = useState<boolean>(true);
-  const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null);
-  const [activeTab, setActiveTab] = useState
-    "index" | "inspect" | "sitemap" | "performance"
-  >("index");
-  const [notification, setNotification] = useState<{
-    type: "success" | "error" | "info" | "warning";
-    message: string;
-  } | null>(null);
+// Main Component
+const GoogleSearchConsole = () => {
+  const [accounts, setAccounts] = useState([]);
+  const [properties, setProperties] = useState([]);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [indexingQueue, setIndexingQueue] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("index");
+  const [notification, setNotification] = useState(null);
 
-  // Form states
-  const [urlToIndex, setUrlToIndex] = useState<string>("");
-  const [urlToInspect, setUrlToInspect] = useState<string>("");
-  const [sitemapUrl, setSitemapUrl] = useState<string>("");
-  const [bulkUrls, setBulkUrls] = useState<string>("");
-  const [inspectionResult, setInspectionResult] =
-    useState<URLInspectionResult | null>(null);
-  const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
-  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
-  const [quotaUsage, setQuotaUsage] = useState<{ used: number; limit: number }>(
-    { used: 0, limit: 200 }
-  );
-  const [accountDropdownOpen, setAccountDropdownOpen] =
-    useState<boolean>(false);
+  const [urlToIndex, setUrlToIndex] = useState("");
+  const [urlToInspect, setUrlToInspect] = useState("");
+  const [sitemapUrl, setSitemapUrl] = useState("");
+  const [bulkUrls, setBulkUrls] = useState("");
+  const [inspectionResult, setInspectionResult] = useState(null);
+  const [performanceData, setPerformanceData] = useState([]);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [quotaUsage, setQuotaUsage] = useState({ used: 0, limit: 200 });
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
 
-  // OAuth Configuration Modal
-  const [showOAuthModal, setShowOAuthModal] = useState<boolean>(false);
-  const [oauthCredentials, setOauthCredentials] = useState<{
-    clientId: string;
-    clientSecret: string;
-  } | null>(null);
+  const [showOAuthModal, setShowOAuthModal] = useState(false);
 
-  // Refs for managing auth window and preventing duplicates
-  const authWindowRef = useRef<Window | null>(null);
-  const messageHandlerRef = useRef<((event: MessageEvent) => void) | null>(
-    null
-  );
+  const authWindowRef = useRef(null);
+  const messageHandlerRef = useRef(null);
 
-  // Load user and accounts from backend on mount
   useEffect(() => {
-    const initializeUser = async () => {
-      setLoadingUser(true);
+    const loadAccounts = () => {
       try {
-        // Get current authenticated user
-        const user = await SearchConsoleAPI.getCurrentUser();
-        
-        if (user) {
-          setCurrentUser(user);
-          console.log('Current user loaded:', user);
-          
-          // Load GSC accounts from backend
-          const backendAccounts = await SearchConsoleAPI.getAccounts();
-          
-          console.log('Loaded accounts from backend:', backendAccounts);
-          
-          if (backendAccounts.length > 0) {
-            // Transform to match frontend GoogleAccount interface
-            const transformedAccounts: GoogleAccount[] = backendAccounts.map(acc => ({
-              id: acc.id,
-              email: acc.email,
-              name: acc.name,
-              picture: acc.picture,
-              accessToken: '', // Never expose tokens in frontend
-              refreshToken: '', // Never expose tokens in frontend
-              tokenExpiry: acc.tokenExpiry, // Already in milliseconds
-              isActive: acc.isActive
-            }));
-            
-            setAccounts(transformedAccounts);
-            
-            // Set first active account as selected
-            const activeAccount = transformedAccounts.find(a => a.isActive);
-            if (!selectedAccount && activeAccount) {
-              setSelectedAccount(activeAccount);
-            } else if (!selectedAccount && transformedAccounts.length > 0) {
-              setSelectedAccount(transformedAccounts[0]);
-            }
-            
-            console.log('Accounts initialized:', transformedAccounts.length);
-          } else {
-            console.log('No accounts found');
+        const savedAccounts = localStorage.getItem("gsc_accounts");
+        if (savedAccounts) {
+          const parsed = JSON.parse(savedAccounts);
+          setAccounts(parsed);
+          if (parsed.length > 0 && !selectedAccount) {
+            setSelectedAccount(parsed[0]);
           }
-        } else {
-          console.log('No authenticated user found');
         }
       } catch (error) {
-        console.error('Failed to initialize user:', error);
-        showNotification('error', 'Failed to load your accounts');
-      } finally {
-        setLoadingUser(false);
+        console.error("Failed to load saved accounts:", error);
+        showNotification("error", "Failed to load saved accounts");
       }
     };
 
-    initializeUser();
+    loadAccounts();
 
-    // Check for code in URL (OAuth callback fallback)
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get("code");
     if (code) {
       handleOAuthCallback(code);
-      // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  // Load properties when account changes
   useEffect(() => {
     if (selectedAccount) {
       loadProperties(selectedAccount.id);
@@ -3033,55 +2854,60 @@ const GoogleSearchConsole: React.FC = () => {
     }
   }, [selectedAccount]);
 
-  // Account verification with auto-refresh
   useEffect(() => {
-    if (!selectedAccount || accounts.length === 0) return;
+    if (accounts.length > 0) {
+      localStorage.setItem("gsc_accounts", JSON.stringify(accounts));
+    }
+  }, [accounts]);
 
-    const verifyAccount = async () => {
-      try {
-        const result = await SearchConsoleAPI.verifyAccount(selectedAccount.id);
-        
-        if (!result.isValid && result.needsReauth) {
-          // Update account status in state
-          setAccounts(prevAccounts =>
-            prevAccounts.map(acc =>
-              acc.id === selectedAccount.id ? { ...acc, isActive: false } : acc
-            )
-          );
-          
-          showNotification(
-            'warning',
-            `Session expired for ${selectedAccount.email}. Please re-authenticate.`
-          );
-        } else if (result.refreshed) {
-          console.log(`✅ Token refreshed for ${selectedAccount.email}`);
-          
-          // Update token expiry in state if provided
-          if (result.tokenExpiry) {
-            setAccounts(prevAccounts =>
-              prevAccounts.map(acc =>
-                acc.id === selectedAccount.id 
-                  ? { ...acc, tokenExpiry: result.tokenExpiry!, isActive: true } 
-                  : acc
-              )
+  useEffect(() => {
+    const refreshTokensIfNeeded = async () => {
+      for (const account of accounts) {
+        const timeUntilExpiry = account.tokenExpiry - Date.now();
+
+        if (account.refreshToken && timeUntilExpiry < 300000) {
+          try {
+            const result = await SearchConsoleAPI.refreshToken(
+              account.id,
+              account.refreshToken
             );
+
+            const updatedAccounts = accounts.map((acc) =>
+              acc.id === account.id
+                ? {
+                    ...acc,
+                    accessToken: result.accessToken,
+                    tokenExpiry: result.tokenExpiry,
+                  }
+                : acc
+            );
+
+            setAccounts(updatedAccounts);
+            console.log(`Token refreshed for ${account.email}`);
+          } catch (error) {
+            console.error(
+              `Failed to refresh token for ${account.email}:`,
+              error
+            );
+            showNotification(
+              "warning",
+              `Token refresh failed for ${account.email}. Please re-authenticate.`
+            );
+
+            const updatedAccounts = accounts.map((acc) =>
+              acc.id === account.id ? { ...acc, isActive: false } : acc
+            );
+            setAccounts(updatedAccounts);
           }
         }
-      } catch (error) {
-        console.error('Failed to verify account:', error);
       }
     };
 
-    // Verify on mount and when account changes
-    verifyAccount();
-    
-    // Verify every 5 minutes
-    const interval = setInterval(verifyAccount, 5 * 60 * 1000);
-    
+    refreshTokensIfNeeded();
+    const interval = setInterval(refreshTokensIfNeeded, 60000);
     return () => clearInterval(interval);
-  }, [selectedAccount?.id]);
+  }, [accounts]);
 
-  // Cleanup auth window on unmount
   useEffect(() => {
     return () => {
       if (authWindowRef.current && !authWindowRef.current.closed) {
@@ -3093,15 +2919,12 @@ const GoogleSearchConsole: React.FC = () => {
     };
   }, []);
 
-  const showNotification = (
-    type: "success" | "error" | "info" | "warning",
-    message: string
-  ) => {
+  const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const loadProperties = async (accountId: string) => {
+  const loadProperties = async (accountId) => {
     setLoading(true);
     try {
       const props = await SearchConsoleAPI.getProperties(accountId);
@@ -3109,7 +2932,7 @@ const GoogleSearchConsole: React.FC = () => {
       if (props.length > 0 && !selectedProperty) {
         setSelectedProperty(props[0]);
       }
-    } catch (error: any) {
+    } catch (error) {
       showNotification("error", error.message || "Failed to load properties");
       console.error("Load properties error:", error);
 
@@ -3127,14 +2950,14 @@ const GoogleSearchConsole: React.FC = () => {
     }
   };
 
-  const loadQuotaUsage = async (accountId: string) => {
+  const loadQuotaUsage = async (accountId) => {
     const today = new Date().toDateString();
     const quotaKey = `gsc_quota_${accountId}_${today}`;
     const used = parseInt(localStorage.getItem(quotaKey) || "0", 10);
     setQuotaUsage({ used, limit: 200 });
   };
 
-  const updateQuotaUsage = (accountId: string, increment: number = 1) => {
+  const updateQuotaUsage = (accountId, increment = 1) => {
     const today = new Date().toDateString();
     const quotaKey = `gsc_quota_${accountId}_${today}`;
     const currentUsage = parseInt(localStorage.getItem(quotaKey) || "0", 10);
@@ -3143,38 +2966,34 @@ const GoogleSearchConsole: React.FC = () => {
     setQuotaUsage({ used: newUsage, limit: 200 });
   };
 
-  const handleOAuthCallback = async (code: string) => {
+  const handleOAuthCallback = async (code) => {
     if (isAuthenticating) return;
 
     setIsAuthenticating(true);
     try {
-      await SearchConsoleAPI.authenticateAccount(code);
+      const account = await SearchConsoleAPI.authenticateAccount(code);
 
-      // Reload all accounts from backend to ensure consistency
-      const updatedAccounts = await SearchConsoleAPI.getAccounts();
-      
-      if (updatedAccounts.length > 0) {
-        const transformedAccounts: GoogleAccount[] = updatedAccounts.map(acc => ({
-          id: acc.id,
-          email: acc.email,
-          name: acc.name,
-          picture: acc.picture,
-          accessToken: '',
-          refreshToken: '',
-          tokenExpiry: acc.tokenExpiry,
-          isActive: acc.isActive
-        }));
-        
-        setAccounts(transformedAccounts);
-        
-        // Find the newly added account (last one or most recently updated)
-        const newAccount = transformedAccounts[transformedAccounts.length - 1];
-        if (newAccount) {
-          setSelectedAccount(newAccount);
-          showNotification('success', `Account ${newAccount.email} connected successfully`);
-        }
+      const existingIndex = accounts.findIndex((acc) => acc.id === account.id);
+      let updatedAccounts;
+
+      if (existingIndex >= 0) {
+        updatedAccounts = [...accounts];
+        updatedAccounts[existingIndex] = account;
+        showNotification(
+          "success",
+          `Account ${account.email} re-authenticated`
+        );
+      } else {
+        updatedAccounts = [...accounts, account];
+        showNotification(
+          "success",
+          `Account ${account.email} connected successfully`
+        );
       }
-    } catch (error: any) {
+
+      setAccounts(updatedAccounts);
+      setSelectedAccount(account);
+    } catch (error) {
       console.error("OAuth callback error:", error);
       showNotification(
         "error",
@@ -3185,21 +3004,17 @@ const GoogleSearchConsole: React.FC = () => {
     }
   };
 
-  const handleSaveOAuthCredentials = async (
-    clientId: string,
-    clientSecret: string
-  ) => {
+  const handleSaveOAuthCredentials = async (clientId, clientSecret) => {
     try {
       setIsAuthenticating(true);
 
       await SearchConsoleAPI.saveConfiguration(clientId, clientSecret);
 
-      setOauthCredentials({ clientId, clientSecret });
       setShowOAuthModal(false);
       showNotification("success", "OAuth credentials saved successfully");
 
       await proceedWithAuthentication(clientId, clientSecret);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error in handleSaveOAuthCredentials:", error);
       showNotification(
         "error",
@@ -3209,10 +3024,7 @@ const GoogleSearchConsole: React.FC = () => {
     }
   };
 
-  const proceedWithAuthentication = async (
-    clientId?: string,
-    clientSecret?: string
-  ) => {
+  const proceedWithAuthentication = async (clientId, clientSecret) => {
     try {
       if (authWindowRef.current && !authWindowRef.current.closed) {
         authWindowRef.current.close();
@@ -3235,8 +3047,24 @@ const GoogleSearchConsole: React.FC = () => {
         `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
       );
 
-      const handleMessage = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
+      const handleMessage = async (event) => {
+        // Get backend origin from API_BASE_URL
+        let backendOrigin;
+        try {
+          backendOrigin = new URL(API_BASE_URL).origin;
+        } catch (e) {
+          backendOrigin = API_BASE_URL;
+        }
+        
+        const allowedOrigins = [backendOrigin, window.location.origin, CLIENT_URL];
+        
+        console.log('📨 Received message from:', event.origin);
+        console.log('✅ Allowed origins:', allowedOrigins);
+        
+        if (!allowedOrigins.includes(event.origin)) {
+          console.log('❌ Message from unauthorized origin:', event.origin);
+          return;
+        }
 
         if (event.data.type === "GOOGLE_AUTH_SUCCESS") {
           const { code } = event.data;
@@ -3281,7 +3109,8 @@ const GoogleSearchConsole: React.FC = () => {
           setIsAuthenticating(false);
         }
       }, 1000);
-    } catch (error: any) {
+    } catch (error) {
+      console.error("Authentication error:", error);
       if (
         error.message?.includes("No configuration found") ||
         error.message?.includes("Configuration required")
@@ -3307,30 +3136,21 @@ const GoogleSearchConsole: React.FC = () => {
     setShowOAuthModal(true);
   };
 
-  const handleRemoveAccount = async (accountId: string) => {
-    try {
-      setLoading(true);
-      
-      // Delete from backend (cascade delete)
-      await SearchConsoleAPI.deleteAccount(accountId);
-      
-      // Update local state
-      const updatedAccounts = accounts.filter((acc) => acc.id !== accountId);
-      setAccounts(updatedAccounts);
+  const handleRemoveAccount = (accountId) => {
+    const updatedAccounts = accounts.filter((acc) => acc.id !== accountId);
+    setAccounts(updatedAccounts);
 
-      if (selectedAccount?.id === accountId) {
-        setSelectedAccount(updatedAccounts[0] || null);
-        setProperties([]);
-        setSelectedProperty(null);
-      }
-
-      showNotification('success', 'Account and all related data removed successfully');
-    } catch (error: any) {
-      showNotification('error', error.message || 'Failed to remove account');
-      console.error('Error removing account:', error);
-    } finally {
-      setLoading(false);
+    if (updatedAccounts.length === 0) {
+      localStorage.removeItem("gsc_accounts");
     }
+
+    if (selectedAccount?.id === accountId) {
+      setSelectedAccount(updatedAccounts[0] || null);
+      setProperties([]);
+      setSelectedProperty(null);
+    }
+
+    showNotification("info", "Account removed");
   };
 
   const handleIndexUrl = async () => {
@@ -3350,7 +3170,7 @@ const GoogleSearchConsole: React.FC = () => {
       return;
     }
 
-    const request: IndexingRequest = {
+    const request = {
       url: validation.sanitized,
       type: "URL_UPDATED",
       status: "pending",
@@ -3379,7 +3199,7 @@ const GoogleSearchConsole: React.FC = () => {
         `URL submitted for indexing: ${validation.sanitized}`
       );
       setUrlToIndex("");
-    } catch (error: any) {
+    } catch (error) {
       setIndexingQueue((queue) =>
         queue.map((item) =>
           item.url === validation.sanitized
@@ -3435,7 +3255,7 @@ const GoogleSearchConsole: React.FC = () => {
     let errorCount = 0;
 
     for (const item of processed.valid) {
-      const request: IndexingRequest = {
+      const request = {
         url: item.url,
         type: "URL_UPDATED",
         status: "pending",
@@ -3454,7 +3274,7 @@ const GoogleSearchConsole: React.FC = () => {
               : queueItem
           )
         );
-      } catch (error: any) {
+      } catch (error) {
         errorCount++;
 
         setIndexingQueue((queue) =>
@@ -3510,7 +3330,7 @@ const GoogleSearchConsole: React.FC = () => {
 
       setInspectionResult(result);
       showNotification("success", "URL inspection completed");
-    } catch (error: any) {
+    } catch (error) {
       showNotification("error", error.message || "Failed to inspect URL");
       console.error("Inspect URL error:", error);
     } finally {
@@ -3541,7 +3361,7 @@ const GoogleSearchConsole: React.FC = () => {
 
       showNotification("success", `Sitemap submitted: ${validation.sanitized}`);
       setSitemapUrl("");
-    } catch (error: any) {
+    } catch (error) {
       showNotification("error", error.message || "Failed to submit sitemap");
       console.error("Submit sitemap error:", error);
     } finally {
@@ -3561,7 +3381,7 @@ const GoogleSearchConsole: React.FC = () => {
       );
 
       setPerformanceData(data);
-    } catch (error: any) {
+    } catch (error) {
       showNotification(
         "error",
         error.message || "Failed to load performance data"
@@ -3572,7 +3392,7 @@ const GoogleSearchConsole: React.FC = () => {
     }
   };
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text) => {
     try {
       const sanitized = Sanitizer.sanitizeText(text);
       await navigator.clipboard.writeText(sanitized);
@@ -3587,21 +3407,8 @@ const GoogleSearchConsole: React.FC = () => {
     showNotification("info", "Indexing queue cleared");
   };
 
-  // Show loading state while initializing
-  if (loadingUser) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading your accounts...</p>
-        </div>
-      </div>
-    );
-  }
-  // The rest of your render code remains exactly the same
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* OAuth Configuration Modal */}
       <OAuthConfigurationModal
         isOpen={showOAuthModal}
         onClose={() => {
@@ -3612,7 +3419,6 @@ const GoogleSearchConsole: React.FC = () => {
         isLoading={isAuthenticating}
       />
 
-      {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -3624,7 +3430,6 @@ const GoogleSearchConsole: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Quota Display */}
               {selectedAccount && (
                 <div className="flex items-center space-x-2 px-3 py-1 bg-gray-100 rounded-lg">
                   <Clock className="w-4 h-4 text-gray-500" />
@@ -3634,7 +3439,6 @@ const GoogleSearchConsole: React.FC = () => {
                 </div>
               )}
 
-              {/* Account Selector */}
               <div className="relative">
                 <button
                   className="flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -3744,7 +3548,6 @@ const GoogleSearchConsole: React.FC = () => {
         </div>
       </div>
 
-      {/* Property Selector */}
       {selectedAccount && (
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -3804,7 +3607,6 @@ const GoogleSearchConsole: React.FC = () => {
         </div>
       )}
 
-      {/* Notification */}
       {notification && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top duration-300">
           <div
@@ -3839,671 +3641,7 @@ const GoogleSearchConsole: React.FC = () => {
         </div>
       )}
 
-      {/* Main Content - keeping all existing UI */}
-      {selectedAccount && selectedProperty ? (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Tabs */}
-          <div className="bg-white rounded-lg shadow mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="flex -mb-px">
-                <button
-                  onClick={() => setActiveTab("index")}
-                  className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === "index"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <Send className="w-4 h-4 inline mr-2" />
-                  URL Indexing
-                </button>
-                <button
-                  onClick={() => setActiveTab("inspect")}
-                  className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === "inspect"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <Search className="w-4 h-4 inline mr-2" />
-                  URL Inspection
-                </button>
-                <button
-                  onClick={() => setActiveTab("sitemap")}
-                  className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === "sitemap"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <FileText className="w-4 h-4 inline mr-2" />
-                  Sitemaps
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("performance");
-                    loadPerformanceData();
-                  }}
-                  className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === "performance"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <TrendingUp className="w-4 h-4 inline mr-2" />
-                  Performance
-                </button>
-              </nav>
-            </div>
-
-            {/* Tab Content */}
-            <div className="p-6">
-              {/* URL Indexing Tab */}
-              {activeTab === "index" && (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      Request URL Indexing
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Submit URLs to Google for indexing. This tells Google that
-                      your content is new or updated and should be crawled.
-                    </p>
-
-                    {/* Single URL */}
-                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Single URL
-                      </label>
-                      <div className="flex space-x-2">
-                        <input
-                          type="url"
-                          value={urlToIndex}
-                          onChange={(e) => setUrlToIndex(e.target.value)}
-                          placeholder="https://example.com/new-page"
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <button
-                          onClick={handleIndexUrl}
-                          disabled={
-                            loading ||
-                            !urlToIndex ||
-                            quotaUsage.used >= quotaUsage.limit
-                          }
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors flex items-center space-x-2"
-                        >
-                          {loading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4" />
-                          )}
-                          <span>Submit</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Bulk URLs */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Bulk URLs (one per line)
-                      </label>
-                      <textarea
-                        value={bulkUrls}
-                        onChange={(e) => setBulkUrls(e.target.value)}
-                        placeholder={`https://example.com/page1\nhttps://example.com/page2\nhttps://example.com/page3`}
-                        rows={5}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <button
-                        onClick={handleBulkIndex}
-                        disabled={
-                          loading ||
-                          !bulkUrls ||
-                          quotaUsage.used >= quotaUsage.limit
-                        }
-                        className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors flex items-center space-x-2"
-                      >
-                        <Send className="w-4 h-4" />
-                        <span>Submit All</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Indexing Queue */}
-                  {indexingQueue.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-medium text-gray-900">
-                          Indexing Queue
-                        </h3>
-                        <button
-                          onClick={clearIndexingQueue}
-                          className="text-sm text-gray-500 hover:text-gray-700"
-                        >
-                          Clear Queue
-                        </button>
-                      </div>
-                      <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {indexingQueue.map((item, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3"
-                          >
-                            <div className="flex items-center space-x-3">
-                              {item.status === "pending" && (
-                                <Clock className="w-4 h-4 text-yellow-500 animate-pulse" />
-                              )}
-                              {item.status === "success" && (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              )}
-                              {item.status === "error" && (
-                                <AlertCircle className="w-4 h-4 text-red-500" />
-                              )}
-                              <span className="text-sm text-gray-900 truncate max-w-md">
-                                {item.url}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {item.status === "pending" && "Submitting..."}
-                              {item.status === "success" && "Submitted"}
-                              {item.status === "error" &&
-                                (item.message || "Failed")}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* API Quota Info */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-start space-x-2">
-                      <Info className="w-5 h-5 text-blue-600 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-blue-900">
-                          Indexing API Quota
-                        </p>
-                        <p className="text-sm text-blue-800 mt-1">
-                          You can submit up to 200 URLs per day using the
-                          Indexing API. URLs are typically crawled within
-                          minutes to hours of submission.
-                        </p>
-                        <div className="mt-2">
-                          <div className="w-full bg-blue-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                              style={{
-                                width: `${Math.min(
-                                  (quotaUsage.used / quotaUsage.limit) * 100,
-                                  100
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                          <p className="text-xs text-blue-700 mt-1">
-                            {quotaUsage.used} of {quotaUsage.limit} URLs used
-                            today
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* URL Inspection Tab */}
-              {activeTab === "inspect" && (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      URL Inspection Tool
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Check the index status of any URL on your property and see
-                      how Google sees your page.
-                    </p>
-
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex space-x-2">
-                        <input
-                          type="url"
-                          value={urlToInspect}
-                          onChange={(e) => setUrlToInspect(e.target.value)}
-                          placeholder="https://example.com/page-to-inspect"
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <button
-                          onClick={handleInspectUrl}
-                          disabled={loading || !urlToInspect}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors flex items-center space-x-2"
-                        >
-                          {loading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Search className="w-4 h-4" />
-                          )}
-                          <span>Inspect</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Inspection Results */}
-                  {inspectionResult && (
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
-                      <h4 className="text-lg font-medium text-gray-900 mb-4">
-                        Inspection Results
-                      </h4>
-
-                      <div className="space-y-4">
-                        {/* Index Status */}
-                        <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                          <span className="text-sm font-medium text-gray-700">
-                            Index Status
-                          </span>
-                          <span
-                            className={`px-3 py-1 rounded-full text-sm font-medium ${
-                              inspectionResult.indexStatus === "INDEXED"
-                                ? "bg-green-100 text-green-800"
-                                : inspectionResult.indexStatus === "CRAWLED"
-                                ? "bg-blue-100 text-blue-800"
-                                : inspectionResult.indexStatus === "DISCOVERED"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {inspectionResult.indexStatus.replace("_", " ")}
-                          </span>
-                        </div>
-
-                        {/* Last Crawl */}
-                        {inspectionResult.lastCrawlTime && (
-                          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                            <span className="text-sm font-medium text-gray-700">
-                              Last Crawled
-                            </span>
-                            <span className="text-sm text-gray-900">
-                              {new Date(
-                                inspectionResult.lastCrawlTime
-                              ).toLocaleDateString()}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Mobile Usability */}
-                        {inspectionResult.mobileUsability && (
-                          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                            <span className="text-sm font-medium text-gray-700">
-                              Mobile Usability
-                            </span>
-                            <span
-                              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                inspectionResult.mobileUsability ===
-                                "MOBILE_FRIENDLY"
-                                  ? "bg-green-100 text-green-800"
-                                  : inspectionResult.mobileUsability ===
-                                    "NOT_MOBILE_FRIENDLY"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {inspectionResult.mobileUsability.replace(
-                                /_/g,
-                                " "
-                              )}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Canonical URL */}
-                        {inspectionResult.googleCanonical && (
-                          <div className="pb-4 border-b border-gray-200">
-                            <span className="text-sm font-medium text-gray-700 block mb-2">
-                              Canonical URL
-                            </span>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm text-gray-900 flex-1 truncate">
-                                {inspectionResult.googleCanonical}
-                              </span>
-                              <button
-                                onClick={() =>
-                                  copyToClipboard(
-                                    inspectionResult.googleCanonical || ""
-                                  )
-                                }
-                                className="p-1 hover:bg-gray-100 rounded"
-                                title="Copy to clipboard"
-                              >
-                                <Copy className="w-4 h-4 text-gray-500" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Actions based on status */}
-                        {inspectionResult.indexStatus !== "INDEXED" && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <button
-                              onClick={() => {
-                                setUrlToIndex(urlToInspect);
-                                setActiveTab("index");
-                              }}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                            >
-                              <Send className="w-4 h-4" />
-                              <span>Request Indexing</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Sitemaps Tab */}
-              {activeTab === "sitemap" && (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      Sitemap Management
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Submit your sitemap to help Google discover all the pages
-                      on your website.
-                    </p>
-
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Sitemap URL
-                      </label>
-                      <div className="flex space-x-2">
-                        <input
-                          type="url"
-                          value={sitemapUrl}
-                          onChange={(e) => setSitemapUrl(e.target.value)}
-                          placeholder="https://example.com/sitemap.xml"
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <button
-                          onClick={handleSubmitSitemap}
-                          disabled={loading || !sitemapUrl}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors flex items-center space-x-2"
-                        >
-                          {loading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <FileText className="w-4 h-4" />
-                          )}
-                          <span>Submit</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Sitemap Tips */}
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <div className="flex items-start space-x-2">
-                      <Info className="w-5 h-5 text-yellow-600 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-yellow-900">
-                          Sitemap Best Practices
-                        </p>
-                        <ul className="text-sm text-yellow-800 mt-2 space-y-1 list-disc list-inside">
-                          <li>Include all important pages you want indexed</li>
-                          <li>Keep your sitemap under 50MB and 50,000 URLs</li>
-                          <li>
-                            Update your sitemap when you add or remove pages
-                          </li>
-                          <li>Use sitemap index files for large websites</li>
-                          <li>
-                            Include lastmod dates to indicate when pages were
-                            updated
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Performance Tab - keeping existing */}
-              {activeTab === "performance" && (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      Search Performance
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Monitor your website's performance in Google Search
-                      results.
-                    </p>
-                  </div>
-
-                  {/* Performance Metrics */}
-                  {performanceData.length > 0 && (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="bg-white border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-500">
-                              Total Clicks
-                            </span>
-                            <TrendingUp className="w-4 h-4 text-gray-400" />
-                          </div>
-                          <p className="text-2xl font-bold text-gray-900 mt-2">
-                            {performanceData
-                              .reduce((sum, d) => sum + d.clicks, 0)
-                              .toLocaleString()}
-                          </p>
-                        </div>
-
-                        <div className="bg-white border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-500">
-                              Total Impressions
-                            </span>
-                            <BarChart className="w-4 h-4 text-gray-400" />
-                          </div>
-                          <p className="text-2xl font-bold text-gray-900 mt-2">
-                            {performanceData
-                              .reduce((sum, d) => sum + d.impressions, 0)
-                              .toLocaleString()}
-                          </p>
-                        </div>
-
-                        <div className="bg-white border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-500">
-                              Average CTR
-                            </span>
-                            <TrendingUp className="w-4 h-4 text-gray-400" />
-                          </div>
-                          <p className="text-2xl font-bold text-gray-900 mt-2">
-                            {performanceData.length > 0
-                              ? (
-                                  (performanceData.reduce(
-                                    (sum, d) => sum + d.ctr,
-                                    0
-                                  ) /
-                                    performanceData.length) *
-                                  100
-                                ).toFixed(1)
-                              : 0}
-                            %
-                          </p>
-                        </div>
-
-                        <div className="bg-white border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-500">
-                              Average Position
-                            </span>
-                            <TrendingUp className="w-4 h-4 text-gray-400" />
-                          </div>
-                          <p className="text-2xl font-bold text-gray-900 mt-2">
-                            {performanceData.length > 0
-                              ? (
-                                  performanceData.reduce(
-                                    (sum, d) => sum + d.position,
-                                    0
-                                  ) / performanceData.length
-                                ).toFixed(1)
-                              : 0}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Performance Chart (simplified) */}
-                      <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h4 className="text-lg font-medium text-gray-900 mb-4">
-                          Daily Performance
-                        </h4>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Date
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Clicks
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Impressions
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  CTR
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Position
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {performanceData.slice(0, 10).map((data, idx) => (
-                                <tr key={idx}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {data.date || "N/A"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {data.clicks.toLocaleString()}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {data.impressions.toLocaleString()}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {(data.ctr * 100).toFixed(2)}%
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {data.position.toFixed(1)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* No data message */}
-                  {performanceData.length === 0 && !loading && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-                      <BarChart className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600">
-                        No performance data available
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Performance data will appear here once Google has
-                        collected search metrics for your property.
-                      </p>
-                      <button
-                        onClick={loadPerformanceData}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Refresh Data
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Account Management */}
-          <div className="mt-6 bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Connected Accounts
-            </h3>
-            <div className="space-y-3">
-              {accounts.map((account) => (
-                <div
-                  key={account.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    {account.picture ? (
-                      <img
-                        src={account.picture}
-                        alt={account.name}
-                        className="w-10 h-10 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
-                        {account.name[0]}
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {account.name}
-                      </p>
-                      <p className="text-xs text-gray-500">{account.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {account.isActive ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                        Active
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleAddAccount()}
-                        className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full hover:bg-yellow-200"
-                      >
-                        Re-authenticate
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleRemoveAccount(account.id)}
-                      className="p-1 hover:bg-gray-200 rounded transition-colors"
-                      title="Remove account"
-                    >
-                      <Trash2 className="w-4 h-4 text-gray-500" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {accounts.length === 0 && (
-              <div className="text-center py-4 text-gray-500">
-                <p className="text-sm">No accounts connected yet</p>
-                <button
-                  onClick={handleAddAccount}
-                  disabled={isAuthenticating}
-                  className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50"
-                >
-                  {isAuthenticating
-                    ? "Authenticating..."
-                    : "Connect your first account"}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        /* Empty State */
+      {!selectedAccount || !selectedProperty ? (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
             <Globe className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -4557,6 +3695,14 @@ const GoogleSearchConsole: React.FC = () => {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center text-gray-500 py-8">
+            <p>Selected: {selectedAccount.email}</p>
+            <p>Property: {selectedProperty.siteUrl}</p>
+            <p className="text-sm mt-2">The rest of the UI tabs will appear here</p>
           </div>
         </div>
       )}
