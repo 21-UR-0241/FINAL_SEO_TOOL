@@ -2843,7 +2843,7 @@ const OAuthConfigurationModal: React.FC<{
                 <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
                   <li>
                     Go to{" "}
-                    
+                    <a
                       href="https://console.cloud.google.com"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -2861,7 +2861,7 @@ const OAuthConfigurationModal: React.FC<{
                   <li>Copy your Client ID and Client Secret</li>
                 </ol>
                 <div className="mt-3">
-                  
+                  <a
                     href="https://developers.google.com/search/apis/indexing-api/v3/prereqs"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -2873,6 +2873,7 @@ const OAuthConfigurationModal: React.FC<{
                 </div>
               </div>
             )}
+
 
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
               <button
