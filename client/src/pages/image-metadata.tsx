@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 // Get API base URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://final-seo-tool.onrender.com';
 
 // Enhanced API with crawling support
 const api = {
