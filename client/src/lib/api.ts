@@ -60,8 +60,7 @@ export const api = {
 
 
 
-
-  fixWithAI: async (
+fixWithAI: async (
   websiteId: string,
   dryRun: boolean = false,
   options?: {
@@ -71,9 +70,8 @@ export const api = {
     enableReanalysis?: boolean;
   }
 ) => {
-  // Create abort controller for timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min timeout
+  const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min
 
   try {
     const response = await fetchWithCredentials(
@@ -82,8 +80,8 @@ export const api = {
         method: "POST",
         body: JSON.stringify({
           dryRun,
-          enableReanalysis: false, // Disable by default for speed
-          maxChanges: 20, // Reasonable limit
+          enableReanalysis: false,
+          maxChanges: 20,
           ...options,
         }),
         signal: controller.signal,
@@ -92,30 +90,73 @@ export const api = {
 
     clearTimeout(timeoutId);
 
+    // Check content type before parsing
+    const contentType = response.headers.get("content-type");
+    
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "AI fix failed" }));
-      throw new Error(error.message || "Failed to apply AI fixes");
+      // Try to get error message from response
+      let errorMessage = `AI fix failed (${response.status})`;
+      
+      if (contentType?.includes("application/json")) {
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch {
+          // JSON parse failed, try text
+          const text = await response.text();
+          errorMessage = text.substring(0, 200) || errorMessage;
+        }
+      } else {
+        // Not JSON, read as text
+        const text = await response.text();
+        
+        // Check for common error patterns
+        if (text.includes("404") || text.includes("Not Found")) {
+          errorMessage = "API endpoint not found - is your backend running?";
+        } else if (text.includes("login") || text.includes("authentication")) {
+          errorMessage = "Authentication required - please log in again";
+        } else if (text.includes("CORS") || text.includes("Access-Control")) {
+          errorMessage = "CORS error - check backend CORS configuration";
+        } else {
+          errorMessage = `Server error: ${text.substring(0, 100)}`;
+        }
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    // Success response - check if it's JSON
+    if (!contentType?.includes("application/json")) {
+      const text = await response.text();
+      console.error("Unexpected response type:", contentType);
+      console.error("Response body:", text);
+      throw new Error(`Server returned ${contentType} instead of JSON. Check server logs.`);
     }
 
     return response.json();
+    
   } catch (error: any) {
     clearTimeout(timeoutId);
     
-    // Handle timeout specifically
     if (error.name === 'AbortError') {
-      throw new Error('Request timeout - AI fix took longer than 10 minutes. Try reducing maxChanges or run in smaller batches.');
+      throw new Error('Request timeout - AI fix took longer than 10 minutes');
     }
     
-    // Handle network errors
     if (error.message === 'Failed to fetch') {
-      throw new Error('Network error - could not connect to server. Check if the backend is running.');
+      throw new Error('Network error - cannot connect to backend. Is the server running?');
+    }
+    
+    // Check for JSON parse errors
+    if (error.message?.includes('JSON') || error.message?.includes('token')) {
+      throw new Error('Invalid server response - backend may have crashed. Check server logs.');
     }
     
     throw error;
   }
 },
+
+
+
   // fixWithAI: async (
   //   websiteId: string,
   //   dryRun: boolean = false,
