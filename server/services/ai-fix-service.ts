@@ -2108,157 +2108,6 @@ private async fixWordPressContent(
 
 
 
-  // FIXED: Modified fixWordPressContent to prevent reprocessing the same content
-  // private async fixWordPressContent(
-  //   creds: WordPressCredentials,
-  //   fixes: AIFix[],
-  //   fixProcessor: (
-  //     content: any,
-  //     fix: AIFix
-  //   ) => Promise<{
-  //     updated: boolean;
-  //     data: any;
-  //     description: string;
-  //   }>,
-  //   userId?: string,
-  //   processingOptions?: ProcessingOptions
-  // ): Promise<{ applied: AIFix[]; errors: string[] }> {
-  //   const applied: AIFix[] = [];
-  //   const errors: string[] = [];
-
-  //   try {
-  //     const limits = processingOptions?.mode
-  //       ? this.getProcessingLimits(processingOptions.mode)
-  //       : { maxItems: 10, batchSize: 5, delayBetweenBatches: 1000 };
-
-  //     const maxItems = processingOptions?.maxItems || limits.maxItems;
-  //     const batchSize = processingOptions?.batchSize || limits.batchSize;
-
-  //     let allContent: any[];
-  //     if (
-  //       processingOptions?.mode === ProcessingMode.PRIORITY &&
-  //       processingOptions?.priorityUrls
-  //     ) {
-  //       allContent = await this.fetchPriorityContent(
-  //         creds,
-  //         processingOptions.priorityUrls
-  //       );
-  //     } else {
-  //       allContent = await this.getAllWordPressContent(creds, maxItems);
-  //     }
-
-  //     this.addLog(`Fetched ${allContent.length} content items to process`);
-
-  //     let processedCount = 0;
-  //     const processedContentIds = new Set<number>(); // Track processed content
-
-  //     for (let i = 0; i < allContent.length; i += batchSize) {
-  //       const batch = allContent.slice(i, Math.min(i + batchSize, allContent.length));
-        
-  //       for (const content of batch) {
-  //         // CRITICAL FIX: Only process each content item once
-  //         if (processedContentIds.has(content.id)) {
-  //           this.addLog(`Skipping already processed content ${content.id}`, "info");
-  //           continue;
-  //         }
-
-  //         const originalImages = this.extractImages(content.content?.rendered || "");
-  //         let contentWasUpdated = false;
-  //         let updateData: any = {};
-
-  //         // Process all fixes for this content, but only update WordPress once
-  //         for (const fix of fixes) {
-  //           try {
-  //             const result = await fixProcessor(content, fix);
-
-  //             // Track the fix result
-  //             applied.push({
-  //               ...fix,
-  //               description: result.description,
-  //               wordpressPostId: content.id,
-  //               success: result.updated,
-  //             });
-
-  //             // If this fix succeeded and we haven't updated yet
-  //             if (result.updated && !contentWasUpdated) {
-  //               if (result.data.content) {
-  //                 result.data.content = this.ensureImagesPreserved(
-  //                   result.data.content,
-  //                   originalImages
-  //                 );
-  //               }
-  //               updateData = { ...updateData, ...result.data };
-  //               contentWasUpdated = true;
-  //             }
-
-  //             if (result.updated) {
-  //               this.addLog(result.description, "success");
-  //             }
-
-  //           } catch (error) {
-  //             const errorMsg = `Fix failed for content ${content.id}: ${
-  //               error instanceof Error ? error.message : "Unknown error"
-  //             }`;
-  //             errors.push(errorMsg);
-  //             this.addLog(errorMsg, "error");
-  //           }
-  //         }
-
-  //         // Update WordPress only once per content item
-  //         if (contentWasUpdated && Object.keys(updateData).length > 0) {
-  //           try {
-  //             await this.updateWordPressContent(
-  //               creds,
-  //               content.id,
-  //               updateData,
-  //               content.contentType
-  //             );
-  //             processedContentIds.add(content.id);
-  //           } catch (error: any) {
-  //             errors.push(`WordPress update failed for ${content.id}: ${error.message}`);
-  //             this.addLog(`WordPress update failed for ${content.id}`, "error");
-  //           }
-  //         }
-
-  //         processedCount++;
-  //         if (processingOptions?.progressCallback) {
-  //           processingOptions.progressCallback(processedCount, allContent.length);
-  //         }
-  //       }
-
-  //       if (i + batchSize < allContent.length) {
-  //         await new Promise((resolve) =>
-  //           setTimeout(resolve, limits.delayBetweenBatches)
-  //         );
-  //       }
-  //     }
-
-  //     if (applied.length === 0 && errors.length === 0) {
-  //       return {
-  //         applied: fixes.map((fix) => ({
-  //           ...fix,
-  //           success: true,
-  //           description: `Verified across ${allContent.length} page(s): Already meets requirements`,
-  //           after: "Already compliant",
-  //         })),
-  //         errors: [],
-  //       };
-  //     }
-
-  //     return { applied, errors };
-  //   } catch (error: any) {
-  //     const errorMsg = `WordPress content fix failed: ${error.message}`;
-  //     errors.push(errorMsg);
-  //     this.addLog(errorMsg, "error");
-  //     return { applied, errors };
-  //   }
-  // }
-
-
-
-
-
-
   private extractImages(html: string): Array<{ 
   src: string; 
   element: string;
@@ -3065,128 +2914,7 @@ private async expandThinContent(
   );
 }
 
-// private async expandThinContent(
-//   creds: WordPressCredentials,
-//   fixes: AIFix[],
-//   userId?: string
-// ): Promise<{ applied: AIFix[]; errors: string[] }> {
-//   return this.fixWordPressContent(
-//     creds,
-//     fixes,
-//     async (content, fix) => {
-//       const contentText = this.extractTextFromHTML(
-//         content.content?.rendered || ""
-//       );
-//       const wordCount = contentText.split(/\s+/).filter(w => w.length > 0).length;
-//       const TARGET_WORDS = 800;
-//       const IDEAL_WORDS = 1200;
 
-//       // Only skip if content is already substantial
-//       if (wordCount >= TARGET_WORDS) {
-//         return {
-//           updated: false,
-//           data: {},
-//           description: `Content length already sufficient (${wordCount} words)`,
-//         };
-//       }
-
-//       const provider = await this.selectAIProvider(userId);
-//       if (!provider) {
-//         return {
-//           updated: false,
-//           data: {},
-//           description: "AI provider not available for content expansion",
-//         };
-//       }
-
-//       try {
-//         this.addLog(`Expanding content from ${wordCount} words to ${TARGET_WORDS}+ words`, "info");
-        
-//         // First attempt: aggressive expansion
-//         let expandedContent = await this.expandContentWithAI(
-//           content.title?.rendered || content.title,
-//           content.content?.rendered || "",
-//           provider,
-//           userId,
-//           TARGET_WORDS,
-//           IDEAL_WORDS
-//         );
-
-//         let newWordCount = this.extractTextFromHTML(expandedContent)
-//           .split(/\s+/)
-//           .filter(w => w.length > 0).length;
-
-//         // Retry if we didn't reach the target
-//         let attempts = 1;
-//         const MAX_ATTEMPTS = 2;
-
-//         while (newWordCount < TARGET_WORDS && attempts < MAX_ATTEMPTS) {
-//           attempts++;
-//           this.addLog(
-//             `Expansion attempt ${attempts}: Current ${newWordCount} words, target ${TARGET_WORDS}`,
-//             "warning"
-//           );
-
-//           expandedContent = await this.expandContentWithAI(
-//             content.title?.rendered || content.title,
-//             expandedContent, // Use the already expanded content as base
-//             provider,
-//             userId,
-//             TARGET_WORDS,
-//             IDEAL_WORDS,
-//             attempts > 1 // isRetry flag
-//           );
-
-//           newWordCount = this.extractTextFromHTML(expandedContent)
-//             .split(/\s+/)
-//             .filter(w => w.length > 0).length;
-//         }
-
-//         // Final validation
-//         if (newWordCount < TARGET_WORDS) {
-//           this.addLog(
-//             `⚠️ Could not reach ${TARGET_WORDS} words after ${attempts} attempts (final: ${newWordCount} words)`,
-//             "warning"
-//           );
-          
-//           // If we at least improved it, still apply
-//           if (newWordCount > wordCount * 1.3) {
-//             return {
-//               updated: true,
-//               data: { content: expandedContent },
-//               description: `Expanded content from ${wordCount} to ${newWordCount} words (target: ${TARGET_WORDS})`,
-//             };
-//           }
-          
-//           return {
-//             updated: false,
-//             data: {},
-//             description: `Could not sufficiently expand content (${wordCount} → ${newWordCount} words)`,
-//           };
-//         }
-
-//         this.addLog(
-//           `✅ Successfully expanded content: ${wordCount} → ${newWordCount} words`,
-//           "success"
-//         );
-
-//         return {
-//           updated: true,
-//           data: { content: expandedContent },
-//           description: `Expanded content from ${wordCount} to ${newWordCount} words`,
-//         };
-//       } catch (error: any) {
-//         this.addLog(`Content expansion failed: ${error.message}`, "error");
-//         return {
-//           updated: false,
-//           data: {},
-//           description: `Failed to expand content: ${error.message}`,
-//         };
-//       }
-//     },
-//     userId
-//   );
-// }
 
 private async expandContentWithAI(
   title: string,
@@ -3205,15 +2933,14 @@ private async expandContentWithAI(
   const targetWordCount = Math.max(idealWords, currentWordCount + wordsNeeded);
 
   this.addLog(
-    `Content expansion: ${currentWordCount} words → target ${targetWordCount} words (minimum ${minimumWords})`,
+    `Content expansion: ${currentWordCount} words → target ${targetWordCount} words`,
     "info"
   );
 
-  // ⭐ CRITICAL FIX: Extract and protect images BEFORE sending to AI
+  // Extract and protect images
   const originalImages = this.extractImages(currentContent);
-  this.addLog(`Protecting ${originalImages.length} images before AI processing`, "info");
+  this.addLog(`Protecting ${originalImages.length} images`, "info");
   
-  // Create a map of simple placeholders to images
   const imageMap = new Map<string, typeof originalImages[0]>();
   let contentForAI = currentContent;
   
@@ -3223,80 +2950,64 @@ private async expandContentWithAI(
     contentForAI = contentForAI.replace(img.element, `[${placeholder}]`);
   });
 
-  const systemPrompt = `You are an expert content writer who creates comprehensive, valuable content.
+  const systemPrompt = `You are an expert content writer expanding existing content.
 
 CRITICAL REQUIREMENTS:
-1. The final output MUST be AT LEAST ${minimumWords} words (target: ${targetWordCount} words)
-2. PRESERVE 100% of the existing content - NEVER remove or significantly alter existing text
-3. PRESERVE ALL [IMAGE_PLACEHOLDER_*_PRESERVED] markers EXACTLY as they appear - DO NOT remove or modify them
-4. ADD substantial new sections and paragraphs to reach the word count
-5. Quality over quantity - but you MUST hit the word count target
-6. Return ONLY the expanded HTML content - NO preambles, explanations, or meta-commentary
+1. PRESERVE 100% of existing content - NEVER remove or shorten
+2. PRESERVE ALL [IMAGE_PLACEHOLDER_*_PRESERVED] markers exactly
+3. ADD ${wordsNeeded}+ NEW words to reach ${targetWordCount} total words
+4. Return ONLY expanded HTML - NO preambles or explanations
 
-EXPANSION STRATEGY:
-${isRetry ? `
-⚠️ RETRY ATTEMPT - Previous expansion was insufficient
-- Be MORE aggressive with expansion
-- Add MORE detailed sections
-- Include MORE examples and explanations
-` : `
-- Add detailed explanations and context
-- Include practical examples and use cases
-- Add expert insights and industry perspectives
-- Provide step-by-step guidance where relevant
-- Address common questions and concerns
-- Include relevant statistics and data points
-- Add comparison and analysis sections
-`}
-
-WORD COUNT VALIDATION:
+VALIDATION:
 - Current: ${currentWordCount} words
-- Need to add: ${wordsNeeded}+ words
-- Target total: ${targetWordCount} words
-- Absolute minimum: ${minimumWords} words`;
+- Target: ${targetWordCount} words minimum
+- Must add: ${wordsNeeded}+ words
 
-  const userPrompt = `Expand this ${currentWordCount}-word content to AT LEAST ${minimumWords} words (ideally ${targetWordCount} words):
+START your response directly with HTML tags.`;
+
+  const userPrompt = `Expand this ${currentWordCount}-word content to AT LEAST ${targetWordCount} words:
 
 Title: ${title}
 
-Current Content:
+Content to expand:
 ${contentForAI}
 
-CRITICAL: Do NOT remove or modify any [IMAGE_PLACEHOLDER_*_PRESERVED] markers - they mark where images belong!
-
-EXPANSION REQUIREMENTS:
+CRITICAL RULES:
 1. Keep ALL existing content intact
-2. Keep ALL [IMAGE_PLACEHOLDER_*_PRESERVED] markers intact
-3. Add ${isRetry ? 'SUBSTANTIAL' : 'comprehensive'} new sections
-4. Organize new content with proper HTML structure (h2, h3, p tags)
-5. Ensure natural flow and readability
+2. Keep ALL [IMAGE_PLACEHOLDER_*_PRESERVED] markers
+3. Add substantial new sections (${wordsNeeded}+ words)
+4. Use proper HTML structure (h2, h3, p)
+5. Natural flow and readability
 
-${isRetry ? '⚠️ IMPORTANT: This is a retry - you MUST be more aggressive with expansion to reach the word count!' : ''}
-
-Remember: The expanded content MUST be at least ${minimumWords} words.`;
+ADD comprehensive new sections about:
+- Detailed explanations
+- Practical examples
+- Expert insights
+- Step-by-step guidance
+- Common questions
+- Related topics`;
 
   const response = await this.callAIProvider(
     provider,
     systemPrompt,
     userPrompt,
-    isRetry ? 6000 : 5000,
+    5000,
     0.7,
     userId
   );
 
   let cleaned = this.cleanAndValidateContent(response);
   
-  // ⭐ CRITICAL FIX: Restore images from placeholders
-  this.addLog(`Restoring ${originalImages.length} images after AI processing`, "info");
+  // Restore images
+  this.addLog(`Restoring ${originalImages.length} images`, "info");
   
   for (const [placeholder, img] of imageMap) {
     const marker = `[${placeholder}]`;
     if (cleaned.includes(marker)) {
-      cleaned = cleaned.split(marker).join(img.element); // Safe string replacement
-      this.addLog(`✅ Restored image: ${img.src.substring(0, 60)}...`, "success");
+      cleaned = cleaned.split(marker).join(img.element);
+      this.addLog(`✅ Restored: ${img.src.substring(0, 60)}...`, "success");
     } else {
-      this.addLog(`⚠️ Marker not found, reinserting: ${img.src.substring(0, 60)}...`, "warning");
-      // Insert after first paragraph
+      this.addLog(`⚠️ Reinserting missing image`, "warning");
       const $ = cheerio.load(cleaned, this.getCheerioConfig());
       const firstP = $('p').first();
       if (firstP.length) {
@@ -3308,28 +3019,28 @@ Remember: The expanded content MUST be at least ${minimumWords} words.`;
     }
   }
   
-  // Final validation with image preservation
+  // Final validation
   cleaned = this.ensureImagesPreserved(cleaned, originalImages);
   
-  // Validate word count
   const finalWordCount = this.extractTextFromHTML(cleaned)
     .split(/\s+/)
     .filter(w => w.length > 0).length;
   
   this.addLog(
-    `AI expansion result: ${currentWordCount} → ${finalWordCount} words (${isRetry ? 'retry' : 'initial'} attempt)`,
+    `Expansion result: ${currentWordCount} → ${finalWordCount} words`,
     finalWordCount >= minimumWords ? "success" : "warning"
   );
 
-  // Validate content wasn't reduced
+  // ⭐ CRITICAL FIX: Reject if content was shortened
   if (finalWordCount < currentWordCount) {
     throw new Error(
-      `Content expansion failed: ${currentWordCount} → ${finalWordCount} words. AI removed content instead of adding.`
+      `REJECTED: Content shortened from ${currentWordCount} to ${finalWordCount} words`
     );
   }
 
   return cleaned;
 }
+
 
 private async improveEAT(
   creds: WordPressCredentials,

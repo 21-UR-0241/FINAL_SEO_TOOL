@@ -1,36 +1,4 @@
 
-// //server/middleware/auth.ts
-// import { Request, Response, NextFunction } from "express";
-
-// // Extend Express Request type to include user
-// declare global {
-//   namespace Express {
-//     interface Request {
-//       user?: {
-//         id: string;
-//         username: string;
-//         // Add other user properties as needed
-//       };
-//     }
-//   }
-// }
-
-// export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-//   // Check if user is authenticated (this depends on your auth setup)
-//   // If using sessions:
-//   if (req.session && req.session.userId) {
-//     // You might want to load the full user object here
-//     req.user = {
-//       id: req.session.userId,
-//       username: req.session.username || ''
-//     };
-//     return next();
-//   }
-
-
-//   // Not authenticated
-//   return res.status(401).json({ error: 'Authentication required' });
-// };
 
 import { Request, Response, NextFunction } from "express";
 import { db } from "../db";
