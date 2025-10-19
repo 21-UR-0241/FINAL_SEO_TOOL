@@ -1,4 +1,3 @@
-
 //client/src/pages/image-metadata.tsx
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -25,12 +24,15 @@ import {
   Download,
 } from "lucide-react";
 
+// Get API base URL from environment variables
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
 // Enhanced API with crawling support
 const api = {
   async getContentImages(websiteId?: string) {
     const url = websiteId
-      ? `/api/images/content-images?websiteId=${websiteId}`
-      : "/api/images/content-images";
+      ? `${API_BASE_URL}/api/images/content-images?websiteId=${websiteId}`
+      : `${API_BASE_URL}/api/images/content-images`;
 
     try {
       const response = await fetch(url);
@@ -58,7 +60,7 @@ const api = {
 
   async crawlWebsiteImages(url: string, options: any) {
     try {
-      const response = await fetch("/api/images/crawl", {
+      const response = await fetch(`${API_BASE_URL}/api/images/crawl`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, options }),
@@ -82,7 +84,7 @@ const api = {
     imageUrls?: Record<string, string>
   ) {
     try {
-      const response = await fetch("/api/images/batch-process", {
+      const response = await fetch(`${API_BASE_URL}/api/images/batch-process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageIds, options, imageUrls }),
@@ -107,7 +109,7 @@ const api = {
 
   async getWebsites() {
     try {
-      const response = await fetch("/api/user/websites");
+      const response = await fetch(`${API_BASE_URL}/api/user/websites`);
       const contentType = response.headers.get("content-type");
 
       if (!response.ok) {
@@ -128,7 +130,7 @@ const api = {
   async getImageStatus(contentId: string) {
     try {
       const response = await fetch(
-        `/api/images/batch-process?contentId=${contentId}`
+        `${API_BASE_URL}/api/images/batch-process?contentId=${contentId}`
       );
 
       if (!response.ok) {
@@ -161,6 +163,8 @@ const formatDate = (dateString: string) => {
     minute: "2-digit",
   });
 };
+
+// ... rest of your interfaces remain the same ...
 
 interface ContentImage {
   id: string;
@@ -260,6 +264,9 @@ interface ProcessingStatus {
 }
 
 export default function EnhancedImageMetadata() {
+  // ... rest of your component code remains exactly the same ...
+  // (all the state management, functions, and JSX stay unchanged)
+
   // State management
   const [images, setImages] = useState<ContentImage[]>([]);
   const [crawledImages, setCrawledImages] = useState<ContentImage[]>([]);
@@ -269,7 +276,7 @@ export default function EnhancedImageMetadata() {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCrawling, setIsCrawling] = useState(false);
-  const [filter, setFilter] = useState<
+  const [filter, setFilter] = useState
     "all" | "with-metadata" | "without-metadata" | "ai-generated" | "crawled"
   >("all");
   const [showSettings, setShowSettings] = useState(false);
