@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 // Get API base URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Enhanced API with crawling support
 const api = {
