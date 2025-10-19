@@ -164,8 +164,6 @@ const formatDate = (dateString: string) => {
   });
 };
 
-// ... rest of your interfaces remain the same ...
-
 interface ContentImage {
   id: string;
   url?: string;
@@ -264,9 +262,6 @@ interface ProcessingStatus {
 }
 
 export default function EnhancedImageMetadata() {
-  // ... rest of your component code remains exactly the same ...
-  // (all the state management, functions, and JSX stay unchanged)
-
   // State management
   const [images, setImages] = useState<ContentImage[]>([]);
   const [crawledImages, setCrawledImages] = useState<ContentImage[]>([]);
@@ -1905,7 +1900,6 @@ export default function EnhancedImageMetadata() {
     </div>
   );
 }
-
 
 
 
