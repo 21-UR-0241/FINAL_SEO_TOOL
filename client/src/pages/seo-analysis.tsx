@@ -627,46 +627,92 @@ export default function SEOAnalysis() {
   });
 
 
-
-
+  // Fix with AI mutations
 const fixWithAIMutation = useMutation({
   mutationFn: async (dryRun: boolean) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min timeout
-
-    try {
-      const response = await fetch(
-        `/api/user/websites/${selectedWebsite}/ai-fix`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            dryRun,
-            enableReanalysis: false, // Disable for speed
-            maxChanges: 20, // Limit for faster completion
-          }),
-          signal: controller.signal,
-        }
-      );
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `HTTP ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
-        throw new Error('Request timeout - AI fix took too long');
-      }
-      throw error;
+    // Start the job
+    const startResponse = await api.fixWithAI(selectedWebsite, dryRun);
+    
+    // If the response has a jobId, it's an async job - poll for completion
+    if (startResponse.jobId) {
+      const jobId = startResponse.jobId;
+      
+      // Poll for completion
+      return new Promise((resolve, reject) => {
+        let pollAttempts = 0;
+        const maxPollAttempts = 300; // 10 minutes at 2-second intervals
+        
+        const pollInterval = setInterval(async () => {
+          try {
+            pollAttempts++;
+            
+            // Check for timeout
+            if (pollAttempts > maxPollAttempts) {
+              clearInterval(pollInterval);
+              reject(new Error('Job timeout - operation took longer than 10 minutes'));
+              return;
+            }
+            
+            // Fetch job status
+            const statusResponse = await fetch(`/api/jobs/${jobId}`, {
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (!statusResponse.ok) {
+              throw new Error(`Failed to fetch job status: ${statusResponse.status}`);
+            }
+            
+            const statusData = await statusResponse.json();
+            const job = statusData.job;
+            
+            // Update progress dialog with real backend data
+            setProgressDialog(prev => {
+              const newLogs = job.logs && Array.isArray(job.logs) 
+                ? parseBackendLogs(job.logs)
+                : prev.logs;
+              
+              return {
+                ...prev,
+                progress: job.progress || prev.progress,
+                logs: newLogs.length > prev.logs.length ? newLogs : prev.logs,
+              };
+            });
+            
+            // Check if completed
+            if (job.status === 'completed') {
+              clearInterval(pollInterval);
+              if ((window as any).__aiFixPollTimer) {
+                delete (window as any).__aiFixPollTimer;
+              }
+              resolve(job.result);
+            } else if (job.status === 'failed') {
+              clearInterval(pollInterval);
+              if ((window as any).__aiFixPollTimer) {
+                delete (window as any).__aiFixPollTimer;
+              }
+              reject(new Error(job.error || 'Job failed'));
+            }
+            // Otherwise keep polling (status is 'queued' or 'running')
+            
+          } catch (error: any) {
+            clearInterval(pollInterval);
+            if ((window as any).__aiFixPollTimer) {
+              delete (window as any).__aiFixPollTimer;
+            }
+            reject(error);
+          }
+        }, 2000); // Poll every 2 seconds
+        
+        // Store timer reference for cleanup
+        (window as any).__aiFixPollTimer = pollInterval;
+      });
     }
+    
+    // If no jobId, it's a synchronous response (old behavior)
+    return startResponse;
   },
 
   onMutate: (dryRun) => {
@@ -674,36 +720,35 @@ const fixWithAIMutation = useMutation({
       open: true,
       type: "ai-fix",
       title: dryRun ? "AI Fix Preview (Dry Run)" : "Applying AI Fixes",
-      description: `${dryRun ? "Simulating" : "Applying"} automatic SEO fixes for ${getWebsiteName(selectedWebsite)}...`,
+      description: `${
+        dryRun ? "Simulating" : "Applying"
+      } automatic SEO fixes for ${getWebsiteName(selectedWebsite)}...`,
       progress: 5,
       logs: [
         {
           timestamp: new Date().toTimeString().split(" ")[0],
           level: "info",
-          message: `🔧 Starting AI fix process (${dryRun ? "dry run" : "live"} mode)...`,
+          message: `🔧 Starting AI fix process (${
+            dryRun ? "dry run" : "live"
+          } mode)...`,
         },
       ],
       status: "running",
       result: null,
     });
 
-    // Simulate progress
+    // Start with optimistic progress updates
     let currentProgress = 5;
     const progressSteps = [
       { at: 10, message: "🔍 Analyzing fixable issues...", level: "info" },
+      { at: 15, message: "📊 Loading tracked SEO issues...", level: "info" },
       { at: 20, message: "🔐 Connecting to WordPress...", level: "info" },
-      { at: 30, message: "📄 Fetching pages and posts...", level: "info" },
-      { at: 40, message: "🤖 Applying AI fixes...", level: "info" },
-      { at: 50, message: "🏷️ Updating meta descriptions...", level: "info" },
-      { at: 60, message: "📝 Optimizing title tags...", level: "info" },
-      { at: 70, message: "🖼️ Adding alt text to images...", level: "info" },
-      { at: 80, message: "📑 Fixing heading structure...", level: "info" },
-      { at: 90, message: "💾 Saving changes...", level: "info" },
     ];
 
     let stepIndex = 0;
     const progressTimer = setInterval(() => {
-      currentProgress = Math.min(currentProgress + Math.random() * 8 + 2, 95);
+      // Only increment if we haven't received real updates
+      currentProgress = Math.min(currentProgress + Math.random() * 3 + 1, 25);
 
       setProgressDialog((prev) => {
         if (prev.status !== "running") {
@@ -711,58 +756,131 @@ const fixWithAIMutation = useMutation({
           return prev;
         }
 
-        const newLogs = [...prev.logs];
+        // Only update if we don't have real backend progress yet
+        if (prev.progress < 30) {
+          const newLogs = [...prev.logs];
 
-        // Add step messages
-        while (
-          stepIndex < progressSteps.length &&
-          currentProgress >= progressSteps[stepIndex].at
-        ) {
-          const step = progressSteps[stepIndex];
-          newLogs.push({
-            timestamp: new Date().toTimeString().split(" ")[0],
-            level: step.level as "info" | "success" | "warning" | "error",
-            message: step.message,
-          });
-          stepIndex++;
+          // Add step messages as we reach them
+          while (
+            stepIndex < progressSteps.length &&
+            currentProgress >= progressSteps[stepIndex].at
+          ) {
+            const step = progressSteps[stepIndex];
+            if (!prev.logs.some(log => log.message === step.message)) {
+              newLogs.push({
+                timestamp: new Date().toTimeString().split(" ")[0],
+                level: step.level as "info" | "success" | "warning" | "error",
+                message: step.message,
+              });
+            }
+            stepIndex++;
+          }
+
+          return {
+            ...prev,
+            progress: currentProgress,
+            logs: newLogs,
+          };
         }
-
-        return {
-          ...prev,
-          progress: currentProgress,
-          logs: newLogs,
-        };
+        
+        return prev;
       });
-    }, 1000);
+    }, 3000); // Update every 3 seconds for initial phase
 
+    // Store timer reference for cleanup
     (window as any).__aiFixTimer = progressTimer;
   },
 
   onSuccess: (data: any) => {
+    // Clear all timers
     if ((window as any).__aiFixTimer) {
       clearInterval((window as any).__aiFixTimer);
       delete (window as any).__aiFixTimer;
     }
+    if ((window as any).__aiFixPollTimer) {
+      clearInterval((window as any).__aiFixPollTimer);
+      delete (window as any).__aiFixPollTimer;
+    }
 
-    const realLogs = data?.detailedLog ? parseBackendLogs(data.detailedLog) : [];
+    // Parse real logs from backend if available
+    const realLogs = data?.detailedLog
+      ? parseBackendLogs(data.detailedLog)
+      : [];
 
+    // If we have real logs, use them; otherwise keep simulated ones
+    const finalLogs =
+      realLogs.length > 0
+        ? realLogs
+        : (() => {
+            const logs = [...progressDialog.logs];
+
+            // Add summary of what was done
+            if (data?.stats) {
+              const { fixesSuccessful, fixesFailed, detailedBreakdown } =
+                data.stats;
+
+              if (detailedBreakdown) {
+                if (detailedBreakdown.altTextFixed > 0) {
+                  logs.push({
+                    timestamp: new Date().toTimeString().split(" ")[0],
+                    level: "success" as const,
+                    message: `✅ Fixed ${detailedBreakdown.altTextFixed} images with missing alt text`,
+                  });
+                }
+                if (detailedBreakdown.metaDescriptionsUpdated > 0) {
+                  logs.push({
+                    timestamp: new Date().toTimeString().split(" ")[0],
+                    level: "success" as const,
+                    message: `✅ Updated ${detailedBreakdown.metaDescriptionsUpdated} meta descriptions`,
+                  });
+                }
+                if (detailedBreakdown.titleTagsImproved > 0) {
+                  logs.push({
+                    timestamp: new Date().toTimeString().split(" ")[0],
+                    level: "success" as const,
+                    message: `✅ Improved ${detailedBreakdown.titleTagsImproved} title tags`,
+                  });
+                }
+                if (detailedBreakdown.headingStructureFixed > 0) {
+                  logs.push({
+                    timestamp: new Date().toTimeString().split(" ")[0],
+                    level: "success" as const,
+                    message: `✅ Fixed heading structure issues`,
+                  });
+                }
+              }
+
+              logs.push({
+                timestamp: new Date().toTimeString().split(" ")[0],
+                level: "success" as const,
+                message: `🎉 Successfully applied ${fixesSuccessful} fixes!`,
+              });
+
+              if (fixesFailed > 0) {
+                logs.push({
+                  timestamp: new Date().toTimeString().split(" ")[0],
+                  level: "warning" as const,
+                  message: `⚠️ ${fixesFailed} fixes could not be applied`,
+                });
+              }
+            }
+
+            return logs;
+          })();
+
+    // Update progress dialog with success
     setProgressDialog((prev) => ({
       ...prev,
       progress: 100,
-      logs: realLogs.length > 0 ? realLogs : [
-        ...prev.logs,
-        {
-          timestamp: new Date().toTimeString().split(" ")[0],
-          level: "success" as const,
-          message: `🎉 Successfully applied ${data?.stats?.fixesSuccessful || 0} fixes!`,
-        },
-      ],
+      logs: finalLogs,
       status: "success",
       result: data,
     }));
 
+    // Save full payload for detailed view
     setFixResult(data);
 
+    // Invalidate queries to refresh data
     queryClient.invalidateQueries({
       queryKey: ["/api/seo-reports", selectedWebsite],
     });
@@ -771,6 +889,7 @@ const fixWithAIMutation = useMutation({
     });
     queryClient.invalidateQueries({ queryKey: ["/api/activity-logs"] });
 
+    // Show toast notification
     const isDry = !!data?.dryRun;
     const successCount = data?.stats?.fixesSuccessful || 0;
 
@@ -783,22 +902,37 @@ const fixWithAIMutation = useMutation({
   },
 
   onError: (error: any) => {
+    // Clear all timers
     if ((window as any).__aiFixTimer) {
       clearInterval((window as any).__aiFixTimer);
       delete (window as any).__aiFixTimer;
     }
+    if ((window as any).__aiFixPollTimer) {
+      clearInterval((window as any).__aiFixPollTimer);
+      delete (window as any).__aiFixPollTimer;
+    }
+
+    // Check if error contains logs
+    const errorLogs = error?.detailedLog
+      ? parseBackendLogs(error.detailedLog)
+      : [];
 
     setProgressDialog((prev) => ({
       ...prev,
       status: "error",
-      logs: [
-        ...prev.logs,
-        {
-          timestamp: new Date().toTimeString().split(" ")[0],
-          level: "error" as const,
-          message: `❌ Fix failed: ${error?.message || "Unknown error"}`,
-        },
-      ],
+      logs:
+        errorLogs.length > 0
+          ? errorLogs
+          : [
+              ...prev.logs,
+              {
+                timestamp: new Date().toTimeString().split(" ")[0],
+                level: "error" as const,
+                message: `❌ Fix failed: ${
+                  error?.message || "Unknown error"
+                }`,
+              },
+            ],
     }));
 
     toast({
@@ -807,346 +941,20 @@ const fixWithAIMutation = useMutation({
       variant: "destructive",
     });
   },
-});
 
-// Cleanup on unmount
-useEffect(() => {
-  return () => {
+  // Add cleanup on component unmount
+  onSettled: () => {
+    // Ensure all timers are cleaned up
     if ((window as any).__aiFixTimer) {
       clearInterval((window as any).__aiFixTimer);
+      delete (window as any).__aiFixTimer;
     }
-  };
-}, []);
-  // Fix with AI mutations
-// const fixWithAIMutation = useMutation({
-//   mutationFn: async (dryRun: boolean) => {
-//     // Start the job
-//     const startResponse = await api.fixWithAI(selectedWebsite, dryRun);
-    
-//     // If the response has a jobId, it's an async job - poll for completion
-//     if (startResponse.jobId) {
-//       const jobId = startResponse.jobId;
-      
-//       // Poll for completion
-//       return new Promise((resolve, reject) => {
-//         let pollAttempts = 0;
-//         const maxPollAttempts = 300; // 10 minutes at 2-second intervals
-        
-//         const pollInterval = setInterval(async () => {
-//           try {
-//             pollAttempts++;
-            
-//             // Check for timeout
-//             if (pollAttempts > maxPollAttempts) {
-//               clearInterval(pollInterval);
-//               reject(new Error('Job timeout - operation took longer than 10 minutes'));
-//               return;
-//             }
-            
-//             // Fetch job status
-//             const statusResponse = await fetch(`/api/jobs/${jobId}`, {
-//               credentials: 'include',
-//               headers: {
-//                 'Content-Type': 'application/json',
-//               }
-//             });
-            
-//             if (!statusResponse.ok) {
-//               throw new Error(`Failed to fetch job status: ${statusResponse.status}`);
-//             }
-            
-//             const statusData = await statusResponse.json();
-//             const job = statusData.job;
-            
-//             // Update progress dialog with real backend data
-//             setProgressDialog(prev => {
-//               const newLogs = job.logs && Array.isArray(job.logs) 
-//                 ? parseBackendLogs(job.logs)
-//                 : prev.logs;
-              
-//               return {
-//                 ...prev,
-//                 progress: job.progress || prev.progress,
-//                 logs: newLogs.length > prev.logs.length ? newLogs : prev.logs,
-//               };
-//             });
-            
-//             // Check if completed
-//             if (job.status === 'completed') {
-//               clearInterval(pollInterval);
-//               if ((window as any).__aiFixPollTimer) {
-//                 delete (window as any).__aiFixPollTimer;
-//               }
-//               resolve(job.result);
-//             } else if (job.status === 'failed') {
-//               clearInterval(pollInterval);
-//               if ((window as any).__aiFixPollTimer) {
-//                 delete (window as any).__aiFixPollTimer;
-//               }
-//               reject(new Error(job.error || 'Job failed'));
-//             }
-//             // Otherwise keep polling (status is 'queued' or 'running')
-            
-//           } catch (error: any) {
-//             clearInterval(pollInterval);
-//             if ((window as any).__aiFixPollTimer) {
-//               delete (window as any).__aiFixPollTimer;
-//             }
-//             reject(error);
-//           }
-//         }, 2000); // Poll every 2 seconds
-        
-//         // Store timer reference for cleanup
-//         (window as any).__aiFixPollTimer = pollInterval;
-//       });
-//     }
-    
-//     // If no jobId, it's a synchronous response (old behavior)
-//     return startResponse;
-//   },
-
-//   onMutate: (dryRun) => {
-//     setProgressDialog({
-//       open: true,
-//       type: "ai-fix",
-//       title: dryRun ? "AI Fix Preview (Dry Run)" : "Applying AI Fixes",
-//       description: `${
-//         dryRun ? "Simulating" : "Applying"
-//       } automatic SEO fixes for ${getWebsiteName(selectedWebsite)}...`,
-//       progress: 5,
-//       logs: [
-//         {
-//           timestamp: new Date().toTimeString().split(" ")[0],
-//           level: "info",
-//           message: `🔧 Starting AI fix process (${
-//             dryRun ? "dry run" : "live"
-//           } mode)...`,
-//         },
-//       ],
-//       status: "running",
-//       result: null,
-//     });
-
-//     // Start with optimistic progress updates
-//     let currentProgress = 5;
-//     const progressSteps = [
-//       { at: 10, message: "🔍 Analyzing fixable issues...", level: "info" },
-//       { at: 15, message: "📊 Loading tracked SEO issues...", level: "info" },
-//       { at: 20, message: "🔐 Connecting to WordPress...", level: "info" },
-//     ];
-
-//     let stepIndex = 0;
-//     const progressTimer = setInterval(() => {
-//       // Only increment if we haven't received real updates
-//       currentProgress = Math.min(currentProgress + Math.random() * 3 + 1, 25);
-
-//       setProgressDialog((prev) => {
-//         if (prev.status !== "running") {
-//           clearInterval(progressTimer);
-//           return prev;
-//         }
-
-//         // Only update if we don't have real backend progress yet
-//         if (prev.progress < 30) {
-//           const newLogs = [...prev.logs];
-
-//           // Add step messages as we reach them
-//           while (
-//             stepIndex < progressSteps.length &&
-//             currentProgress >= progressSteps[stepIndex].at
-//           ) {
-//             const step = progressSteps[stepIndex];
-//             if (!prev.logs.some(log => log.message === step.message)) {
-//               newLogs.push({
-//                 timestamp: new Date().toTimeString().split(" ")[0],
-//                 level: step.level as "info" | "success" | "warning" | "error",
-//                 message: step.message,
-//               });
-//             }
-//             stepIndex++;
-//           }
-
-//           return {
-//             ...prev,
-//             progress: currentProgress,
-//             logs: newLogs,
-//           };
-//         }
-        
-//         return prev;
-//       });
-//     }, 3000); // Update every 3 seconds for initial phase
-
-//     // Store timer reference for cleanup
-//     (window as any).__aiFixTimer = progressTimer;
-//   },
-
-//   onSuccess: (data: any) => {
-//     // Clear all timers
-//     if ((window as any).__aiFixTimer) {
-//       clearInterval((window as any).__aiFixTimer);
-//       delete (window as any).__aiFixTimer;
-//     }
-//     if ((window as any).__aiFixPollTimer) {
-//       clearInterval((window as any).__aiFixPollTimer);
-//       delete (window as any).__aiFixPollTimer;
-//     }
-
-//     // Parse real logs from backend if available
-//     const realLogs = data?.detailedLog
-//       ? parseBackendLogs(data.detailedLog)
-//       : [];
-
-//     // If we have real logs, use them; otherwise keep simulated ones
-//     const finalLogs =
-//       realLogs.length > 0
-//         ? realLogs
-//         : (() => {
-//             const logs = [...progressDialog.logs];
-
-//             // Add summary of what was done
-//             if (data?.stats) {
-//               const { fixesSuccessful, fixesFailed, detailedBreakdown } =
-//                 data.stats;
-
-//               if (detailedBreakdown) {
-//                 if (detailedBreakdown.altTextFixed > 0) {
-//                   logs.push({
-//                     timestamp: new Date().toTimeString().split(" ")[0],
-//                     level: "success" as const,
-//                     message: `✅ Fixed ${detailedBreakdown.altTextFixed} images with missing alt text`,
-//                   });
-//                 }
-//                 if (detailedBreakdown.metaDescriptionsUpdated > 0) {
-//                   logs.push({
-//                     timestamp: new Date().toTimeString().split(" ")[0],
-//                     level: "success" as const,
-//                     message: `✅ Updated ${detailedBreakdown.metaDescriptionsUpdated} meta descriptions`,
-//                   });
-//                 }
-//                 if (detailedBreakdown.titleTagsImproved > 0) {
-//                   logs.push({
-//                     timestamp: new Date().toTimeString().split(" ")[0],
-//                     level: "success" as const,
-//                     message: `✅ Improved ${detailedBreakdown.titleTagsImproved} title tags`,
-//                   });
-//                 }
-//                 if (detailedBreakdown.headingStructureFixed > 0) {
-//                   logs.push({
-//                     timestamp: new Date().toTimeString().split(" ")[0],
-//                     level: "success" as const,
-//                     message: `✅ Fixed heading structure issues`,
-//                   });
-//                 }
-//               }
-
-//               logs.push({
-//                 timestamp: new Date().toTimeString().split(" ")[0],
-//                 level: "success" as const,
-//                 message: `🎉 Successfully applied ${fixesSuccessful} fixes!`,
-//               });
-
-//               if (fixesFailed > 0) {
-//                 logs.push({
-//                   timestamp: new Date().toTimeString().split(" ")[0],
-//                   level: "warning" as const,
-//                   message: `⚠️ ${fixesFailed} fixes could not be applied`,
-//                 });
-//               }
-//             }
-
-//             return logs;
-//           })();
-
-//     // Update progress dialog with success
-//     setProgressDialog((prev) => ({
-//       ...prev,
-//       progress: 100,
-//       logs: finalLogs,
-//       status: "success",
-//       result: data,
-//     }));
-
-//     // Save full payload for detailed view
-//     setFixResult(data);
-
-//     // Invalidate queries to refresh data
-//     queryClient.invalidateQueries({
-//       queryKey: ["/api/seo-reports", selectedWebsite],
-//     });
-//     queryClient.invalidateQueries({
-//       queryKey: ["/api/seo-detailed", selectedWebsite],
-//     });
-//     queryClient.invalidateQueries({ queryKey: ["/api/activity-logs"] });
-
-//     // Show toast notification
-//     const isDry = !!data?.dryRun;
-//     const successCount = data?.stats?.fixesSuccessful || 0;
-
-//     toast({
-//       title: isDry ? "Dry Run Complete" : "AI Fixes Applied",
-//       description: isDry
-//         ? `Preview complete. ${successCount} fixes ready to apply.`
-//         : `Successfully applied ${successCount} SEO improvements.`,
-//     });
-//   },
-
-//   onError: (error: any) => {
-//     // Clear all timers
-//     if ((window as any).__aiFixTimer) {
-//       clearInterval((window as any).__aiFixTimer);
-//       delete (window as any).__aiFixTimer;
-//     }
-//     if ((window as any).__aiFixPollTimer) {
-//       clearInterval((window as any).__aiFixPollTimer);
-//       delete (window as any).__aiFixPollTimer;
-//     }
-
-//     // Check if error contains logs
-//     const errorLogs = error?.detailedLog
-//       ? parseBackendLogs(error.detailedLog)
-//       : [];
-
-//     setProgressDialog((prev) => ({
-//       ...prev,
-//       status: "error",
-//       logs:
-//         errorLogs.length > 0
-//           ? errorLogs
-//           : [
-//               ...prev.logs,
-//               {
-//                 timestamp: new Date().toTimeString().split(" ")[0],
-//                 level: "error" as const,
-//                 message: `❌ Fix failed: ${
-//                   error?.message || "Unknown error"
-//                 }`,
-//               },
-//             ],
-//     }));
-
-//     toast({
-//       title: "AI Fix Failed",
-//       description: error?.message || "Could not apply AI fixes.",
-//       variant: "destructive",
-//     });
-//   },
-
-//   // Add cleanup on component unmount
-//   onSettled: () => {
-//     // Ensure all timers are cleaned up
-//     if ((window as any).__aiFixTimer) {
-//       clearInterval((window as any).__aiFixTimer);
-//       delete (window as any).__aiFixTimer;
-//     }
-//     if ((window as any).__aiFixPollTimer) {
-//       clearInterval((window as any).__aiFixPollTimer);
-//       delete (window as any).__aiFixPollTimer;
-//     }
-//   },
-// });
-
-
+    if ((window as any).__aiFixPollTimer) {
+      clearInterval((window as any).__aiFixPollTimer);
+      delete (window as any).__aiFixPollTimer;
+    }
+  },
+});
 
 // Add cleanup effect
 useEffect(() => {
@@ -1154,42 +962,12 @@ useEffect(() => {
     // Cleanup on unmount
     if ((window as any).__aiFixTimer) {
       clearInterval((window as any).__aiFixTimer);
-      delete (window as any).__aiFixTimer;
+    }
+    if ((window as any).__aiFixPollTimer) {
+      clearInterval((window as any).__aiFixPollTimer);
     }
   };
 }, []);
-// // Add cleanup effect
-// useEffect(() => {
-//   return () => {
-//     // Cleanup on unmount
-//     if ((window as any).__aiFixTimer) {
-//       clearInterval((window as any).__aiFixTimer);
-//     }
-//     if ((window as any).__aiFixPollTimer) {
-//       clearInterval((window as any).__aiFixPollTimer);
-//     }
-//   };
-// }, []);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   // Fix with AI mutations
   // const fixWithAIMutation = useMutation({
   //   mutationFn: (dryRun: boolean) => api.fixWithAI(selectedWebsite, dryRun),

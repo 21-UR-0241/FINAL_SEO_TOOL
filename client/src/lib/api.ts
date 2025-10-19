@@ -2,7 +2,7 @@
 
 
 
-//src/lib/api.ts
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 console.log('🔍 API_BASE_URL:', API_BASE_URL);
 
@@ -58,134 +58,35 @@ export const api = {
     });
   },
 
-
-
-fixWithAI: async (
-  websiteId: string,
-  dryRun: boolean = false,
-  options?: {
-    fixTypes?: string[];
-    maxChanges?: number;
-    skipBackup?: boolean;
-    enableReanalysis?: boolean;
-  }
-) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min
-
-  try {
+  fixWithAI: async (
+    websiteId: string,
+    dryRun: boolean = false,
+    options?: {
+      fixTypes?: string[];
+      maxChanges?: number;
+      skipBackup?: boolean;
+    }
+  ) => {
     const response = await fetchWithCredentials(
       `/api/user/websites/${websiteId}/ai-fix`,
       {
         method: "POST",
         body: JSON.stringify({
           dryRun,
-          enableReanalysis: false,
-          maxChanges: 20,
           ...options,
         }),
-        signal: controller.signal,
       }
     );
 
-    clearTimeout(timeoutId);
-
-    // Check content type before parsing
-    const contentType = response.headers.get("content-type");
-    
     if (!response.ok) {
-      // Try to get error message from response
-      let errorMessage = `AI fix failed (${response.status})`;
-      
-      if (contentType?.includes("application/json")) {
-        try {
-          const error = await response.json();
-          errorMessage = error.message || errorMessage;
-        } catch {
-          // JSON parse failed, try text
-          const text = await response.text();
-          errorMessage = text.substring(0, 200) || errorMessage;
-        }
-      } else {
-        // Not JSON, read as text
-        const text = await response.text();
-        
-        // Check for common error patterns
-        if (text.includes("404") || text.includes("Not Found")) {
-          errorMessage = "API endpoint not found - is your backend running?";
-        } else if (text.includes("login") || text.includes("authentication")) {
-          errorMessage = "Authentication required - please log in again";
-        } else if (text.includes("CORS") || text.includes("Access-Control")) {
-          errorMessage = "CORS error - check backend CORS configuration";
-        } else {
-          errorMessage = `Server error: ${text.substring(0, 100)}`;
-        }
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    // Success response - check if it's JSON
-    if (!contentType?.includes("application/json")) {
-      const text = await response.text();
-      console.error("Unexpected response type:", contentType);
-      console.error("Response body:", text);
-      throw new Error(`Server returned ${contentType} instead of JSON. Check server logs.`);
+      const error = await response
+        .json()
+        .catch(() => ({ message: "AI fix failed" }));
+      throw new Error(error.message || "Failed to apply AI fixes");
     }
 
     return response.json();
-    
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout - AI fix took longer than 10 minutes');
-    }
-    
-    if (error.message === 'Failed to fetch') {
-      throw new Error('Network error - cannot connect to backend. Is the server running?');
-    }
-    
-    // Check for JSON parse errors
-    if (error.message?.includes('JSON') || error.message?.includes('token')) {
-      throw new Error('Invalid server response - backend may have crashed. Check server logs.');
-    }
-    
-    throw error;
-  }
-},
-
-
-
-  // fixWithAI: async (
-  //   websiteId: string,
-  //   dryRun: boolean = false,
-  //   options?: {
-  //     fixTypes?: string[];
-  //     maxChanges?: number;
-  //     skipBackup?: boolean;
-  //   }
-  // ) => {
-  //   const response = await fetchWithCredentials(
-  //     `/api/user/websites/${websiteId}/ai-fix`,
-  //     {
-  //       method: "POST",
-  //       body: JSON.stringify({
-  //         dryRun,
-  //         ...options,
-  //       }),
-  //     }
-  //   );
-
-  //   if (!response.ok) {
-  //     const error = await response
-  //       .json()
-  //       .catch(() => ({ message: "AI fix failed" }));
-  //     throw new Error(error.message || "Failed to apply AI fixes");
-  //   }
-
-  //   return response.json();
-  // },
+  },
 
   iterativeFixWithAI: async (
     websiteId: string,
