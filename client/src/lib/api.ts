@@ -2,7 +2,7 @@
 
 
 
-
+//src/lib/api.ts
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 console.log('🔍 API_BASE_URL:', API_BASE_URL);
 
@@ -58,25 +58,39 @@ export const api = {
     });
   },
 
+
+
+
   fixWithAI: async (
-    websiteId: string,
-    dryRun: boolean = false,
-    options?: {
-      fixTypes?: string[];
-      maxChanges?: number;
-      skipBackup?: boolean;
-    }
-  ) => {
+  websiteId: string,
+  dryRun: boolean = false,
+  options?: {
+    fixTypes?: string[];
+    maxChanges?: number;
+    skipBackup?: boolean;
+    enableReanalysis?: boolean;
+  }
+) => {
+  // Create abort controller for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min timeout
+
+  try {
     const response = await fetchWithCredentials(
       `/api/user/websites/${websiteId}/ai-fix`,
       {
         method: "POST",
         body: JSON.stringify({
           dryRun,
+          enableReanalysis: false, // Disable by default for speed
+          maxChanges: 20, // Reasonable limit
           ...options,
         }),
+        signal: controller.signal,
       }
     );
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const error = await response
@@ -86,7 +100,51 @@ export const api = {
     }
 
     return response.json();
-  },
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    // Handle timeout specifically
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - AI fix took longer than 10 minutes. Try reducing maxChanges or run in smaller batches.');
+    }
+    
+    // Handle network errors
+    if (error.message === 'Failed to fetch') {
+      throw new Error('Network error - could not connect to server. Check if the backend is running.');
+    }
+    
+    throw error;
+  }
+},
+  // fixWithAI: async (
+  //   websiteId: string,
+  //   dryRun: boolean = false,
+  //   options?: {
+  //     fixTypes?: string[];
+  //     maxChanges?: number;
+  //     skipBackup?: boolean;
+  //   }
+  // ) => {
+  //   const response = await fetchWithCredentials(
+  //     `/api/user/websites/${websiteId}/ai-fix`,
+  //     {
+  //       method: "POST",
+  //       body: JSON.stringify({
+  //         dryRun,
+  //         ...options,
+  //       }),
+  //     }
+  //   );
+
+  //   if (!response.ok) {
+  //     const error = await response
+  //       .json()
+  //       .catch(() => ({ message: "AI fix failed" }));
+  //     throw new Error(error.message || "Failed to apply AI fixes");
+  //   }
+
+  //   return response.json();
+  // },
 
   iterativeFixWithAI: async (
     websiteId: string,
