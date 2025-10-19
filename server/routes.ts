@@ -5301,7 +5301,11 @@ function convertLocalTimeToUTC(localTime: string, timezone: string): string {
   // ===========================================================================
   
   app.post("/api/user/websites/:id/ai-fix", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
+    // 🔥 ADD: Increase timeout for long operations
+  req.setTimeout(600000); // 10 minutes
+  res.setTimeout(600000); // 10 minutes
+  
+    try {
     const userId = req.user!.id;
     const websiteId = req.params.id;
     const { 
