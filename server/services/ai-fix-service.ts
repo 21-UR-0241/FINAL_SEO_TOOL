@@ -1941,7 +1941,9 @@ Write natural, descriptive alt text that helps both users and SEO.`;
 
   // ==================== HELPER METHODS ====================
 
-private async fixWordPressContent(
+
+
+  private async fixWordPressContent(
   creds: WordPressCredentials,
   fixes: AIFix[],
   fixProcessor: (
@@ -1981,13 +1983,10 @@ private async fixWordPressContent(
 
     this.addLog(`Fetched ${allContent.length} content items to process`);
 
-    // ⭐ CRITICAL FIX: Track what content has been processed
     const processedContentIds = new Set<number>();
-    const contentUpdatesByType = new Map<string, Map<number, any>>();
-    
     let processedCount = 0;
 
-    // ⭐ CRITICAL FIX: Process each content item ONCE
+    // Process in batches
     for (let i = 0; i < allContent.length; i += batchSize) {
       const batch = allContent.slice(i, Math.min(i + batchSize, allContent.length));
       
@@ -2001,11 +2000,15 @@ private async fixWordPressContent(
         const originalImages = this.extractImages(content.content?.rendered || "");
         let contentNeedsUpdate = false;
         let accumulatedUpdates: any = {};
+        
+        // ⭐ KEY FIX: Track the current state of content as fixes are applied
+        let currentContent = { ...content };
 
-        // ⭐ CRITICAL FIX: Process ALL fixes for this content, but collect updates
+        // Process ALL fixes for this content SEQUENTIALLY
         for (const fix of fixes) {
           try {
-            const result = await fixProcessor(content, fix);
+            // ⭐ KEY FIX: Pass the currentContent (which includes previous fixes)
+            const result = await fixProcessor(currentContent, fix);
 
             // Always track the fix attempt
             applied.push({
@@ -2015,7 +2018,7 @@ private async fixWordPressContent(
               success: result.updated,
             });
 
-            // Accumulate updates instead of applying immediately
+            // ⭐ KEY FIX: Update currentContent so next fix builds on this one
             if (result.updated) {
               if (result.data.content) {
                 // Preserve images in the content
@@ -2024,12 +2027,35 @@ private async fixWordPressContent(
                   originalImages
                 );
                 accumulatedUpdates.content = result.data.content;
+                
+                // Update currentContent for next fix to see
+                currentContent = {
+                  ...currentContent,
+                  content: {
+                    ...currentContent.content,
+                    rendered: result.data.content
+                  }
+                };
               }
               if (result.data.title) {
                 accumulatedUpdates.title = result.data.title;
+                currentContent = {
+                  ...currentContent,
+                  title: {
+                    ...currentContent.title,
+                    rendered: result.data.title
+                  }
+                };
               }
               if (result.data.excerpt) {
                 accumulatedUpdates.excerpt = result.data.excerpt;
+                currentContent = {
+                  ...currentContent,
+                  excerpt: {
+                    ...currentContent.excerpt,
+                    rendered: result.data.excerpt
+                  }
+                };
               }
               contentNeedsUpdate = true;
               this.addLog(result.description, "success");
@@ -2044,7 +2070,7 @@ private async fixWordPressContent(
           }
         }
 
-        // ⭐ CRITICAL FIX: Update WordPress ONLY ONCE per content item
+        // Update WordPress ONLY ONCE per content item with all accumulated changes
         if (contentNeedsUpdate && Object.keys(accumulatedUpdates).length > 0) {
           try {
             this.addLog(
@@ -2105,6 +2131,178 @@ private async fixWordPressContent(
     return { applied, errors };
   }
 }
+// private async fixWordPressContent(
+//   creds: WordPressCredentials,
+//   fixes: AIFix[],
+//   fixProcessor: (
+//     content: any,
+//     fix: AIFix
+//   ) => Promise<{
+//     updated: boolean;
+//     data: any;
+//     description: string;
+//   }>,
+//   userId?: string,
+//   processingOptions?: ProcessingOptions
+// ): Promise<{ applied: AIFix[]; errors: string[] }> {
+//   const applied: AIFix[] = [];
+//   const errors: string[] = [];
+
+//   try {
+//     const limits = processingOptions?.mode
+//       ? this.getProcessingLimits(processingOptions.mode)
+//       : { maxItems: 10, batchSize: 5, delayBetweenBatches: 1000 };
+
+//     const maxItems = processingOptions?.maxItems || limits.maxItems;
+//     const batchSize = processingOptions?.batchSize || limits.batchSize;
+
+//     let allContent: any[];
+//     if (
+//       processingOptions?.mode === ProcessingMode.PRIORITY &&
+//       processingOptions?.priorityUrls
+//     ) {
+//       allContent = await this.fetchPriorityContent(
+//         creds,
+//         processingOptions.priorityUrls
+//       );
+//     } else {
+//       allContent = await this.getAllWordPressContent(creds, maxItems);
+//     }
+
+//     this.addLog(`Fetched ${allContent.length} content items to process`);
+
+//     // ⭐ CRITICAL FIX: Track what content has been processed
+//     const processedContentIds = new Set<number>();
+//     const contentUpdatesByType = new Map<string, Map<number, any>>();
+    
+//     let processedCount = 0;
+
+//     // ⭐ CRITICAL FIX: Process each content item ONCE
+//     for (let i = 0; i < allContent.length; i += batchSize) {
+//       const batch = allContent.slice(i, Math.min(i + batchSize, allContent.length));
+      
+//       for (const content of batch) {
+//         // Skip if already processed
+//         if (processedContentIds.has(content.id)) {
+//           this.addLog(`Skipping already processed content ${content.id}`, "info");
+//           continue;
+//         }
+
+//         const originalImages = this.extractImages(content.content?.rendered || "");
+//         let contentNeedsUpdate = false;
+//         let accumulatedUpdates: any = {};
+
+//         // ⭐ CRITICAL FIX: Process ALL fixes for this content, but collect updates
+//         for (const fix of fixes) {
+//           try {
+//             const result = await fixProcessor(content, fix);
+
+//             // Always track the fix attempt
+//             applied.push({
+//               ...fix,
+//               description: result.description,
+//               wordpressPostId: content.id,
+//               success: result.updated,
+//             });
+
+//             // Accumulate updates instead of applying immediately
+//             if (result.updated) {
+//               if (result.data.content) {
+//                 // Preserve images in the content
+//                 result.data.content = this.ensureImagesPreserved(
+//                   result.data.content,
+//                   originalImages
+//                 );
+//                 accumulatedUpdates.content = result.data.content;
+//               }
+//               if (result.data.title) {
+//                 accumulatedUpdates.title = result.data.title;
+//               }
+//               if (result.data.excerpt) {
+//                 accumulatedUpdates.excerpt = result.data.excerpt;
+//               }
+//               contentNeedsUpdate = true;
+//               this.addLog(result.description, "success");
+//             }
+
+//           } catch (error) {
+//             const errorMsg = `Fix failed for content ${content.id}: ${
+//               error instanceof Error ? error.message : "Unknown error"
+//             }`;
+//             errors.push(errorMsg);
+//             this.addLog(errorMsg, "error");
+//           }
+//         }
+
+//         // ⭐ CRITICAL FIX: Update WordPress ONLY ONCE per content item
+//         if (contentNeedsUpdate && Object.keys(accumulatedUpdates).length > 0) {
+//           try {
+//             this.addLog(
+//               `Updating content ${content.id} with accumulated changes: ${Object.keys(accumulatedUpdates).join(', ')}`,
+//               "info"
+//             );
+            
+//             await this.updateWordPressContent(
+//               creds,
+//               content.id,
+//               accumulatedUpdates,
+//               content.contentType
+//             );
+            
+//             processedContentIds.add(content.id);
+//             this.addLog(`✅ Successfully updated content ${content.id}`, "success");
+//           } catch (error: any) {
+//             errors.push(`WordPress update failed for ${content.id}: ${error.message}`);
+//             this.addLog(`WordPress update failed for ${content.id}`, "error");
+//           }
+//         }
+
+//         processedCount++;
+//         if (processingOptions?.progressCallback) {
+//           processingOptions.progressCallback(processedCount, allContent.length);
+//         }
+//       }
+
+//       if (i + batchSize < allContent.length) {
+//         await new Promise((resolve) =>
+//           setTimeout(resolve, limits.delayBetweenBatches)
+//         );
+//       }
+//     }
+
+//     this.addLog(
+//       `Processing complete: ${processedContentIds.size} content items updated`,
+//       "success"
+//     );
+
+//     if (applied.length === 0 && errors.length === 0) {
+//       return {
+//         applied: fixes.map((fix) => ({
+//           ...fix,
+//           success: true,
+//           description: `Verified across ${allContent.length} page(s): Already meets requirements`,
+//           after: "Already compliant",
+//         })),
+//         errors: [],
+//       };
+//     }
+
+//     return { applied, errors };
+//   } catch (error: any) {
+//     const errorMsg = `WordPress content fix failed: ${error.message}`;
+//     errors.push(errorMsg);
+//     this.addLog(errorMsg, "error");
+//     return { applied, errors };
+//   }
+// }
+
+
+
+
+
+
+
+
 
 
 
@@ -2169,6 +2367,11 @@ private async fixWordPressContent(
 
   return images;
 }
+
+
+
+
+
 private replaceImagesWithPlaceholders(
   html: string,
   images: Array<{ src: string; placeholder: string; element: string }>
