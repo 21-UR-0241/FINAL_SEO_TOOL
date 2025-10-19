@@ -27,7 +27,7 @@ import {
 // Get API base URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://final-seo-tool.onrender.com';
 
-// Enhanced API with crawling support
+// Enhanced API with authentication support
 const api = {
   async getContentImages(websiteId?: string) {
     const url = websiteId
@@ -35,7 +35,20 @@ const api = {
       : `${API_BASE_URL}/api/images/content-images`;
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        credentials: 'include', // ← CRITICAL: Sends auth cookies
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Handle auth errors
+      if (response.status === 401) {
+        console.error('Authentication required - redirecting to login');
+        window.location.href = '/login';
+        return [];
+      }
+
       const contentType = response.headers.get("content-type");
 
       if (!response.ok) {
@@ -62,9 +75,19 @@ const api = {
     try {
       const response = await fetch(`${API_BASE_URL}/api/images/crawl`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: 'include', // ← CRITICAL: Sends auth cookies
+        headers: { 
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({ url, options }),
       });
+
+      // Handle auth errors
+      if (response.status === 401) {
+        console.error('Authentication required - redirecting to login');
+        window.location.href = '/login';
+        throw new Error('Authentication required');
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -86,9 +109,19 @@ const api = {
     try {
       const response = await fetch(`${API_BASE_URL}/api/images/batch-process`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: 'include', // ← CRITICAL: Sends auth cookies
+        headers: { 
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({ imageIds, options, imageUrls }),
       });
+
+      // Handle auth errors
+      if (response.status === 401) {
+        console.error('Authentication required - redirecting to login');
+        window.location.href = '/login';
+        throw new Error('Authentication required');
+      }
 
       const contentType = response.headers.get("content-type");
 
@@ -109,7 +142,20 @@ const api = {
 
   async getWebsites() {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/user/websites`);
+      const response = await fetch(`${API_BASE_URL}/api/user/websites`, {
+        credentials: 'include', // ← CRITICAL: Sends auth cookies
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Handle auth errors
+      if (response.status === 401) {
+        console.error('Authentication required - redirecting to login');
+        window.location.href = '/login';
+        return [];
+      }
+
       const contentType = response.headers.get("content-type");
 
       if (!response.ok) {
@@ -130,8 +176,21 @@ const api = {
   async getImageStatus(contentId: string) {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/images/batch-process?contentId=${contentId}`
+        `${API_BASE_URL}/api/images/batch-process?contentId=${contentId}`,
+        {
+          credentials: 'include', // ← CRITICAL: Sends auth cookies
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
       );
+
+      // Handle auth errors
+      if (response.status === 401) {
+        console.error('Authentication required - redirecting to login');
+        window.location.href = '/login';
+        throw new Error('Authentication required');
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to get status: ${response.statusText}`);
