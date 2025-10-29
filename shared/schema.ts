@@ -1545,6 +1545,99 @@ export const jobs = pgTable('jobs', {
 });
 
 
+
+
+
+
+// ============================================================================
+// GOOGLE OAUTH CONFIGURATION TABLE
+// ============================================================================
+
+export const googleOAuthConfig = pgTable("google_oauth_config", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  
+  // Admin/System level config - can be set by any user for the app
+  clientId: text("client_id").notNull(),
+  clientSecret: text("client_secret").notNull(), // Store encrypted in production
+  redirectUri: text("redirect_uri").notNull(),
+  
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_google_oauth_active").on(table.isActive),
+]);
+
+// ============================================================================
+// GOOGLE OAUTH ACCOUNTS TABLE - Linked Google accounts
+// ============================================================================
+
+export const googleAccounts = pgTable("google_accounts", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  
+  googleId: text("google_id").notNull().unique(), // Google's user ID
+  email: text("email").notNull(),
+  name: text("name"),
+  picture: text("picture"),
+  
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiry: timestamp("token_expiry"),
+  
+  isActive: boolean("is_active").notNull().default(true),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_google_accounts_user_id").on(table.userId),
+  index("idx_google_accounts_google_id").on(table.googleId),
+  index("idx_google_accounts_email").on(table.email),
+]);
+
+// ============================================================================
+// INSERT SCHEMAS
+// ============================================================================
+
+export const insertGoogleOAuthConfigSchema = createInsertSchema(googleOAuthConfig).pick({
+  clientId: true,
+  clientSecret: true,
+  redirectUri: true,
+  isActive: true,
+});
+
+export const insertGoogleAccountSchema = createInsertSchema(googleAccounts).pick({
+  userId: true,
+  googleId: true,
+  email: true,
+  name: true,
+  picture: true,
+  accessToken: true,
+  refreshToken: true,
+  tokenExpiry: true,
+  isActive: true,
+});
+
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+export type GoogleOAuthConfig = typeof googleOAuthConfig.$inferSelect;
+export type InsertGoogleOAuthConfig = z.infer<typeof insertGoogleOAuthConfigSchema>;
+
+export type GoogleAccount = typeof googleAccounts.$inferSelect;
+export type InsertGoogleAccount = z.infer<typeof insertGoogleAccountSchema>;
+
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UpsertUser = typeof users.$inferInsert;
