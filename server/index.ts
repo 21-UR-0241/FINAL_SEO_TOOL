@@ -9,7 +9,7 @@ import { Pool } from 'pg';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
-import { schedulerService } from './services/scheduler-service.js';
+import { schedulerService } from './services/scheduler-service';
 
 // =============================================================================
 // TYPE DECLARATIONS
