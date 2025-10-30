@@ -73,6 +73,35 @@ const sessionStore = new PgSession({
 const app = express();
 
 // =============================================================================
+// ☢️ NUCLEAR CORS FIX - RUNS FIRST, BEFORE EVERYTHING ☢️
+// This ensures CORS headers on ALL responses, especially OPTIONS preflight
+// =============================================================================
+
+app.use('*', (req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin || req.headers.referer || '*';
+  
+  console.log(`☢️ NUCLEAR CORS: ${req.method} ${req.path} from ${origin}`);
+  
+  // Force CORS headers on EVERY response
+  res.setHeader('Access-Control-Allow-Origin', origin === '*' ? '*' : origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.setHeader('Vary', 'Origin');
+  
+  // Handle OPTIONS preflight immediately - don't let it reach other middleware
+  if (req.method === 'OPTIONS') {
+    console.log(`☢️ NUCLEAR CORS: Handling OPTIONS preflight - sending 204`);
+    return res.status(204).end();
+  }
+  
+  next();
+});
+
+console.log('☢️ NUCLEAR CORS ACTIVATED - All requests will have CORS headers');
+
+// =============================================================================
 // 1. TRUST PROXY (CRITICAL FOR RENDER)
 // =============================================================================
 
