@@ -1,6 +1,4 @@
 
-
-
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
@@ -198,7 +196,7 @@ app.post('/api/cors-test', (req: Request, res: Response) => {
 });
 
 // =============================================================================
-// 6. RATE LIMITING
+// 6. RATE LIMITING (FIXED TO SKIP OPTIONS)
 // =============================================================================
 
 const rateLimitHandler = (req: Request, res: Response) => {
@@ -220,6 +218,7 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
+  skip: (req) => req.method === 'OPTIONS', // ✅ CRITICAL FIX: Skip rate limiting for CORS preflight
 });
 
 const authLimiter = rateLimit({
@@ -227,10 +226,10 @@ const authLimiter = rateLimit({
   max: 100,
   handler: rateLimitHandler,
   skipSuccessfulRequests: true,
-  
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
+  skip: (req) => req.method === 'OPTIONS', // ✅ CRITICAL FIX: Skip rate limiting for CORS preflight
 });
 
 app.use('/api/', generalLimiter);
@@ -593,6 +592,7 @@ if (process.env.NODE_ENV === 'development') {
       log(`🛡️ Security: Helmet + Rate Limiting enabled`);
       log(`📡 API available at: http://${host}:${port}/api`);
       log(`🌐 CORS: Ultra-permissive mode (allows all origins)`);
+      log(`✅ Rate limiter: Skipping OPTIONS requests for CORS preflight`);
       log(`🧪 Test endpoints:`);
       log(`   - CORS Test: http://${host}:${port}/api/cors-test`);
       log(`   - Session Debug: http://${host}:${port}/api/session-debug`);
