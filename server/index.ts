@@ -1,360 +1,472 @@
-// =============================================================================
-// IMPORTS
-// =============================================================================
-import 'dotenv/config';
-import express, { Request, Response, NextFunction } from 'express';
-import session from 'express-session';
-import pgSession from 'connect-pg-simple';
-import { Pool } from 'pg';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import express from 'express';
 import { createServer } from 'http';
-import { schedulerService } from './services/scheduler-service.ts';
 
-// =============================================================================
-// TYPE DECLARATIONS
-// =============================================================================
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        username: string;
-        email?: string;
-        name?: string;
-        isAdmin?: boolean;
-      };
-    }
-  }
-}
-
-declare module 'express-session' {
-  interface SessionData {
-    userId: string;
-    username?: string;
-  }
-}
-
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
-function log(message: string) {
-  console.log(message);
-}
-
-// =============================================================================
-// DATABASE & SESSION STORE CONFIGURATION
-// =============================================================================
-const PgSession = pgSession(session);
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === 'production'
-      ? { rejectUnauthorized: false }
-      : false,
-});
-
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('❌ Database connection failed:', err);
-  } else {
-    console.log('✅ Database connected:', res.rows[0].now);
-  }
-});
-
-const sessionStore = new PgSession({
-  pool,
-  tableName: 'sessions',
-  createTableIfMissing: false,
-});
-
-// =============================================================================
-// EXPRESS APP SETUP
-// =============================================================================
 const app = express();
 
 // =============================================================================
-// 🚀 NUCLEAR CORS (MUST BE FIRST MIDDLEWARE)
-// =============================================================================
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin;
-
-  console.log(`🌐 ${req.method} ${req.path} from ${origin || 'NO-ORIGIN'}`);
-
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-
-  res.setHeader(
-    'Access-Control-Allow-Methods',
-    'GET, POST, PUT, DELETE, PATCH, OPTIONS'
-  );
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token'
-  );
-  res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  res.setHeader('Vary', 'Origin');
-
-  // ✅ Respond immediately to OPTIONS preflight requests
-  if (req.method === 'OPTIONS') {
-    console.log(`✅ OPTIONS ${req.path} -> 200`);
-    return res.status(200).send('OK');
-  }
-
-  next();
-});
-
-// =============================================================================
-// TRUST PROXY (REQUIRED FOR RENDER + SECURE COOKIES)
+// STEP 1: TRUST PROXY (REQUIRED FOR RENDER)
 // =============================================================================
 app.set('trust proxy', 1);
 
 // =============================================================================
-// BASIC MIDDLEWARE
+// STEP 2: ULTRA-SIMPLE CORS - FIRST MIDDLEWARE
 // =============================================================================
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: false }));
-
-// =============================================================================
-// SECURITY HEADERS
-// =============================================================================
-app.use(
-  helmet({
-    crossOriginOpenerPolicy: false,
-    crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: false,
-    contentSecurityPolicy: false,
-  })
-);
-
-// =============================================================================
-// RATE LIMITING
-// =============================================================================
-const rateLimitHandler = (req: Request, res: Response) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '*';
+  
+  // Log every request
+  console.log(`📨 ${req.method} ${req.path} from ${origin}`);
+  
+  // Set CORS headers
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Vary', 'Origin');
+  
+  // Handle OPTIONS
+  if (req.method === 'OPTIONS') {
+    console.log(`✅ Sending 204 for OPTIONS ${req.path}`);
+    return res.status(204).end();
   }
-  res.status(429).json({
-    success: false,
-    message: 'Too many requests, please try again later.',
-  });
-};
-
-const generalLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 500,
-  handler: rateLimitHandler,
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: false,
-  skip: (req) => req.method === 'OPTIONS',
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  handler: rateLimitHandler,
-  skipSuccessfulRequests: true,
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: false,
-  skip: (req) => req.method === 'OPTIONS',
-});
-
-app.use('/api/', generalLimiter);
-app.use('/api/auth/', authLimiter);
-
-// =============================================================================
-// SESSION CONFIGURATION
-// =============================================================================
-app.use(
-  session({
-    store: sessionStore,
-    secret:
-      process.env.SESSION_SECRET || 'your-super-secret-key-change-in-production',
-    resave: false,
-    saveUninitialized: false,
-    name: 'ai-seo-session',
-    proxy: true,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/',
-    },
-    rolling: true,
-  })
-);
-
-// =============================================================================
-// LOGGING
-// =============================================================================
-app.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.path.startsWith('/api')) {
-    console.log(
-      `📍 ${req.method} ${req.path} - Session: ${
-        req.session?.userId || 'none'
-      }`
-    );
-  }
+  
   next();
 });
 
 // =============================================================================
-// TEST ENDPOINTS
+// STEP 3: BASIC MIDDLEWARE
 // =============================================================================
-app.get('/health', (_req: Request, res: Response) => {
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// =============================================================================
+// STEP 4: ROUTES
+// =============================================================================
+
+app.get('/', (req, res) => {
+  res.json({
+    status: 'Server is working!',
+    timestamp: new Date().toISOString(),
+    cors: 'enabled',
+    message: 'CORS should be working now'
+  });
+});
+
+app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    cors: 'enabled',
+    timestamp: new Date().toISOString()
   });
 });
 
-app.get('/', (_req: Request, res: Response) => {
+app.get('/api/auth/me', (req, res) => {
+  console.log('🔍 /api/auth/me called');
+  res.status(401).json({
+    success: false,
+    message: 'Not authenticated',
+    authenticated: false,
+    note: 'This is the minimal test - session logic not implemented yet'
+  });
+});
+
+app.get('/api/auth/google/url', (req, res) => {
+  console.log('🔗 /api/auth/google/url called');
   res.json({
-    success: true,
-    message: '🚀 AI SEO Tool API',
-    version: '1.0.0',
-    cors: 'ALL origins allowed',
-    endpoints: {
-      health: '/health',
-      auth: '/api/auth/me',
-      google: '/api/auth/google/url',
-    },
-  });
-});
-
-app.get('/api/cors-test', (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'CORS working!',
-    origin: req.headers.origin,
-    method: req.method,
-    timestamp: new Date().toISOString(),
+    success: false,
+    message: 'Google OAuth not configured in minimal test',
+    note: 'If you see this, CORS is working!'
   });
 });
 
 // =============================================================================
-// ROUTES + SERVER STARTUP
+// STEP 5: START SERVER
 // =============================================================================
-(async () => {
-  try {
-    const { registerRoutes } = await import('./routes.ts').catch(() => ({
-      registerRoutes: async (app: any) => {
-        console.log('⚠️  No routes.ts found, using basic routes only');
-        return app;
-      },
-    }));
 
-    await registerRoutes(app);
-    console.log('✅ Routes registered');
+const PORT = parseInt(process.env.PORT || '10000', 10);
+const httpServer = createServer(app);
 
-    // =============================================================================
-    // ERROR HANDLER
-    // =============================================================================
-    app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-      const origin = req.headers.origin;
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log('\n' + '='.repeat(60));
+  console.log(`🚀 MINIMAL TEST SERVER RUNNING`);
+  console.log(`📡 Port: ${PORT}`);
+  console.log(`🌐 CORS: Enabled for ALL origins`);
+  console.log(`⏰ Started: ${new Date().toISOString()}`);
+  console.log('='.repeat(60) + '\n');
+});
 
-      console.error('❌ Error:', {
-        message: err.message,
-        path: req.path,
-        method: req.method,
-      });
+httpServer.on('error', (error: any) => {
+  console.error('❌ Server error:', error);
+  process.exit(1);
+});
 
-      if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      } else {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-      }
-
-      res.status(err.status || 500).json({
-        success: false,
-        message: err.message || 'Internal Server Error',
-      });
-    });
-
-    // =============================================================================
-    // 404 HANDLER
-    // =============================================================================
-    app.use('*', (req: Request, res: Response) => {
-      const origin = req.headers.origin;
-      console.log(`❌ 404: ${req.method} ${req.path}`);
-
-      if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      } else {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-      }
-
-      res.status(404).json({
-        success: false,
-        message: 'Route not found',
-        path: req.path,
-        method: req.method,
-      });
-    });
-
-    // =============================================================================
-    // START SERVER
-    // =============================================================================
-    const port = parseInt(process.env.PORT || '10000', 10);
-    const host = '0.0.0.0';
-    const httpServer = createServer(app);
-
-    httpServer.listen(port, host, () => {
-      log(`\n${'='.repeat(60)}`);
-      log(`🚀 Server: http://${host}:${port}`);
-      log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      log(`🌐 CORS: NUCLEAR MODE - All origins allowed`);
-      log(
-        `🧪 Test: curl -X OPTIONS ${host}:${port}/api/auth/me -H "Origin: https://test.com" -v`
-      );
-      log(`${'='.repeat(60)}\n`);
-
-      schedulerService.startScheduler(1);
-      log(`⏰ Scheduler started`);
-    });
-
-    httpServer.on('error', (error: any) => {
-      console.error('❌ Server error:', error);
-      process.exit(1);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start:', error);
-    process.exit(1);
-  }
-})();
-
-// =============================================================================
-// GRACEFUL SHUTDOWN
-// =============================================================================
 process.on('SIGTERM', () => {
-  log('🔴 Shutting down');
-  pool.end(() => {
-    log('🔌 Database closed');
-    process.exit(0);
-  });
+  console.log('🔴 Shutting down...');
+  process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  log('🔴 Shutting down');
-  pool.end(() => {
-    log('🔌 Database closed');
-    process.exit(0);
-  });
+  console.log('🔴 Shutting down...');
+  process.exit(0);
 });
+
+
+// // =============================================================================
+// // IMPORTS
+// // =============================================================================
+// import 'dotenv/config';
+// import express, { Request, Response, NextFunction } from 'express';
+// import session from 'express-session';
+// import pgSession from 'connect-pg-simple';
+// import { Pool } from 'pg';
+// import helmet from 'helmet';
+// import rateLimit from 'express-rate-limit';
+// import { createServer } from 'http';
+// import { schedulerService } from './services/scheduler-service.ts';
+
+// // =============================================================================
+// // TYPE DECLARATIONS
+// // =============================================================================
+// declare global {
+//   namespace Express {
+//     interface Request {
+//       user?: {
+//         id: string;
+//         username: string;
+//         email?: string;
+//         name?: string;
+//         isAdmin?: boolean;
+//       };
+//     }
+//   }
+// }
+
+// declare module 'express-session' {
+//   interface SessionData {
+//     userId: string;
+//     username?: string;
+//   }
+// }
+
+// // =============================================================================
+// // UTILITY FUNCTIONS
+// // =============================================================================
+// function log(message: string) {
+//   console.log(message);
+// }
+
+// // =============================================================================
+// // DATABASE & SESSION STORE CONFIGURATION
+// // =============================================================================
+// const PgSession = pgSession(session);
+// const pool = new Pool({
+//   connectionString: process.env.DATABASE_URL,
+//   ssl:
+//     process.env.NODE_ENV === 'production'
+//       ? { rejectUnauthorized: false }
+//       : false,
+// });
+
+// pool.query('SELECT NOW()', (err, res) => {
+//   if (err) {
+//     console.error('❌ Database connection failed:', err);
+//   } else {
+//     console.log('✅ Database connected:', res.rows[0].now);
+//   }
+// });
+
+// const sessionStore = new PgSession({
+//   pool,
+//   tableName: 'sessions',
+//   createTableIfMissing: false,
+// });
+
+// // =============================================================================
+// // EXPRESS APP SETUP
+// // =============================================================================
+// const app = express();
+
+// // =============================================================================
+// // 🚀 NUCLEAR CORS (MUST BE FIRST MIDDLEWARE)
+// // =============================================================================
+// app.use((req: Request, res: Response, next: NextFunction) => {
+//   const origin = req.headers.origin;
+
+//   console.log(`🌐 ${req.method} ${req.path} from ${origin || 'NO-ORIGIN'}`);
+
+//   if (origin) {
+//     res.setHeader('Access-Control-Allow-Origin', origin);
+//     res.setHeader('Access-Control-Allow-Credentials', 'true');
+//   } else {
+//     res.setHeader('Access-Control-Allow-Origin', '*');
+//   }
+
+//   res.setHeader(
+//     'Access-Control-Allow-Methods',
+//     'GET, POST, PUT, DELETE, PATCH, OPTIONS'
+//   );
+//   res.setHeader(
+//     'Access-Control-Allow-Headers',
+//     'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token'
+//   );
+//   res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type');
+//   res.setHeader('Access-Control-Max-Age', '86400');
+//   res.setHeader('Vary', 'Origin');
+
+//   // ✅ Respond immediately to OPTIONS preflight requests
+//   if (req.method === 'OPTIONS') {
+//     console.log(`✅ OPTIONS ${req.path} -> 200`);
+//     return res.status(200).send('OK');
+//   }
+
+//   next();
+// });
+
+// // =============================================================================
+// // TRUST PROXY (REQUIRED FOR RENDER + SECURE COOKIES)
+// // =============================================================================
+// app.set('trust proxy', 1);
+
+// // =============================================================================
+// // BASIC MIDDLEWARE
+// // =============================================================================
+// app.use(express.json({ limit: '10mb' }));
+// app.use(express.urlencoded({ extended: false }));
+
+// // =============================================================================
+// // SECURITY HEADERS
+// // =============================================================================
+// app.use(
+//   helmet({
+//     crossOriginOpenerPolicy: false,
+//     crossOriginEmbedderPolicy: false,
+//     crossOriginResourcePolicy: false,
+//     contentSecurityPolicy: false,
+//   })
+// );
+
+// // =============================================================================
+// // RATE LIMITING
+// // =============================================================================
+// const rateLimitHandler = (req: Request, res: Response) => {
+//   const origin = req.headers.origin;
+//   if (origin) {
+//     res.setHeader('Access-Control-Allow-Origin', origin);
+//     res.setHeader('Access-Control-Allow-Credentials', 'true');
+//   }
+//   res.status(429).json({
+//     success: false,
+//     message: 'Too many requests, please try again later.',
+//   });
+// };
+
+// const generalLimiter = rateLimit({
+//   windowMs: 1 * 60 * 1000,
+//   max: 500,
+//   handler: rateLimitHandler,
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   validate: false,
+//   skip: (req) => req.method === 'OPTIONS',
+// });
+
+// const authLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 100,
+//   handler: rateLimitHandler,
+//   skipSuccessfulRequests: true,
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   validate: false,
+//   skip: (req) => req.method === 'OPTIONS',
+// });
+
+// app.use('/api/', generalLimiter);
+// app.use('/api/auth/', authLimiter);
+
+// // =============================================================================
+// // SESSION CONFIGURATION
+// // =============================================================================
+// app.use(
+//   session({
+//     store: sessionStore,
+//     secret:
+//       process.env.SESSION_SECRET || 'your-super-secret-key-change-in-production',
+//     resave: false,
+//     saveUninitialized: false,
+//     name: 'ai-seo-session',
+//     proxy: true,
+//     cookie: {
+//       secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+//       httpOnly: true,
+//       maxAge: 24 * 60 * 60 * 1000, // 1 day
+//       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+//       path: '/',
+//     },
+//     rolling: true,
+//   })
+// );
+
+// // =============================================================================
+// // LOGGING
+// // =============================================================================
+// app.use((req: Request, res: Response, next: NextFunction) => {
+//   if (req.path.startsWith('/api')) {
+//     console.log(
+//       `📍 ${req.method} ${req.path} - Session: ${
+//         req.session?.userId || 'none'
+//       }`
+//     );
+//   }
+//   next();
+// });
+
+// // =============================================================================
+// // TEST ENDPOINTS
+// // =============================================================================
+// app.get('/health', (_req: Request, res: Response) => {
+//   res.json({
+//     status: 'healthy',
+//     timestamp: new Date().toISOString(),
+//     environment: process.env.NODE_ENV || 'development',
+//     cors: 'enabled',
+//   });
+// });
+
+// app.get('/', (_req: Request, res: Response) => {
+//   res.json({
+//     success: true,
+//     message: '🚀 AI SEO Tool API',
+//     version: '1.0.0',
+//     cors: 'ALL origins allowed',
+//     endpoints: {
+//       health: '/health',
+//       auth: '/api/auth/me',
+//       google: '/api/auth/google/url',
+//     },
+//   });
+// });
+
+// app.get('/api/cors-test', (req: Request, res: Response) => {
+//   res.json({
+//     success: true,
+//     message: 'CORS working!',
+//     origin: req.headers.origin,
+//     method: req.method,
+//     timestamp: new Date().toISOString(),
+//   });
+// });
+
+// // =============================================================================
+// // ROUTES + SERVER STARTUP
+// // =============================================================================
+// (async () => {
+//   try {
+//     const { registerRoutes } = await import('./routes.ts').catch(() => ({
+//       registerRoutes: async (app: any) => {
+//         console.log('⚠️  No routes.ts found, using basic routes only');
+//         return app;
+//       },
+//     }));
+
+//     await registerRoutes(app);
+//     console.log('✅ Routes registered');
+
+//     // =============================================================================
+//     // ERROR HANDLER
+//     // =============================================================================
+//     app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+//       const origin = req.headers.origin;
+
+//       console.error('❌ Error:', {
+//         message: err.message,
+//         path: req.path,
+//         method: req.method,
+//       });
+
+//       if (origin) {
+//         res.setHeader('Access-Control-Allow-Origin', origin);
+//         res.setHeader('Access-Control-Allow-Credentials', 'true');
+//       } else {
+//         res.setHeader('Access-Control-Allow-Origin', '*');
+//       }
+
+//       res.status(err.status || 500).json({
+//         success: false,
+//         message: err.message || 'Internal Server Error',
+//       });
+//     });
+
+//     // =============================================================================
+//     // 404 HANDLER
+//     // =============================================================================
+//     app.use('*', (req: Request, res: Response) => {
+//       const origin = req.headers.origin;
+//       console.log(`❌ 404: ${req.method} ${req.path}`);
+
+//       if (origin) {
+//         res.setHeader('Access-Control-Allow-Origin', origin);
+//         res.setHeader('Access-Control-Allow-Credentials', 'true');
+//       } else {
+//         res.setHeader('Access-Control-Allow-Origin', '*');
+//       }
+
+//       res.status(404).json({
+//         success: false,
+//         message: 'Route not found',
+//         path: req.path,
+//         method: req.method,
+//       });
+//     });
+
+//     // =============================================================================
+//     // START SERVER
+//     // =============================================================================
+//     const port = parseInt(process.env.PORT || '10000', 10);
+//     const host = '0.0.0.0';
+//     const httpServer = createServer(app);
+
+//     httpServer.listen(port, host, () => {
+//       log(`\n${'='.repeat(60)}`);
+//       log(`🚀 Server: http://${host}:${port}`);
+//       log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+//       log(`🌐 CORS: NUCLEAR MODE - All origins allowed`);
+//       log(
+//         `🧪 Test: curl -X OPTIONS ${host}:${port}/api/auth/me -H "Origin: https://test.com" -v`
+//       );
+//       log(`${'='.repeat(60)}\n`);
+
+//       schedulerService.startScheduler(1);
+//       log(`⏰ Scheduler started`);
+//     });
+
+//     httpServer.on('error', (error: any) => {
+//       console.error('❌ Server error:', error);
+//       process.exit(1);
+//     });
+//   } catch (error) {
+//     console.error('❌ Failed to start:', error);
+//     process.exit(1);
+//   }
+// })();
+
+// // =============================================================================
+// // GRACEFUL SHUTDOWN
+// // =============================================================================
+// process.on('SIGTERM', () => {
+//   log('🔴 Shutting down');
+//   pool.end(() => {
+//     log('🔌 Database closed');
+//     process.exit(0);
+//   });
+// });
+
+// process.on('SIGINT', () => {
+//   log('🔴 Shutting down');
+//   pool.end(() => {
+//     log('🔌 Database closed');
+//     process.exit(0);
+//   });
+// });
 
 
 
