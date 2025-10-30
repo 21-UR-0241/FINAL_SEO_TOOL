@@ -227,6 +227,7 @@ const authLimiter = rateLimit({
   max: 100,
   handler: rateLimitHandler,
   skipSuccessfulRequests: true,
+  
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
