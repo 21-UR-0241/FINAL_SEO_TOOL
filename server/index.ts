@@ -564,7 +564,6 @@
 //   process.exit(1);
 // });
 
-
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
@@ -573,7 +572,7 @@ import { Pool } from 'pg';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
-import cors from 'cors'; // <-- 1. IMPORTED CORS PACKAGE
+import cors from 'cors';
 import { schedulerService } from './services/scheduler-service.ts';
 
 // =============================================================================
@@ -597,7 +596,7 @@ declare global {
 declare module 'express-session' {
   interface SessionData {
     userId: string;
-    username?: string; // Optional but helpful for debugging
+    username?: string;
   }
 }
 
@@ -614,12 +613,11 @@ function log(message: string) {
 // =============================================================================
 
 const PgSession = pgSession(session);
-const pool = new Pool({ 
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Test database connection
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error('❌ Database connection failed:', err);
@@ -641,35 +639,32 @@ const sessionStore = new PgSession({
 const app = express();
 
 // =============================================================================
-// 1. TRUST PROXY (CRITICAL FOR RENDER)
+// 1. TRUST PROXY
 // =============================================================================
 
 app.set('trust proxy', 1);
 
 // =============================================================================
-// 2. CORS CONFIGURATION (REPLACES CUSTOM MIDDLEWARE)
+// 2. CORS CONFIGURATION
 // =============================================================================
 
 const allowedOrigins = [
-  'https://final-seo-tool.vercel.app', // Your Vercel frontend
-  'http://localhost:5173'              // Your local dev frontend, adjust port if needed
+  'https://final-seo-tool.vercel.app',
+  'http://localhost:5173'
 ];
 
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('This origin is not allowed by CORS'));
     }
   },
-  credentials: true, // This is crucial for sending cookies
+  credentials: true,
 };
 
-// Apply CORS middleware to all routes
 app.use(cors(corsOptions));
-// Handle preflight requests for all routes
 app.options('*', cors(corsOptions));
 
 // =============================================================================
@@ -680,13 +675,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // =============================================================================
-// 4. CORS & SESSION TEST ENDPOINTS
+// 4. TEST ENDPOINTS
 // =============================================================================
 
 app.get('/api/cors-test', (req: Request, res: Response) => {
   console.log('🧪 CORS Test GET Hit');
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'CORS is working!',
     origin: req.headers.origin,
     timestamp: new Date().toISOString()
@@ -695,8 +690,8 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
 
 app.post('/api/cors-test', (req: Request, res: Response) => {
   console.log('🧪 CORS Test POST Hit');
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'CORS POST is working!',
     origin: req.headers.origin,
     body: req.body,
@@ -721,7 +716,6 @@ const generalLimiter = rateLimit({
   handler: rateLimitHandler,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: false,
 });
 
 const authLimiter = rateLimit({
@@ -731,7 +725,6 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: false,
 });
 
 app.use('/api/', generalLimiter);
@@ -747,11 +740,11 @@ app.use('/api/gsc/oauth-callback', authLimiter);
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-  
+
   if (req.path === '/api/gsc/oauth-callback') {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   }
-  
+
   next();
 });
 
@@ -818,20 +811,18 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   name: 'ai-seo-session',
-  proxy: true, // Trust proxy for secure cookies
+  proxy: true,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-    httpOnly: true, // Prevent XSS
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Cross-origin in production
-    domain: undefined, // Let browser handle domain
-    path: '/' // Available for all paths
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   },
-  rolling: true // Extend session on activity
+  rolling: true
 }));
 
 // =============================================================================
-// 9. SESSION MIDDLEWARE - Log session info on each request
+// 9. SESSION MIDDLEWARE LOGGING
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -851,56 +842,28 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // =============================================================================
 
 app.get('/api/session-debug', (req: Request, res: Response) => {
-  console.log('🔍 Session Debug Full:', {
-    sessionID: req.sessionID,
-    session: req.session,
-    cookies: req.headers.cookie,
-    origin: req.headers.origin,
-    secure: req.secure,
-    protocol: req.protocol
-  });
-  
   res.json({
     success: true,
     hasSession: !!req.session,
     sessionID: req.sessionID,
     userId: req.session?.userId || null,
-    username: req.session?.username || null,
     cookies: req.headers.cookie || 'none',
     origin: req.headers.origin || 'none',
-    secure: req.secure,
-    protocol: req.protocol,
-    environment: process.env.NODE_ENV || 'development'
   });
 });
 
 // =============================================================================
-// 11. LOGGING
+// 11. REQUEST/RESPONSE LOGGING
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson: any, ...args: any[]) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        const preview = JSON.stringify(capturedJsonResponse).substring(0, 100);
-        logLine += ` :: ${preview}${preview.length >= 100 ? '...' : ''}`;
-      }
-      log(logLine);
+    if (req.path.startsWith("/api")) {
+      log(`${req.method} ${req.path} ${res.statusCode} in ${duration}ms`);
     }
   });
-
   next();
 });
 
@@ -909,50 +872,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // =============================================================================
 
 app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
-  const originalRedirect = res.redirect.bind(res);
-  res.redirect = function(url: string | number, status?: any) {
-    if (typeof url === 'number') {
-      return res.status(url).json({ 
-        success: false, 
-        message: 'Unauthorized', 
-        redirect: status 
-      });
-    }
-    return res.status(302).json({ 
-      success: false, 
-      message: 'Redirect required', 
-      redirect: url 
+  res.redirect = (url: string | number, status?: any): any => {
+    const redirectUrl = typeof url === 'string' ? url : status;
+    return res.status(302).json({
+      success: false,
+      message: 'Redirect required',
+      redirect: redirectUrl
     });
   };
   next();
 });
-
-// =============================================================================
-// 13. DEBUG MIDDLEWARE (Development Only)
-// =============================================================================
-
-if (process.env.NODE_ENV === 'development') {
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const originalSend = res.send;
-    const originalJson = res.json;
-    
-    res.send = function(data) {
-      console.log(`📤 Response for ${req.method} ${req.path}:`, {
-        status: res.statusCode,
-      });
-      return originalSend.call(this, data);
-    };
-    
-    res.json = function(data) {
-      console.log(`📤 JSON Response for ${req.method} ${req.path}:`, {
-        status: res.statusCode,
-      });
-      return originalJson.call(this, data);
-    };
-    
-    next();
-  });
-}
 
 // =============================================================================
 // SERVER STARTUP & ROUTES
@@ -960,21 +889,11 @@ if (process.env.NODE_ENV === 'development') {
 
 (async () => {
   try {
-    const { registerRoutes } = await import('./routes.ts').catch(() => ({ 
-      registerRoutes: async (app: any) => app 
-    }));
-    
+    const { registerRoutes } = await import('./routes.ts');
     await registerRoutes(app);
-    
+
     app.get('/health', (_req: Request, res: Response) => {
-      res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-        uptime: process.uptime(),
-        port: process.env.PORT || '10000',
-        database: 'connected'
-      });
+      res.json({ status: 'healthy', timestamp: new Date().toISOString() });
     });
 
     // =============================================================================
@@ -984,54 +903,24 @@ if (process.env.NODE_ENV === 'development') {
     app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
       console.error("❌ Global Error Handler:", {
         message: err.message,
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
         path: req.path,
-        method: req.method,
-        origin: req.headers.origin,
-        userId: req.session?.userId || 'none'
       });
-      
-      const status = err.status || err.statusCode || 500;
+
+      const status = err.status || 500;
       const message = err.message || "Internal Server Error";
-      
-      const responseMessage = process.env.NODE_ENV === 'production' 
-        ? status >= 500 ? 'Internal Server Error' : message
-        : message;
 
-      res.status(status).json({ 
-        success: false,
-        message: responseMessage,
-        ...(process.env.NODE_ENV === 'development' && { 
-          stack: err.stack,
-          path: req.path,
-          method: req.method
-        })
-      });
+      res.status(status).json({ success: false, message });
     });
-
-    if (app.get("env") === "development") {
-      try {
-        const { setupVite } = await import('./vite.ts');
-        const httpServer = createServer(app);
-        await setupVite(app, httpServer);
-      } catch (e) {
-        console.log('Vite setup not available or failed, continuing without it');
-      }
-    }
 
     // =============================================================================
     // 404 HANDLER
     // =============================================================================
 
     app.use('*', (req: Request, res: Response) => {
-      console.log(`❌ 404: ${req.method} ${req.path}`);
-      console.log(`   Origin: ${req.headers.origin || 'none'}`);
-      
       res.status(404).json({
         success: false,
         message: 'Route not found',
         path: req.path,
-        method: req.method
       });
     });
 
@@ -1047,37 +936,19 @@ if (process.env.NODE_ENV === 'development') {
       log(`\n${'='.repeat(60)}`);
       log(`🚀 Server running on http://${host}:${port}`);
       log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      log(`🔐 Session store: PostgreSQL`);
-      log(`🛡️ Security: Helmet + Rate Limiting enabled`);
-      log(`📡 API available at: http://${host}:${port}/api`);
-      log(`🌐 CORS: Configured for specific origins`); // <-- Updated log message
-      log(`🧪 Test endpoints:`);
-      log(`   - CORS Test: http://${host}:${port}/api/cors-test`);
-      log(`   - Session Debug: http://${host}:${port}/api/session-debug`);
-      log(`   - Health Check: http://${host}:${port}/health`);
-      
+      log(`🌐 CORS: Configured for specific origins`);
       schedulerService.startScheduler(1);
       log(`⏰ Content scheduler started`);
-      
-      if (process.env.NODE_ENV === 'development') {
-        log(`🛠️  Development mode: Vite dev server + verbose logging enabled`);
-      }
-      
-      if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'your-super-secret-key-change-in-production') {
-        log(`⚠️  WARNING: Using default SESSION_SECRET - change this in production!`);
-      }
-      
       log(`${'='.repeat(60)}\n`);
     });
 
     httpServer.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`❌ Port ${port} is already in use`);
-        process.exit(1);
       } else {
         console.error('❌ Server error:', error);
-        process.exit(1);
       }
+      process.exit(1);
     });
 
   } catch (error) {
@@ -1090,28 +961,13 @@ if (process.env.NODE_ENV === 'development') {
 // GRACEFUL SHUTDOWN
 // =============================================================================
 
-process.on('SIGTERM', () => {
-  log('🔴 SIGTERM received, shutting down gracefully');
+const shutdown = () => {
+  log('🔴 Shutting down gracefully');
   pool.end(() => {
     log('🔌 Database pool closed');
     process.exit(0);
   });
-});
+};
 
-process.on('SIGINT', () => {
-  log('🔴 SIGINT received, shutting down gracefully');
-  pool.end(() => {
-    log('🔌 Database pool closed');
-    process.exit(0);
-  });
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
