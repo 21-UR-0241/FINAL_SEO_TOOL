@@ -73,19 +73,53 @@ const sessionStore = new PgSession({
 const app = express();
 
 // =============================================================================
-// 1. TRUST PROXY (CRITICAL FOR RENDER)
+// 1. TRUST PROXY - MUST BE FIRST
 // =============================================================================
 
 app.set('trust proxy', 1);
 
 // =============================================================================
-// 2. CORS & OPTIONS HANDLER - MUST BE FIRST
+// 2. RAW BODY PARSER FOR OPTIONS - MUST BE BEFORE ANYTHING ELSE
+// =============================================================================
+
+// This ensures we can read the request even for OPTIONS
+app.use(express.raw({ type: '*/*', limit: '1kb' }));
+
+// =============================================================================
+// 3. NUCLEAR OPTIONS HANDLER - ABSOLUTE PRIORITY
+// =============================================================================
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Handle OPTIONS IMMEDIATELY before anything else can interfere
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin || req.headers.referer?.split('/').slice(0, 3).join('/') || '*';
+    
+    console.log(`⚡ OPTIONS ${req.path} from ${origin}`);
+    
+    // Set ALL CORS headers
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
+    res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.setHeader('Vary', 'Origin');
+    
+    // Send 200 immediately - don't let anything else process this
+    return res.status(200).end();
+  }
+  
+  // Not an OPTIONS request, continue to next middleware
+  next();
+});
+
+// =============================================================================
+// 4. CORS FOR ALL OTHER REQUESTS
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin || req.headers.referer?.split('/').slice(0, 3).join('/');
   
-  // Set CORS headers for ALL requests
   if (origin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -96,28 +130,20 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
   res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type');
-  res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('Vary', 'Origin');
   
-  // Handle OPTIONS immediately - don't let it reach other middleware
-  if (req.method === 'OPTIONS') {
-    console.log(`⚡ OPTIONS ${req.path} - immediate 200 response`);
-    console.log(`   Origin: ${origin || 'NO ORIGIN'}`);
-    return res.status(200).end();
-  }
-
   next();
 });
 
 // =============================================================================
-// 3. BASIC MIDDLEWARE
+// 5. BODY PARSERS
 // =============================================================================
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // =============================================================================
-// 4. CORS & SESSION TEST ENDPOINTS
+// 6. CORS TEST ENDPOINTS (Before rate limiting)
 // =============================================================================
 
 app.get('/api/cors-test', (req: Request, res: Response) => {
@@ -141,19 +167,8 @@ app.post('/api/cors-test', (req: Request, res: Response) => {
   });
 });
 
-
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`📥 ${req.method} ${req.path}`, {
-    origin: req.headers.origin,
-    cookie: req.headers.cookie ? 'present' : 'missing',
-    session: req.sessionID ? 'present' : 'missing'
-  });
-  next();
-});
-
 // =============================================================================
-// 5. RATE LIMITING
+// 7. RATE LIMITING (Skip OPTIONS)
 // =============================================================================
 
 const rateLimitHandler = (req: Request, res: Response) => {
@@ -175,7 +190,7 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
-  skip: (req) => req.method === 'OPTIONS', // Skip OPTIONS requests
+  skip: (req) => req.method === 'OPTIONS',
 });
 
 const authLimiter = rateLimit({
@@ -186,7 +201,7 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
-  skip: (req) => req.method === 'OPTIONS', // Skip OPTIONS requests
+  skip: (req) => req.method === 'OPTIONS',
 });
 
 app.use('/api/', generalLimiter);
@@ -196,7 +211,7 @@ app.use('/api/gsc/auth-url', authLimiter);
 app.use('/api/gsc/oauth-callback', authLimiter);
 
 // =============================================================================
-// 6. SECURITY HEADERS
+// 8. SECURITY HEADERS
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -232,7 +247,7 @@ app.use(helmet({
 }));
 
 // =============================================================================
-// 7. INPUT SANITIZATION
+// 9. INPUT SANITIZATION
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -264,7 +279,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 8. SESSION CONFIGURATION
+// 10. SESSION CONFIGURATION
 // =============================================================================
 
 app.use(session({
@@ -277,7 +292,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     domain: undefined,
     path: '/'
@@ -286,23 +301,23 @@ app.use(session({
 }));
 
 // =============================================================================
-// 9. SESSION MIDDLEWARE - Log session info on each request
+// 11. REQUEST LOGGER
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.path.startsWith('/api') && !req.path.includes('cors-test')) {
-    console.log(`🔑 Session Info: ${req.method} ${req.path}`, {
-      sessionID: req.sessionID?.substring(0, 8) + '...',
-      hasSession: !!req.session,
-      userId: req.session?.userId || 'none',
-      cookie: req.headers.cookie?.substring(0, 50) + '...' || 'none'
+    console.log(`📥 ${req.method} ${req.path}`, {
+      origin: req.headers.origin || 'none',
+      cookie: req.headers.cookie ? 'present' : 'missing',
+      sessionID: req.sessionID?.substring(0, 8) + '...' || 'none',
+      userId: req.session?.userId || 'none'
     });
   }
   next();
 });
 
 // =============================================================================
-// 10. SESSION DEBUG ENDPOINT
+// 12. SESSION DEBUG ENDPOINT
 // =============================================================================
 
 app.get('/api/session-debug', (req: Request, res: Response) => {
@@ -330,7 +345,7 @@ app.get('/api/session-debug', (req: Request, res: Response) => {
 });
 
 // =============================================================================
-// 11. LOGGING
+// 13. LOGGING
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -361,72 +376,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 12. API REDIRECT HANDLER
-// =============================================================================
-
-app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
-  const originalRedirect = res.redirect.bind(res);
-  res.redirect = function(url: string | number, status?: any) {
-    const origin = req.headers.origin;
-    if (origin) {
-      this.setHeader('Access-Control-Allow-Origin', origin);
-      this.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    
-    if (typeof url === 'number') {
-      return res.status(url).json({ 
-        success: false, 
-        message: 'Unauthorized', 
-        redirect: status 
-      });
-    }
-    return res.status(302).json({ 
-      success: false, 
-      message: 'Redirect required', 
-      redirect: url 
-    });
-  };
-  next();
-});
-
-// =============================================================================
-// 13. DEBUG MIDDLEWARE (Development Only)
-// =============================================================================
-
-if (process.env.NODE_ENV === 'development') {
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const originalSend = res.send;
-    const originalJson = res.json;
-    
-    res.send = function(data) {
-      console.log(`📤 Response for ${req.method} ${req.path}:`, {
-        status: res.statusCode,
-        corsOrigin: res.getHeader('access-control-allow-origin'),
-        corsCredentials: res.getHeader('access-control-allow-credentials'),
-      });
-      return originalSend.call(this, data);
-    };
-    
-    res.json = function(data) {
-      console.log(`📤 JSON Response for ${req.method} ${req.path}:`, {
-        status: res.statusCode,
-        corsOrigin: res.getHeader('access-control-allow-origin'),
-        corsCredentials: res.getHeader('access-control-allow-credentials'),
-      });
-      return originalJson.call(this, data);
-    };
-    
-    next();
-  });
-}
-
-// =============================================================================
 // SERVER STARTUP & ROUTES
 // =============================================================================
 
 (async () => {
   try {
-    // Dynamic imports to handle optional modules
     const { registerRoutes } = await import('./routes.ts').catch(() => ({ 
       registerRoutes: async (app: any) => app 
     }));
@@ -461,7 +415,7 @@ if (process.env.NODE_ENV === 'development') {
         userId: req.session?.userId || 'none'
       });
       
-      // CRITICAL: Force CORS headers on ALL errors
+      // Force CORS headers on errors
       if (origin) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -509,9 +463,7 @@ if (process.env.NODE_ENV === 'development') {
       const origin = req.headers.origin;
       
       console.log(`❌ 404: ${req.method} ${req.path}`);
-      console.log(`   Origin: ${origin || 'none'}`);
       
-      // Ensure CORS headers on 404
       if (origin) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -531,16 +483,13 @@ if (process.env.NODE_ENV === 'development') {
     });
 
     // =============================================================================
-    // START HTTP SERVER - CRITICAL FOR RENDER
+    // START HTTP SERVER
     // =============================================================================
 
     const port = parseInt(process.env.PORT || '10000', 10);
     const host = '0.0.0.0';
-
-    // Create HTTP server explicitly
     const httpServer = createServer(app);
 
-    // CRITICAL: Use proper listen signature for Render
     httpServer.listen(port, host, () => {
       log(`\n${'='.repeat(60)}`);
       log(`🚀 Server running on http://${host}:${port}`);
@@ -548,28 +497,17 @@ if (process.env.NODE_ENV === 'development') {
       log(`🔐 Session store: PostgreSQL`);
       log(`🛡️ Security: Helmet + Rate Limiting enabled`);
       log(`📡 API available at: http://${host}:${port}/api`);
-      log(`🌐 CORS: Ultra-permissive mode (allows all origins)`);
+      log(`🌐 CORS: Nuclear mode (OPTIONS handled first)`);
       log(`🧪 Test endpoints:`);
       log(`   - CORS Test: http://${host}:${port}/api/cors-test`);
       log(`   - Session Debug: http://${host}:${port}/api/session-debug`);
       log(`   - Health Check: http://${host}:${port}/health`);
       
-      // Start scheduler after server is listening
       schedulerService.startScheduler(1);
       log(`⏰ Content scheduler started`);
-      
-      if (process.env.NODE_ENV === 'development') {
-        log(`🛠️  Development mode: Vite dev server + verbose logging enabled`);
-      }
-      
-      if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'your-super-secret-key-change-in-production') {
-        log(`⚠️  WARNING: Using default SESSION_SECRET - change this in production!`);
-      }
-      
       log(`${'='.repeat(60)}\n`);
     });
 
-    // Handle server errors
     httpServer.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`❌ Port ${port} is already in use`);
@@ -615,8 +553,6 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
-
-
 
 
 
