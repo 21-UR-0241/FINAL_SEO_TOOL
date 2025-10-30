@@ -72,47 +72,22 @@ const sessionStore = new PgSession({
 const app = express();
 
 // =============================================================================
-// 1. TRUST PROXY (MUST BE FIRST)
+// TRUST PROXY - FIRST
 // =============================================================================
 
 app.set('trust proxy', 1);
 
 // =============================================================================
-// 2. ABSOLUTE FIRST: HANDLE OPTIONS PREFLIGHT - BEFORE ANYTHING ELSE
-// =============================================================================
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  // Log all requests for debugging
-  console.log(`📨 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
-
-  if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin || '*';
-    
-    console.log(`✅ OPTIONS preflight for ${req.path} from ${origin}`);
-    
-    // Set ALL necessary CORS headers for preflight
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', '86400');
-    res.setHeader('Vary', 'Origin');
-    
-    // Return 204 No Content immediately
-    return res.status(204).end();
-  }
-  
-  next();
-});
-
-// =============================================================================
-// 3. CORS FOR ACTUAL REQUESTS
+// NUCLEAR CORS - CATCHES EVERYTHING BEFORE ANY OTHER MIDDLEWARE
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
   
-  // Set CORS headers for actual requests
+  // Log every single request
+  console.log(`🌐 ${req.method} ${req.path} from ${origin || 'NO-ORIGIN'}`);
+  
+  // Set CORS headers on EVERY response
   if (origin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -120,54 +95,41 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
   
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
   res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('Vary', 'Origin');
-
+  
+  // Handle OPTIONS immediately - don't pass to next middleware
+  if (req.method === 'OPTIONS') {
+    console.log(`✅ OPTIONS ${req.path} -> 204`);
+    return res.status(204).end();
+  }
+  
   next();
 });
 
 // =============================================================================
-// 4. BASIC MIDDLEWARE
+// BASIC MIDDLEWARE
 // =============================================================================
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // =============================================================================
-// 5. SECURITY HEADERS (BEFORE HELMET)
-// =============================================================================
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-  
-  if (req.path === '/api/gsc/oauth-callback') {
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  }
-  
-  next();
-});
-
-// =============================================================================
-// 6. HELMET - CONFIGURED TO NOT INTERFERE WITH CORS
+// SECURITY HEADERS
 // =============================================================================
 
 app.use(helmet({
   crossOriginOpenerPolicy: false,
   crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: false, // Added this
-  contentSecurityPolicy: false, // Simplified for now
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true
-  }
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: false,
 }));
 
 // =============================================================================
-// 7. RATE LIMITING - WITH PROPER OPTIONS SKIP
+// RATE LIMITING
 // =============================================================================
 
 const rateLimitHandler = (req: Request, res: Response) => {
@@ -189,14 +151,7 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
-  skip: (req) => {
-    // Skip OPTIONS completely
-    if (req.method === 'OPTIONS') {
-      console.log(`⏭️  Rate limiter: Skipping OPTIONS for ${req.path}`);
-      return true;
-    }
-    return false;
-  }
+  skip: (req) => req.method === 'OPTIONS',
 });
 
 const authLimiter = rateLimit({
@@ -207,57 +162,14 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
-  skip: (req) => {
-    // Skip OPTIONS completely
-    if (req.method === 'OPTIONS') {
-      console.log(`⏭️  Auth limiter: Skipping OPTIONS for ${req.path}`);
-      return true;
-    }
-    return false;
-  }
+  skip: (req) => req.method === 'OPTIONS',
 });
 
-// Apply rate limiters (but OPTIONS requests bypass them completely)
 app.use('/api/', generalLimiter);
 app.use('/api/auth/', authLimiter);
-app.use('/api/gsc/auth', authLimiter);
-app.use('/api/gsc/auth-url', authLimiter);
-app.use('/api/gsc/oauth-callback', authLimiter);
 
 // =============================================================================
-// 8. INPUT SANITIZATION
-// =============================================================================
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const sanitizeString = (str: any): any => {
-    if (typeof str !== 'string') return str;
-    return str
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/on\w+\s*=/gi, '')
-      .trim();
-  };
-
-  if (req.body && typeof req.body === 'object') {
-    Object.keys(req.body).forEach(key => {
-      if (!['password', 'token', 'refreshToken', 'accessToken', 'url', 'redirectUri', 'clientSecret'].includes(key)) {
-        req.body[key] = sanitizeString(req.body[key]);
-      }
-    });
-  }
-
-  if (req.query && typeof req.query === 'object') {
-    Object.keys(req.query).forEach(key => {
-      if (typeof req.query[key] === 'string') {
-        req.query[key] = sanitizeString(req.query[key] as string);
-      }
-    });
-  }
-
-  next();
-});
-
-// =============================================================================
-// 9. SESSION CONFIGURATION
+// SESSION CONFIGURATION
 // =============================================================================
 
 app.use(session({
@@ -279,87 +191,51 @@ app.use(session({
 }));
 
 // =============================================================================
-// 10. SESSION MIDDLEWARE
+// SIMPLE LOGGING
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.path.startsWith('/api') && !req.path.includes('cors-test')) {
-    console.log(`🔑 Session: ${req.method} ${req.path}`, {
-      sessionID: req.sessionID?.substring(0, 8) + '...',
-      userId: req.session?.userId || 'none'
-    });
+  if (req.path.startsWith('/api')) {
+    console.log(`📍 ${req.method} ${req.path} - Session: ${req.session?.userId || 'none'}`);
   }
   next();
 });
 
 // =============================================================================
-// 11. TEST ENDPOINTS
+// TEST ENDPOINTS
 // =============================================================================
 
-app.get('/api/cors-test', (req: Request, res: Response) => {
-  console.log('🧪 CORS Test GET Hit');
-  res.json({ 
-    success: true, 
-    message: 'CORS is working!',
-    origin: req.headers.origin,
-    timestamp: new Date().toISOString()
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    cors: 'enabled'
   });
 });
 
-app.post('/api/cors-test', (req: Request, res: Response) => {
-  console.log('🧪 CORS Test POST Hit');
-  res.json({ 
-    success: true, 
-    message: 'CORS POST is working!',
-    origin: req.headers.origin,
-    body: req.body,
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.get('/api/session-debug', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     success: true,
-    hasSession: !!req.session,
-    sessionID: req.sessionID,
-    userId: req.session?.userId || null,
-    username: req.session?.username || null,
-    cookies: req.headers.cookie || 'none',
-    origin: req.headers.origin || 'none',
-    secure: req.secure,
-    protocol: req.protocol,
-    environment: process.env.NODE_ENV || 'development'
+    message: '🚀 AI SEO Tool API',
+    version: '1.0.0',
+    cors: 'ALL origins allowed',
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth/me',
+      google: '/api/auth/google/url'
+    }
   });
 });
 
-// =============================================================================
-// 12. LOGGING
-// =============================================================================
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson: any, ...args: any[]) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        const preview = JSON.stringify(capturedJsonResponse).substring(0, 100);
-        logLine += ` :: ${preview}${preview.length >= 100 ? '...' : ''}`;
-      }
-      log(logLine);
-    }
+app.get('/api/cors-test', (req: Request, res: Response) => {
+  res.json({ 
+    success: true, 
+    message: 'CORS working!',
+    origin: req.headers.origin,
+    method: req.method,
+    timestamp: new Date().toISOString()
   });
-
-  next();
 });
 
 // =============================================================================
@@ -369,52 +245,17 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 (async () => {
   try {
     const { registerRoutes } = await import('./routes.ts').catch(() => ({ 
-      registerRoutes: async (app: any) => app 
+      registerRoutes: async (app: any) => {
+        console.log('⚠️  No routes.ts found, using basic routes only');
+        return app;
+      }
     }));
     
     await registerRoutes(app);
-    
-    // Health check endpoint
-    app.get('/health', (_req: Request, res: Response) => {
-      res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-        uptime: process.uptime(),
-        port: process.env.PORT || '10000',
-        database: 'connected'
-      });
-    });
-
-    // Root endpoint
-    app.get('/', (_req: Request, res: Response) => {
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://final-seo-tool.onrender.com' 
-        : `http://localhost:${process.env.PORT || 10000}`;
-
-      res.json({
-        success: true,
-        message: '🚀 AI SEO Tool API Server',
-        version: '1.0.0',
-        status: 'operational',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-        endpoints: {
-          health: `${baseUrl}/health`,
-          api: `${baseUrl}/api`,
-          corsTest: `${baseUrl}/api/cors-test`,
-          sessionDebug: `${baseUrl}/api/session-debug`
-        },
-        cors: {
-          enabled: true,
-          allowedOrigins: 'all',
-          allowCredentials: true
-        }
-      });
-    });
+    console.log('✅ Routes registered');
 
     // =============================================================================
-    // GLOBAL ERROR HANDLER
+    // ERROR HANDLER
     // =============================================================================
 
     app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
@@ -423,46 +264,22 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       console.error("❌ Error:", {
         message: err.message,
         path: req.path,
-        method: req.method,
-        origin: origin
+        method: req.method
       });
       
-      // Force CORS headers on errors
+      // Force CORS on errors
       if (origin) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
       } else {
         res.setHeader('Access-Control-Allow-Origin', '*');
       }
-      res.setHeader('Vary', 'Origin');
       
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      
-      const responseMessage = process.env.NODE_ENV === 'production' 
-        ? status >= 500 ? 'Internal Server Error' : message
-        : message;
-
-      res.status(status).json({ 
+      res.status(err.status || 500).json({ 
         success: false,
-        message: responseMessage,
-        ...(process.env.NODE_ENV === 'development' && { 
-          stack: err.stack,
-          path: req.path
-        })
+        message: err.message || 'Internal Server Error'
       });
     });
-
-    // Setup Vite in development
-    if (app.get("env") === "development") {
-      try {
-        const { setupVite } = await import('./vite.ts');
-        const httpServer = createServer(app);
-        await setupVite(app, httpServer);
-      } catch (e) {
-        console.log('Vite setup not available');
-      }
-    }
 
     // =============================================================================
     // 404 HANDLER
@@ -471,7 +288,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     app.use('*', (req: Request, res: Response) => {
       const origin = req.headers.origin;
       
-      console.log(`❌ 404: ${req.method} ${req.path} from ${origin || 'no origin'}`);
+      console.log(`❌ 404: ${req.method} ${req.path}`);
       
       if (origin) {
         res.setHeader('Access-Control-Allow-Origin', origin);
@@ -479,7 +296,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       } else {
         res.setHeader('Access-Control-Allow-Origin', '*');
       }
-      res.setHeader('Vary', 'Origin');
       
       res.status(404).json({
         success: false,
@@ -501,27 +317,17 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       log(`\n${'='.repeat(60)}`);
       log(`🚀 Server: http://${host}:${port}`);
       log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      log(`🌐 CORS: Enabled for all origins`);
-      log(`🧪 Test: ${host}:${port}/api/cors-test`);
-      log(`⏰ Scheduler: Starting...`);
+      log(`🌐 CORS: NUCLEAR MODE - All origins allowed`);
+      log(`🧪 Test: curl -X OPTIONS ${host}:${port}/api/auth/me -H "Origin: https://test.com" -v`);
+      log(`${'='.repeat(60)}\n`);
       
       schedulerService.startScheduler(1);
-      
-      if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'your-super-secret-key-change-in-production') {
-        log(`⚠️  WARNING: Change SESSION_SECRET in production!`);
-      }
-      
-      log(`${'='.repeat(60)}\n`);
+      log(`⏰ Scheduler started`);
     });
 
     httpServer.on('error', (error: any) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${port} in use`);
-        process.exit(1);
-      } else {
-        console.error('❌ Server error:', error);
-        process.exit(1);
-      }
+      console.error('❌ Server error:', error);
+      process.exit(1);
     });
 
   } catch (error) {
@@ -535,7 +341,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // =============================================================================
 
 process.on('SIGTERM', () => {
-  log('🔴 SIGTERM - shutting down');
+  log('🔴 Shutting down');
   pool.end(() => {
     log('🔌 Database closed');
     process.exit(0);
@@ -543,25 +349,12 @@ process.on('SIGTERM', () => {
 });
 
 process.on('SIGINT', () => {
-  log('🔴 SIGINT - shutting down');
+  log('🔴 Shutting down');
   pool.end(() => {
     log('🔌 Database closed');
     process.exit(0);
   });
 });
-
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection:', promise, reason);
-  process.exit(1);
-});
-
-
-
 
 
 
