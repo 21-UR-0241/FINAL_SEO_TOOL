@@ -565,9 +565,6 @@
 // });
 
 
-
-
-
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
@@ -576,6 +573,7 @@ import { Pool } from 'pg';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
+import cors from 'cors'; // <-- 1. IMPORTED CORS PACKAGE
 import { schedulerService } from './services/scheduler-service.ts';
 
 // =============================================================================
@@ -649,98 +647,40 @@ const app = express();
 app.set('trust proxy', 1);
 
 // =============================================================================
-// 2. ULTRA-AGGRESSIVE CORS - FIRST MIDDLEWARE
+// 2. CORS CONFIGURATION (REPLACES CUSTOM MIDDLEWARE)
 // =============================================================================
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin;
-  
-  console.log(`🌐 CORS: ${req.method} ${req.path}`);
-  console.log(`   Origin: ${origin || 'NO ORIGIN'}`);
-  
-  // ULTRA-PERMISSIVE: Allow the requesting origin
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
-  res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  res.setHeader('Vary', 'Origin');
-  
-  // Handle OPTIONS preflight immediately
-  if (req.method === 'OPTIONS') {
-    console.log(`   ⚡ OPTIONS preflight - sending 204`);
-    return res.status(204).end();
-  }
+const allowedOrigins = [
+  'https://final-seo-tool.vercel.app', // Your Vercel frontend
+  'http://localhost:5173'              // Your local dev frontend, adjust port if needed
+];
 
-  next();
-});
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('This origin is not allowed by CORS'));
+    }
+  },
+  credentials: true, // This is crucial for sending cookies
+};
+
+// Apply CORS middleware to all routes
+app.use(cors(corsOptions));
+// Handle preflight requests for all routes
+app.options('*', cors(corsOptions));
 
 // =============================================================================
-// 3. RESPONSE INTERCEPTOR - Ensure CORS on ALL responses
-// =============================================================================
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin;
-  
-  const originalSend = res.send;
-  const originalJson = res.json;
-  const originalStatus = res.status;
-  const originalEnd = res.end;
-  
-  // Override status
-  res.status = function(code: number) {
-    if (origin && !this.getHeader('Access-Control-Allow-Origin')) {
-      this.setHeader('Access-Control-Allow-Origin', origin);
-      this.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    return originalStatus.call(this, code);
-  };
-  
-  // Override send
-  res.send = function(data: any) {
-    if (origin && !this.getHeader('Access-Control-Allow-Origin')) {
-      this.setHeader('Access-Control-Allow-Origin', origin);
-      this.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    return originalSend.call(this, data);
-  };
-  
-  // Override json
-  res.json = function(data: any) {
-    if (origin && !this.getHeader('Access-Control-Allow-Origin')) {
-      this.setHeader('Access-Control-Allow-Origin', origin);
-      this.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    return originalJson.call(this, data);
-  };
-  
-  // Override end
-  res.end = function(chunk?: any, encoding?: any) {
-    if (origin && !this.getHeader('Access-Control-Allow-Origin')) {
-      this.setHeader('Access-Control-Allow-Origin', origin);
-      this.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    return originalEnd.call(this, chunk, encoding);
-  };
-  
-  next();
-});
-
-// =============================================================================
-// 4. BASIC MIDDLEWARE
+// 3. BASIC MIDDLEWARE & SECURITY
 // =============================================================================
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // =============================================================================
-// 5. CORS & SESSION TEST ENDPOINTS
+// 4. CORS & SESSION TEST ENDPOINTS
 // =============================================================================
 
 app.get('/api/cors-test', (req: Request, res: Response) => {
@@ -765,15 +705,10 @@ app.post('/api/cors-test', (req: Request, res: Response) => {
 });
 
 // =============================================================================
-// 6. RATE LIMITING
+// 5. RATE LIMITING
 // =============================================================================
 
 const rateLimitHandler = (req: Request, res: Response) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
   res.status(429).json({
     success: false,
     message: 'Too many requests, please try again later.'
@@ -794,7 +729,6 @@ const authLimiter = rateLimit({
   max: 100,
   handler: rateLimitHandler,
   skipSuccessfulRequests: true,
-  
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
@@ -807,7 +741,7 @@ app.use('/api/gsc/auth-url', authLimiter);
 app.use('/api/gsc/oauth-callback', authLimiter);
 
 // =============================================================================
-// 7. SECURITY HEADERS
+// 6. SECURITY HEADERS (HELMET)
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -843,7 +777,7 @@ app.use(helmet({
 }));
 
 // =============================================================================
-// 8. INPUT SANITIZATION
+// 7. INPUT SANITIZATION
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -875,7 +809,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 9. SESSION CONFIGURATION
+// 8. SESSION CONFIGURATION
 // =============================================================================
 
 app.use(session({
@@ -897,7 +831,7 @@ app.use(session({
 }));
 
 // =============================================================================
-// 10. SESSION MIDDLEWARE - Log session info on each request
+// 9. SESSION MIDDLEWARE - Log session info on each request
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -913,7 +847,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 11. SESSION DEBUG ENDPOINT
+// 10. SESSION DEBUG ENDPOINT
 // =============================================================================
 
 app.get('/api/session-debug', (req: Request, res: Response) => {
@@ -941,7 +875,7 @@ app.get('/api/session-debug', (req: Request, res: Response) => {
 });
 
 // =============================================================================
-// 12. LOGGING
+// 11. LOGGING
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -963,7 +897,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         const preview = JSON.stringify(capturedJsonResponse).substring(0, 100);
         logLine += ` :: ${preview}${preview.length >= 100 ? '...' : ''}`;
       }
-
       log(logLine);
     }
   });
@@ -972,18 +905,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 13. API REDIRECT HANDLER
+// 12. API REDIRECT HANDLER
 // =============================================================================
 
 app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
   const originalRedirect = res.redirect.bind(res);
   res.redirect = function(url: string | number, status?: any) {
-    const origin = req.headers.origin;
-    if (origin) {
-      this.setHeader('Access-Control-Allow-Origin', origin);
-      this.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-    
     if (typeof url === 'number') {
       return res.status(url).json({ 
         success: false, 
@@ -1001,7 +928,7 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
 });
 
 // =============================================================================
-// 14. DEBUG MIDDLEWARE (Development Only)
+// 13. DEBUG MIDDLEWARE (Development Only)
 // =============================================================================
 
 if (process.env.NODE_ENV === 'development') {
@@ -1012,8 +939,6 @@ if (process.env.NODE_ENV === 'development') {
     res.send = function(data) {
       console.log(`📤 Response for ${req.method} ${req.path}:`, {
         status: res.statusCode,
-        corsOrigin: res.getHeader('access-control-allow-origin'),
-        corsCredentials: res.getHeader('access-control-allow-credentials'),
       });
       return originalSend.call(this, data);
     };
@@ -1021,8 +946,6 @@ if (process.env.NODE_ENV === 'development') {
     res.json = function(data) {
       console.log(`📤 JSON Response for ${req.method} ${req.path}:`, {
         status: res.statusCode,
-        corsOrigin: res.getHeader('access-control-allow-origin'),
-        corsCredentials: res.getHeader('access-control-allow-credentials'),
       });
       return originalJson.call(this, data);
     };
@@ -1037,14 +960,12 @@ if (process.env.NODE_ENV === 'development') {
 
 (async () => {
   try {
-    // Dynamic imports to handle optional modules
     const { registerRoutes } = await import('./routes.ts').catch(() => ({ 
       registerRoutes: async (app: any) => app 
     }));
     
     await registerRoutes(app);
     
-    // Health check endpoint
     app.get('/health', (_req: Request, res: Response) => {
       res.json({
         status: 'healthy',
@@ -1061,27 +982,14 @@ if (process.env.NODE_ENV === 'development') {
     // =============================================================================
 
     app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-      const origin = req.headers.origin;
-      
       console.error("❌ Global Error Handler:", {
         message: err.message,
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
         path: req.path,
         method: req.method,
-        origin: origin,
+        origin: req.headers.origin,
         userId: req.session?.userId || 'none'
       });
-      
-      // CRITICAL: Force CORS headers on ALL errors
-      if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      } else {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-      }
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-      res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
-      res.setHeader('Vary', 'Origin');
       
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
@@ -1101,7 +1009,6 @@ if (process.env.NODE_ENV === 'development') {
       });
     });
 
-    // Setup Vite in development
     if (app.get("env") === "development") {
       try {
         const { setupVite } = await import('./vite.ts');
@@ -1117,21 +1024,8 @@ if (process.env.NODE_ENV === 'development') {
     // =============================================================================
 
     app.use('*', (req: Request, res: Response) => {
-      const origin = req.headers.origin;
-      
       console.log(`❌ 404: ${req.method} ${req.path}`);
-      console.log(`   Origin: ${origin || 'none'}`);
-      
-      // Ensure CORS headers on 404
-      if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-      } else {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-      }
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-      res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
-      res.setHeader('Vary', 'Origin');
+      console.log(`   Origin: ${req.headers.origin || 'none'}`);
       
       res.status(404).json({
         success: false,
@@ -1142,16 +1036,13 @@ if (process.env.NODE_ENV === 'development') {
     });
 
     // =============================================================================
-    // START HTTP SERVER - CRITICAL FOR RENDER
+    // START HTTP SERVER
     // =============================================================================
 
     const port = parseInt(process.env.PORT || '10000', 10);
     const host = '0.0.0.0';
-
-    // Create HTTP server explicitly
     const httpServer = createServer(app);
 
-    // CRITICAL: Use proper listen signature for Render
     httpServer.listen(port, host, () => {
       log(`\n${'='.repeat(60)}`);
       log(`🚀 Server running on http://${host}:${port}`);
@@ -1159,13 +1050,12 @@ if (process.env.NODE_ENV === 'development') {
       log(`🔐 Session store: PostgreSQL`);
       log(`🛡️ Security: Helmet + Rate Limiting enabled`);
       log(`📡 API available at: http://${host}:${port}/api`);
-      log(`🌐 CORS: Ultra-permissive mode (allows all origins)`);
+      log(`🌐 CORS: Configured for specific origins`); // <-- Updated log message
       log(`🧪 Test endpoints:`);
       log(`   - CORS Test: http://${host}:${port}/api/cors-test`);
       log(`   - Session Debug: http://${host}:${port}/api/session-debug`);
       log(`   - Health Check: http://${host}:${port}/health`);
       
-      // Start scheduler after server is listening
       schedulerService.startScheduler(1);
       log(`⏰ Content scheduler started`);
       
@@ -1180,7 +1070,6 @@ if (process.env.NODE_ENV === 'development') {
       log(`${'='.repeat(60)}\n`);
     });
 
-    // Handle server errors
     httpServer.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`❌ Port ${port} is already in use`);
