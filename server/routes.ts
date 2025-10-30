@@ -1227,7 +1227,6 @@ app.post("/api/auth/send-verification", async (req: Request, res: Response): Pro
 
 
 
-
 // ================================================
 // GOOGLE OAUTH ROUTES
 // ================================================
@@ -1239,7 +1238,7 @@ app.post("/api/auth/send-verification", async (req: Request, res: Response): Pro
 app.get("/api/auth/google/url", async (req, res) => {
   try {
     const clientId = process.env.GOOGLE_CLIENT_ID!;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI!;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI_AUTH!;
 
     if (!clientId || !redirectUri) {
       return res.status(500).json({
@@ -1285,22 +1284,22 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
     if (error) {
       console.error("Google OAuth error:", error);
-      return res.redirect(`/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
     }
 
     // CSRF check
     if (!state || state !== req.session.oauthState) {
-      return res.redirect(`/auth?google_error=${encodeURIComponent("Invalid state parameter")}`);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Invalid state parameter")}`);
     }
     delete req.session.oauthState;
 
     if (!code) {
-      return res.redirect(`/auth?google_error=${encodeURIComponent("No authorization code received")}`);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("No authorization code received")}`);
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID!;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI!; // MUST match Google Cloud
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI_AUTH!; // MUST match Google Cloud Console
 
     // Exchange code for tokens
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -1318,7 +1317,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
     if (!tokenResponse.ok) {
       const text = await tokenResponse.text();
       console.error("Token exchange failed:", text);
-      return res.redirect(`/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`);
     }
 
     const { access_token, refresh_token, expires_in } = await tokenResponse.json();
@@ -1329,7 +1328,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
     });
 
     if (!userInfoResponse.ok) {
-      return res.redirect(`/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`);
     }
 
     const { id: googleId, email, name, picture } = await userInfoResponse.json();
@@ -1352,7 +1351,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
       const userResult = await db.select().from(users).where(eq(users.id, googleAccount.userId)).limit(1);
       if (userResult.length === 0) {
-        return res.redirect(`/auth?google_error=${encodeURIComponent("User account not found")}`);
+        return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("User account not found")}`);
       }
       user = userResult[0];
     } else {
@@ -1402,14 +1401,14 @@ app.get("/api/auth/google/callback", async (req, res) => {
     req.session.save(err => {
       if (err) {
         console.error("Session save error:", err);
-        return res.redirect(`/auth?google_error=${encodeURIComponent("Session creation failed")}`);
+        return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Session creation failed")}`);
       }
-      res.redirect("/"); // redirect to dashboard
+      res.redirect(process.env.FRONTEND_URL || "/"); // redirect to dashboard
     });
 
   } catch (err) {
     console.error("Google OAuth callback error:", err);
-    res.redirect(`/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+    res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
   }
 });
 
@@ -1457,9 +1456,6 @@ app.get("/api/auth/google/status", async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to check Google account status" });
   }
 });
-
-
-
 
 
 
