@@ -1223,10 +1223,6 @@ app.post("/api/auth/send-verification", async (req: Request, res: Response): Pro
 
 
 
-
-
-
-
 // ================================================
 // GOOGLE OAUTH ROUTES
 // ================================================
@@ -1281,25 +1277,93 @@ app.get("/api/auth/google/url", async (req, res) => {
 app.get("/api/auth/google/callback", async (req, res) => {
   try {
     const { code, state, error } = req.query;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://final-seo-tool.vercel.app';
 
+    // Handle OAuth error from Google
     if (error) {
       console.error("Google OAuth error:", error);
-      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+      const errorUrl = `${frontendUrl}/auth?google_error=${encodeURIComponent("Authentication failed")}`;
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0;url=${errorUrl}">
+            <title>Authentication Failed</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; text-align: center; }
+              .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; 
+                         width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body>
+            <div class="spinner"></div>
+            <p>Authentication failed. Redirecting...</p>
+            <script>window.location.replace('${errorUrl}');</script>
+          </body>
+        </html>
+      `);
     }
 
     // CSRF check
     if (!state || state !== req.session.oauthState) {
-      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Invalid state parameter")}`);
+      console.error("Invalid OAuth state parameter");
+      const errorUrl = `${frontendUrl}/auth?google_error=${encodeURIComponent("Invalid state parameter")}`;
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0;url=${errorUrl}">
+            <title>Security Error</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; text-align: center; }
+              .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; 
+                         width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body>
+            <div class="spinner"></div>
+            <p>Security validation failed. Redirecting...</p>
+            <script>window.location.replace('${errorUrl}');</script>
+          </body>
+        </html>
+      `);
     }
     delete req.session.oauthState;
 
+    // Check for authorization code
     if (!code) {
-      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("No authorization code received")}`);
+      console.error("No authorization code received");
+      const errorUrl = `${frontendUrl}/auth?google_error=${encodeURIComponent("No authorization code received")}`;
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0;url=${errorUrl}">
+            <title>Authentication Error</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; text-align: center; }
+              .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; 
+                         width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body>
+            <div class="spinner"></div>
+            <p>No authorization code received. Redirecting...</p>
+            <script>window.location.replace('${errorUrl}');</script>
+          </body>
+        </html>
+      `);
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID!;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI_AUTH!; // MUST match Google Cloud Console
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI_AUTH!;
 
     // Exchange code for tokens
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -1317,7 +1381,28 @@ app.get("/api/auth/google/callback", async (req, res) => {
     if (!tokenResponse.ok) {
       const text = await tokenResponse.text();
       console.error("Token exchange failed:", text);
-      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`);
+      const errorUrl = `${frontendUrl}/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`;
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0;url=${errorUrl}">
+            <title>Token Exchange Failed</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; text-align: center; }
+              .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; 
+                         width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body>
+            <div class="spinner"></div>
+            <p>Token exchange failed. Redirecting...</p>
+            <script>window.location.replace('${errorUrl}');</script>
+          </body>
+        </html>
+      `);
     }
 
     const { access_token, refresh_token, expires_in } = await tokenResponse.json();
@@ -1328,7 +1413,29 @@ app.get("/api/auth/google/callback", async (req, res) => {
     });
 
     if (!userInfoResponse.ok) {
-      return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`);
+      console.error("Failed to fetch user info");
+      const errorUrl = `${frontendUrl}/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`;
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0;url=${errorUrl}">
+            <title>User Info Failed</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; text-align: center; }
+              .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; 
+                         width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body>
+            <div class="spinner"></div>
+            <p>Failed to fetch user information. Redirecting...</p>
+            <script>window.location.replace('${errorUrl}');</script>
+          </body>
+        </html>
+      `);
     }
 
     const { id: googleId, email, name, picture } = await userInfoResponse.json();
@@ -1351,7 +1458,29 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
       const userResult = await db.select().from(users).where(eq(users.id, googleAccount.userId)).limit(1);
       if (userResult.length === 0) {
-        return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("User account not found")}`);
+        console.error("User account not found for Google account");
+        const errorUrl = `${frontendUrl}/auth?google_error=${encodeURIComponent("User account not found")}`;
+        return res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0;url=${errorUrl}">
+              <title>User Not Found</title>
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; text-align: center; }
+                .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; 
+                           width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+              </style>
+            </head>
+            <body>
+              <div class="spinner"></div>
+              <p>User account not found. Redirecting...</p>
+              <script>window.location.replace('${errorUrl}');</script>
+            </body>
+          </html>
+        `);
       }
       user = userResult[0];
     } else {
@@ -1398,17 +1527,153 @@ app.get("/api/auth/google/callback", async (req, res) => {
     // Set session
     req.session.userId = user.id;
     req.session.isAuthenticated = true;
+    
+    // Save session and redirect
     req.session.save(err => {
       if (err) {
         console.error("Session save error:", err);
-        return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Session creation failed")}`);
+        const errorUrl = `${frontendUrl}/auth?google_error=${encodeURIComponent("Session creation failed")}`;
+        return res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0;url=${errorUrl}">
+              <title>Session Error</title>
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; text-align: center; }
+                .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; 
+                           width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+              </style>
+            </head>
+            <body>
+              <div class="spinner"></div>
+              <p>Session creation failed. Redirecting...</p>
+              <script>window.location.replace('${errorUrl}');</script>
+            </body>
+          </html>
+        `);
       }
-      res.redirect(process.env.FRONTEND_URL || "/"); // redirect to dashboard
+      
+      // SUCCESS: Send HTML redirect to dashboard
+      console.log(`✅ Google OAuth successful for user: ${user.email}`);
+      const successUrl = frontendUrl;
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0;url=${successUrl}">
+            <title>Login Successful</title>
+            <style>
+              body { 
+                font-family: system-ui, -apple-system, sans-serif; 
+                padding: 40px; 
+                text-align: center;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+              }
+              .success-icon {
+                width: 80px;
+                height: 80px;
+                margin: 0 auto 20px;
+                background: white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                animation: scaleIn 0.5s ease-out;
+              }
+              .checkmark {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: block;
+                stroke-width: 3;
+                stroke: #4CAF50;
+                stroke-miterlimit: 10;
+                animation: fillCheck 0.4s ease-in-out 0.4s forwards;
+              }
+              .checkmark-circle {
+                stroke-dasharray: 166;
+                stroke-dashoffset: 166;
+                stroke-width: 3;
+                stroke-miterlimit: 10;
+                stroke: #4CAF50;
+                fill: none;
+                animation: strokeCircle 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+              }
+              .checkmark-check {
+                transform-origin: 50% 50%;
+                stroke-dasharray: 48;
+                stroke-dashoffset: 48;
+                animation: strokeCheck 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+              }
+              @keyframes strokeCircle {
+                100% { stroke-dashoffset: 0; }
+              }
+              @keyframes strokeCheck {
+                100% { stroke-dashoffset: 0; }
+              }
+              @keyframes scaleIn {
+                0% { transform: scale(0); }
+                100% { transform: scale(1); }
+              }
+              h1 { margin: 20px 0 10px; font-size: 28px; font-weight: 600; }
+              p { font-size: 16px; opacity: 0.9; }
+            </style>
+          </head>
+          <body>
+            <div class="success-icon">
+              <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+              </svg>
+            </div>
+            <h1>Login Successful!</h1>
+            <p>Redirecting to your dashboard...</p>
+            <script>
+              // Primary redirect
+              setTimeout(function() {
+                window.location.replace('${successUrl}');
+              }, 100);
+            </script>
+          </body>
+        </html>
+      `);
     });
 
   } catch (err) {
     console.error("Google OAuth callback error:", err);
-    res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+    const frontendUrl = process.env.FRONTEND_URL || 'https://final-seo-tool.vercel.app';
+    const errorUrl = `${frontendUrl}/auth?google_error=${encodeURIComponent("Authentication failed")}`;
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta http-equiv="refresh" content="0;url=${errorUrl}">
+          <title>Authentication Error</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; text-align: center; }
+            .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; 
+                       width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          </style>
+        </head>
+        <body>
+          <div class="spinner"></div>
+          <p>Authentication failed. Redirecting...</p>
+          <script>window.location.replace('${errorUrl}');</script>
+        </body>
+      </html>
+    `);
   }
 });
 
@@ -1456,6 +1721,238 @@ app.get("/api/auth/google/status", async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to check Google account status" });
   }
 });
+
+
+
+// // ================================================
+// // GOOGLE OAUTH ROUTES
+// // ================================================
+
+// /**
+//  * GET /api/auth/google/url
+//  * Returns the Google OAuth authorization URL
+//  */
+// app.get("/api/auth/google/url", async (req, res) => {
+//   try {
+//     const clientId = process.env.GOOGLE_CLIENT_ID!;
+//     const redirectUri = process.env.GOOGLE_REDIRECT_URI_AUTH!;
+
+//     if (!clientId || !redirectUri) {
+//       return res.status(500).json({
+//         success: false,
+//         message: "Google OAuth is not configured",
+//       });
+//     }
+
+//     // CSRF protection state
+//     const state = crypto.randomBytes(32).toString("hex");
+//     req.session.oauthState = state;
+
+//     const params = new URLSearchParams({
+//       client_id: clientId,
+//       redirect_uri: redirectUri,
+//       response_type: "code",
+//       scope: "openid email profile",
+//       state,
+//       access_type: "offline",
+//       prompt: "consent",
+//     });
+
+//     res.json({
+//       success: true,
+//       url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+//     });
+//   } catch (err) {
+//     console.error("Error generating Google OAuth URL:", err);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to generate OAuth URL",
+//     });
+//   }
+// });
+
+// /**
+//  * GET /api/auth/google/callback
+//  * Handles the OAuth callback from Google
+//  */
+// app.get("/api/auth/google/callback", async (req, res) => {
+//   try {
+//     const { code, state, error } = req.query;
+
+//     if (error) {
+//       console.error("Google OAuth error:", error);
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+//     }
+
+//     // CSRF check
+//     if (!state || state !== req.session.oauthState) {
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Invalid state parameter")}`);
+//     }
+//     delete req.session.oauthState;
+
+//     if (!code) {
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("No authorization code received")}`);
+//     }
+
+//     const clientId = process.env.GOOGLE_CLIENT_ID!;
+//     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+//     const redirectUri = process.env.GOOGLE_REDIRECT_URI_AUTH!; // MUST match Google Cloud Console
+
+//     // Exchange code for tokens
+//     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+//       body: new URLSearchParams({
+//         code: code as string,
+//         client_id: clientId,
+//         client_secret: clientSecret,
+//         redirect_uri: redirectUri,
+//         grant_type: "authorization_code",
+//       }),
+//     });
+
+//     if (!tokenResponse.ok) {
+//       const text = await tokenResponse.text();
+//       console.error("Token exchange failed:", text);
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`);
+//     }
+
+//     const { access_token, refresh_token, expires_in } = await tokenResponse.json();
+
+//     // Fetch Google user info
+//     const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+//       headers: { Authorization: `Bearer ${access_token}` },
+//     });
+
+//     if (!userInfoResponse.ok) {
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`);
+//     }
+
+//     const { id: googleId, email, name, picture } = await userInfoResponse.json();
+
+//     // Check if Google account exists
+//     let existingGoogleAccount = await db.select().from(googleAccounts).where(eq(googleAccounts.googleId, googleId)).limit(1);
+//     let user;
+
+//     if (existingGoogleAccount.length > 0) {
+//       // Existing Google account: update tokens
+//       const googleAccount = existingGoogleAccount[0];
+//       await db.update(googleAccounts)
+//         .set({
+//           accessToken: access_token,
+//           refreshToken: refresh_token || googleAccount.refreshToken,
+//           tokenExpiry: new Date(Date.now() + expires_in * 1000),
+//           updatedAt: new Date(),
+//         })
+//         .where(eq(googleAccounts.id, googleAccount.id));
+
+//       const userResult = await db.select().from(users).where(eq(users.id, googleAccount.userId)).limit(1);
+//       if (userResult.length === 0) {
+//         return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("User account not found")}`);
+//       }
+//       user = userResult[0];
+//     } else {
+//       // New Google account: create user if email not exists
+//       const existingUserByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
+//       if (existingUserByEmail.length > 0) {
+//         user = existingUserByEmail[0];
+//       } else {
+//         // Generate unique username
+//         const usernameBase = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_.-]/g, "");
+//         let username = usernameBase;
+//         let counter = 1;
+//         while ((await db.select().from(users).where(eq(users.username, username)).limit(1)).length > 0) {
+//           username = `${usernameBase}${counter}`;
+//           counter++;
+//         }
+
+//         const newUsers = await db.insert(users).values({
+//           username,
+//           email,
+//           name,
+//           password: crypto.randomBytes(32).toString("hex"),
+//           emailVerified: true,
+//           isActive: true,
+//         }).returning();
+
+//         user = newUsers[0];
+//       }
+
+//       // Link Google account
+//       await db.insert(googleAccounts).values({
+//         userId: user.id,
+//         googleId,
+//         email,
+//         name,
+//         picture,
+//         accessToken: access_token,
+//         refreshToken: refresh_token,
+//         tokenExpiry: new Date(Date.now() + expires_in * 1000),
+//         isActive: true,
+//       });
+//     }
+
+//     // Set session
+//     req.session.userId = user.id;
+//     req.session.isAuthenticated = true;
+//     req.session.save(err => {
+//       if (err) {
+//         console.error("Session save error:", err);
+//         return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Session creation failed")}`);
+//       }
+//       res.redirect(process.env.FRONTEND_URL || "/"); // redirect to dashboard
+//     });
+
+//   } catch (err) {
+//     console.error("Google OAuth callback error:", err);
+//     res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+//   }
+// });
+
+// /**
+//  * POST /api/auth/google/unlink
+//  * Unlink Google account from user
+//  */
+// app.post("/api/auth/google/unlink", async (req, res) => {
+//   try {
+//     if (!req.session.userId) return res.status(401).json({ success: false, message: "Not authenticated" });
+
+//     const user = await db.select().from(users).where(eq(users.id, req.session.userId)).limit(1);
+//     if (user.length === 0) return res.status(404).json({ success: false, message: "User not found" });
+//     if (!user[0].password || user[0].password.length < 10) {
+//       return res.status(400).json({ success: false, message: "Set a password first to unlink Google" });
+//     }
+
+//     await db.delete(googleAccounts).where(eq(googleAccounts.userId, req.session.userId));
+//     res.json({ success: true, message: "Google account unlinked successfully" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, message: "Failed to unlink Google account" });
+//   }
+// });
+
+// /**
+//  * GET /api/auth/google/status
+//  * Check if user has a linked Google account
+//  */
+// app.get("/api/auth/google/status", async (req, res) => {
+//   try {
+//     if (!req.session.userId) return res.status(401).json({ success: false, message: "Not authenticated" });
+
+//     const googleAccount = await db.select({
+//       id: googleAccounts.id,
+//       email: googleAccounts.email,
+//       name: googleAccounts.name,
+//       picture: googleAccounts.picture,
+//       isActive: googleAccounts.isActive,
+//     }).from(googleAccounts).where(eq(googleAccounts.userId, req.session.userId)).limit(1);
+
+//     res.json({ success: true, linked: googleAccount.length > 0, account: googleAccount[0] || null });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, message: "Failed to check Google account status" });
+//   }
+// });
 
 
 
