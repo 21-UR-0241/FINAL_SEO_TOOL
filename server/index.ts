@@ -9,7 +9,7 @@ import { Pool } from 'pg';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
-import { schedulerService } from './services/scheduler-service.js';
+import { schedulerService } from './services/scheduler-service';
 
 // =============================================================================
 // TYPE DECLARATIONS
@@ -471,7 +471,7 @@ if (process.env.NODE_ENV === 'development') {
 (async () => {
   try {
     // Dynamic imports to handle optional modules
-    const { registerRoutes } = await import('./routes.js').catch(() => ({ 
+    const { registerRoutes } = await import('./routes').catch(() => ({ 
       registerRoutes: async (app: any) => app 
     }));
     
@@ -537,7 +537,7 @@ if (process.env.NODE_ENV === 'development') {
     // Setup Vite in development
     if (app.get("env") === "development") {
       try {
-        const { setupVite } = await import('./vite.js');
+        const { setupVite } = await import('./vite');
         const httpServer = createServer(app);
         await setupVite(app, httpServer);
       } catch (e) {
