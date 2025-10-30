@@ -1724,6 +1724,249 @@ app.get("/api/auth/google/status", async (req, res) => {
 
 
 
+// // ================================================
+// // GOOGLE OAUTH ROUTES
+// // ================================================
+
+// /**
+//  * GET /api/auth/google/url
+//  * Returns the Google OAuth authorization URL
+//  */
+// app.get("/api/auth/google/url", async (req, res) => {
+//   try {
+//     const clientId = process.env.GOOGLE_CLIENT_ID!;
+//     const redirectUri = process.env.GOOGLE_REDIRECT_URI_AUTH!;
+
+//     if (!clientId || !redirectUri) {
+//       return res.status(500).json({
+//         success: false,
+//         message: "Google OAuth is not configured",
+//       });
+//     }
+
+//     // CSRF protection state
+//     const state = crypto.randomBytes(32).toString("hex");
+//     req.session.oauthState = state;
+
+//     const params = new URLSearchParams({
+//       client_id: clientId,
+//       redirect_uri: redirectUri,
+//       response_type: "code",
+//       scope: "openid email profile",
+//       state,
+//       access_type: "offline",
+//       prompt: "consent",
+//     });
+
+//     res.json({
+//       success: true,
+//       url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+//     });
+//   } catch (err) {
+//     console.error("Error generating Google OAuth URL:", err);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to generate OAuth URL",
+//     });
+//   }
+// });
+
+// /**
+//  * GET /api/auth/google/callback
+//  * Handles the OAuth callback from Google
+//  */
+// app.get("/api/auth/google/callback", async (req, res) => {
+//   try {
+//     const { code, state, error } = req.query;
+
+//     if (error) {
+//       console.error("Google OAuth error:", error);
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+//     }
+
+//     // CSRF check
+//     if (!state || state !== req.session.oauthState) {
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Invalid state parameter")}`);
+//     }
+//     delete req.session.oauthState;
+
+//     if (!code) {
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("No authorization code received")}`);
+//     }
+
+//     const clientId = process.env.GOOGLE_CLIENT_ID!;
+//     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+//     const redirectUri = process.env.GOOGLE_REDIRECT_URI_AUTH!; // MUST match Google Cloud Console
+
+//     // Exchange code for tokens
+//     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+//       body: new URLSearchParams({
+//         code: code as string,
+//         client_id: clientId,
+//         client_secret: clientSecret,
+//         redirect_uri: redirectUri,
+//         grant_type: "authorization_code",
+//       }),
+//     });
+
+//     if (!tokenResponse.ok) {
+//       const text = await tokenResponse.text();
+//       console.error("Token exchange failed:", text);
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`);
+//     }
+
+//     const { access_token, refresh_token, expires_in } = await tokenResponse.json();
+
+//     // Fetch Google user info
+//     const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+//       headers: { Authorization: `Bearer ${access_token}` },
+//     });
+
+//     if (!userInfoResponse.ok) {
+//       return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`);
+//     }
+
+//     const { id: googleId, email, name, picture } = await userInfoResponse.json();
+
+//     // Check if Google account exists
+//     let existingGoogleAccount = await db.select().from(googleAccounts).where(eq(googleAccounts.googleId, googleId)).limit(1);
+//     let user;
+
+//     if (existingGoogleAccount.length > 0) {
+//       // Existing Google account: update tokens
+//       const googleAccount = existingGoogleAccount[0];
+//       await db.update(googleAccounts)
+//         .set({
+//           accessToken: access_token,
+//           refreshToken: refresh_token || googleAccount.refreshToken,
+//           tokenExpiry: new Date(Date.now() + expires_in * 1000),
+//           updatedAt: new Date(),
+//         })
+//         .where(eq(googleAccounts.id, googleAccount.id));
+
+//       const userResult = await db.select().from(users).where(eq(users.id, googleAccount.userId)).limit(1);
+//       if (userResult.length === 0) {
+//         return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("User account not found")}`);
+//       }
+//       user = userResult[0];
+//     } else {
+//       // New Google account: create user if email not exists
+//       const existingUserByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
+//       if (existingUserByEmail.length > 0) {
+//         user = existingUserByEmail[0];
+//       } else {
+//         // Generate unique username
+//         const usernameBase = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_.-]/g, "");
+//         let username = usernameBase;
+//         let counter = 1;
+//         while ((await db.select().from(users).where(eq(users.username, username)).limit(1)).length > 0) {
+//           username = `${usernameBase}${counter}`;
+//           counter++;
+//         }
+
+//         const newUsers = await db.insert(users).values({
+//           username,
+//           email,
+//           name,
+//           password: crypto.randomBytes(32).toString("hex"),
+//           emailVerified: true,
+//           isActive: true,
+//         }).returning();
+
+//         user = newUsers[0];
+//       }
+
+//       // Link Google account
+//       await db.insert(googleAccounts).values({
+//         userId: user.id,
+//         googleId,
+//         email,
+//         name,
+//         picture,
+//         accessToken: access_token,
+//         refreshToken: refresh_token,
+//         tokenExpiry: new Date(Date.now() + expires_in * 1000),
+//         isActive: true,
+//       });
+//     }
+
+//     // Set session
+//     req.session.userId = user.id;
+//     req.session.isAuthenticated = true;
+//     req.session.save(err => {
+//       if (err) {
+//         console.error("Session save error:", err);
+//         return res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Session creation failed")}`);
+//       }
+//       res.redirect(process.env.FRONTEND_URL || "/"); // redirect to dashboard
+//     });
+
+//   } catch (err) {
+//     console.error("Google OAuth callback error:", err);
+//     res.redirect(`${process.env.FRONTEND_URL}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+//   }
+// });
+
+// /**
+//  * POST /api/auth/google/unlink
+//  * Unlink Google account from user
+//  */
+// app.post("/api/auth/google/unlink", async (req, res) => {
+//   try {
+//     if (!req.session.userId) return res.status(401).json({ success: false, message: "Not authenticated" });
+
+//     const user = await db.select().from(users).where(eq(users.id, req.session.userId)).limit(1);
+//     if (user.length === 0) return res.status(404).json({ success: false, message: "User not found" });
+//     if (!user[0].password || user[0].password.length < 10) {
+//       return res.status(400).json({ success: false, message: "Set a password first to unlink Google" });
+//     }
+
+//     await db.delete(googleAccounts).where(eq(googleAccounts.userId, req.session.userId));
+//     res.json({ success: true, message: "Google account unlinked successfully" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, message: "Failed to unlink Google account" });
+//   }
+// });
+
+// /**
+//  * GET /api/auth/google/status
+//  * Check if user has a linked Google account
+//  */
+// app.get("/api/auth/google/status", async (req, res) => {
+//   try {
+//     if (!req.session.userId) return res.status(401).json({ success: false, message: "Not authenticated" });
+
+//     const googleAccount = await db.select({
+//       id: googleAccounts.id,
+//       email: googleAccounts.email,
+//       name: googleAccounts.name,
+//       picture: googleAccounts.picture,
+//       isActive: googleAccounts.isActive,
+//     }).from(googleAccounts).where(eq(googleAccounts.userId, req.session.userId)).limit(1);
+
+//     res.json({ success: true, linked: googleAccount.length > 0, account: googleAccount[0] || null });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, message: "Failed to check Google account status" });
+//   }
+// });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ===========================================================================
 // PASSWORD RESET ROUTES
 // ===========================================================================
