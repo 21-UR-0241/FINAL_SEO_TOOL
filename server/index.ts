@@ -1,3 +1,6 @@
+
+
+
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
@@ -6,7 +9,7 @@ import { Pool } from 'pg';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
-import { schedulerService } from './services/scheduler-service';
+import { schedulerService } from './services/scheduler-service.ts';
 
 // =============================================================================
 // TYPE DECLARATIONS
@@ -29,7 +32,7 @@ declare global {
 declare module 'express-session' {
   interface SessionData {
     userId: string;
-    username?: string;
+    username?: string; // Optional but helpful for debugging
   }
 }
 
@@ -71,35 +74,6 @@ const sessionStore = new PgSession({
 // =============================================================================
 
 const app = express();
-
-// =============================================================================
-// ☢️ NUCLEAR CORS FIX - RUNS FIRST, BEFORE EVERYTHING ☢️
-// This ensures CORS headers on ALL responses, especially OPTIONS preflight
-// =============================================================================
-
-app.use('*', (req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin || req.headers.referer || '*';
-  
-  console.log(`☢️ NUCLEAR CORS: ${req.method} ${req.path} from ${origin}`);
-  
-  // Force CORS headers on EVERY response
-  res.setHeader('Access-Control-Allow-Origin', origin === '*' ? '*' : origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  res.setHeader('Vary', 'Origin');
-  
-  // Handle OPTIONS preflight immediately - don't let it reach other middleware
-  if (req.method === 'OPTIONS') {
-    console.log(`☢️ NUCLEAR CORS: Handling OPTIONS preflight - sending 204`);
-    return res.status(204).end();
-  }
-  
-  next();
-});
-
-console.log('☢️ NUCLEAR CORS ACTIVATED - All requests will have CORS headers');
 
 // =============================================================================
 // 1. TRUST PROXY (CRITICAL FOR RENDER)
@@ -253,6 +227,7 @@ const authLimiter = rateLimit({
   max: 100,
   handler: rateLimitHandler,
   skipSuccessfulRequests: true,
+  
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
@@ -342,16 +317,16 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   name: 'ai-seo-session',
-  proxy: true,
+  proxy: true, // Trust proxy for secure cookies
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    domain: undefined,
-    path: '/'
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true, // Prevent XSS
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Cross-origin in production
+    domain: undefined, // Let browser handle domain
+    path: '/' // Available for all paths
   },
-  rolling: true
+  rolling: true // Extend session on activity
 }));
 
 // =============================================================================
@@ -490,58 +465,29 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // =============================================================================
-// 15. HEALTH CHECK - REGISTER BEFORE ROUTE LOADING (CRITICAL FIX!)
-// =============================================================================
-
-app.get('/health', (_req: Request, res: Response) => {
-  console.log('❤️ Health check endpoint hit');
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    uptime: process.uptime(),
-    port: process.env.PORT || '10000',
-    database: 'connected'
-  });
-});
-
-// =============================================================================
 // SERVER STARTUP & ROUTES
 // =============================================================================
 
 (async () => {
   try {
-    // =============================================================================
-    // LOAD ROUTES - DON'T HIDE ERRORS!
-    // =============================================================================
+    // Dynamic imports to handle optional modules
+    const { registerRoutes } = await import('./routes.ts').catch(() => ({ 
+      registerRoutes: async (app: any) => app 
+    }));
     
-    console.log('📂 Attempting to load routes module...');
+    await registerRoutes(app);
     
-    let registerRoutes;
-    try {
-      const routesModule = await import('./routes.ts');
-      registerRoutes = routesModule.registerRoutes;
-      console.log('✅ Routes module loaded successfully from ./routes.ts');
-    } catch (routeError: any) {
-      console.error('❌ CRITICAL: Failed to load routes module');
-      console.error('Error message:', routeError.message);
-      console.error('Stack trace:', routeError.stack);
-      console.error('⚠️ Server will continue with basic endpoints only');
-      // Don't exit - let server run with health endpoint
-    }
-    
-    if (registerRoutes && typeof registerRoutes === 'function') {
-      try {
-        console.log('🔧 Registering routes...');
-        await registerRoutes(app);
-        console.log('✅ All routes registered successfully');
-      } catch (registerError: any) {
-        console.error('❌ Error during route registration:', registerError.message);
-        console.error('Stack:', registerError.stack);
-      }
-    } else {
-      console.error('⚠️ registerRoutes is not a function - skipping route registration');
-    }
+    // Health check endpoint
+    app.get('/health', (_req: Request, res: Response) => {
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        uptime: process.uptime(),
+        port: process.env.PORT || '10000',
+        database: 'connected'
+      });
+    });
 
     // =============================================================================
     // GLOBAL ERROR HANDLER
@@ -588,23 +534,19 @@ app.get('/health', (_req: Request, res: Response) => {
       });
     });
 
-    // =============================================================================
-    // SETUP VITE (Development Only)
-    // =============================================================================
-
+    // Setup Vite in development
     if (app.get("env") === "development") {
       try {
         const { setupVite } = await import('./vite.ts');
         const httpServer = createServer(app);
         await setupVite(app, httpServer);
-        console.log('✅ Vite dev server setup complete');
       } catch (e) {
-        console.log('ℹ️ Vite setup skipped (not required for production)');
+        console.log('Vite setup not available or failed, continuing without it');
       }
     }
 
     // =============================================================================
-    // 404 HANDLER - MUST BE LAST!
+    // 404 HANDLER
     // =============================================================================
 
     app.use('*', (req: Request, res: Response) => {
@@ -628,13 +570,7 @@ app.get('/health', (_req: Request, res: Response) => {
         success: false,
         message: 'Route not found',
         path: req.path,
-        method: req.method,
-        availableEndpoints: [
-          'GET /health',
-          'GET /api/cors-test',
-          'POST /api/cors-test',
-          'GET /api/session-debug'
-        ]
+        method: req.method
       });
     });
 
@@ -651,24 +587,20 @@ app.get('/health', (_req: Request, res: Response) => {
     // CRITICAL: Use proper listen signature for Render
     httpServer.listen(port, host, () => {
       log(`\n${'='.repeat(60)}`);
-      log(`🚀 Server LIVE on http://${host}:${port}`);
+      log(`🚀 Server running on http://${host}:${port}`);
       log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       log(`🔐 Session store: PostgreSQL`);
       log(`🛡️ Security: Helmet + Rate Limiting enabled`);
       log(`📡 API available at: http://${host}:${port}/api`);
       log(`🌐 CORS: Ultra-permissive mode (allows all origins)`);
       log(`🧪 Test endpoints:`);
-      log(`   - Health Check: http://${host}:${port}/health`);
       log(`   - CORS Test: http://${host}:${port}/api/cors-test`);
       log(`   - Session Debug: http://${host}:${port}/api/session-debug`);
+      log(`   - Health Check: http://${host}:${port}/health`);
       
       // Start scheduler after server is listening
-      try {
-        schedulerService.startScheduler(1);
-        log(`⏰ Content scheduler started`);
-      } catch (schedulerError: any) {
-        log(`⚠️ Scheduler failed to start: ${schedulerError.message}`);
-      }
+      schedulerService.startScheduler(1);
+      log(`⏰ Content scheduler started`);
       
       if (process.env.NODE_ENV === 'development') {
         log(`🛠️  Development mode: Vite dev server + verbose logging enabled`);
@@ -692,10 +624,8 @@ app.get('/health', (_req: Request, res: Response) => {
       }
     });
 
-  } catch (error: any) {
-    console.error("❌❌❌ FATAL: Failed to start server");
-    console.error("Error message:", error.message);
-    console.error("Stack trace:", error.stack);
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 })();
