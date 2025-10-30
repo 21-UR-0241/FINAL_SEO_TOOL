@@ -492,7 +492,7 @@ app.get('/health', (_req: Request, res: Response) => {
     
     let registerRoutes;
     try {
-      const routesModule = await import('./routes.js');
+      const routesModule = await import('./routes.ts');
       registerRoutes = routesModule.registerRoutes;
       console.log('✅ Routes module loaded successfully');
     } catch (routeError: any) {
@@ -567,7 +567,7 @@ app.get('/health', (_req: Request, res: Response) => {
 
     if (app.get("env") === "development") {
       try {
-        const { setupVite } = await import('./vite.js');
+        const { setupVite } = await import('./vite.ts');
         const httpServer = createServer(app);
         await setupVite(app, httpServer);
         console.log('✅ Vite dev server setup complete');
