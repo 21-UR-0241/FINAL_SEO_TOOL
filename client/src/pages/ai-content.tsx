@@ -3192,7 +3192,9 @@ const api = {
 
 
 async getAllContent() {
-  const response = await fetch("/api/user/content/all");
+  const response = await fetch(`${API_URL}/api/user/content/all`, {
+       credentials: "include",
+  });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || "Failed to fetch all content");
