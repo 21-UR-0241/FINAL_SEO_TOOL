@@ -825,26 +825,6 @@ async deleteWebsite(id: string): Promise<boolean> {
     .orderBy(desc(content.createdAt));
 }
 
-
-  // // User-scoped Content
-  // async getUserContent(userId: string, websiteId?: string): Promise<Content[]> {
-  //   if (websiteId) {
-  //     // Verify website ownership first
-  //     const website = await this.getUserWebsite(websiteId, userId);
-  //     if (!website) {
-  //       return [];
-  //     }
-  //     return await this.getContentByWebsite(websiteId);
-  //   }
-    
-  //   // Get all content for user's websites
-  //   return await db
-  //     .select()
-  //     .from(content)
-  //     .where(eq(content.userId, userId))
-  //     .orderBy(desc(content.createdAt));
-  // }
-
   async getContentByWebsite(websiteId: string): Promise<Content[]> {
     return await db
       .select()
