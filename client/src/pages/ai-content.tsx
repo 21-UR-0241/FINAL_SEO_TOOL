@@ -3153,6 +3153,7 @@ import {
 } from "lucide-react";
 import AutoContentScheduler from "./auto-content-scheduler";
 import { sanitizeHtmlContent, sanitizeFormInput } from "@/utils/sanitize-HTML";
+import { API_URL } from "@/config/api";
 
 
 
@@ -3176,7 +3177,9 @@ const NICHES = [
 // API utility functions
 const api = {
   async getWebsites() {
-    const response = await fetch("/api/user/websites");
+         const response = await fetch(`${API_URL}/api/user/websites`, {
+       credentials: "include",
+     });
     if (!response.ok) throw new Error("Failed to fetch websites");
     return response.json();
   },
