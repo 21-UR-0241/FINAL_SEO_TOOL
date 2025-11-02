@@ -3174,38 +3174,42 @@ const NICHES = [
 ];
 
 
-// API utility functions
+// API utility functions - COMPLETE UPDATED VERSION
+// All functions now use ${API_URL} and include credentials
+
 const api = {
   async getWebsites() {
-         const response = await fetch(`${API_URL}/api/user/websites`, {
-       credentials: "include",
-     });
+    const response = await fetch(`${API_URL}/api/user/websites`, {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch websites");
     return response.json();
   },
 
   async getWebsiteContent(websiteId) {
-    const response = await fetch(`/api/user/websites/${websiteId}/content`);
+    const response = await fetch(`${API_URL}/api/user/websites/${websiteId}/content`, {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch content");
     return response.json();
   },
 
-
-async getAllContent() {
-  const response = await fetch(`${API_URL}/api/user/content/all`, {
-       credentials: "include",
-  });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to fetch all content");
-  }
-  return response.json(); // Now returns array directly
-},
+  async getAllContent() {
+    const response = await fetch(`${API_URL}/api/user/content/all`, {
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch all content");
+    }
+    return response.json();
+  },
 
   async generateContent(data) {
-    const response = await fetch("/api/user/content/generate", {
+    const response = await fetch(`${API_URL}/api/user/content/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -3216,9 +3220,10 @@ async getAllContent() {
   },
 
   async updateContent(contentId, data) {
-    const response = await fetch(`/api/user/content/${contentId}`, {
+    const response = await fetch(`${API_URL}/api/user/content/${contentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -3229,9 +3234,10 @@ async getAllContent() {
   },
 
   async publishContent(contentId) {
-    const response = await fetch(`/api/user/content/${contentId}/publish`, {
+    const response = await fetch(`${API_URL}/api/user/content/${contentId}/publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
     });
 
     if (!response.ok) {
@@ -3253,9 +3259,11 @@ async getAllContent() {
 
   async getActivityLogs(websiteId) {
     const url = websiteId
-      ? `/api/user/activity-logs?websiteId=${websiteId}`
-      : "/api/user/activity-logs";
-    const response = await fetch(url);
+      ? `${API_URL}/api/user/activity-logs?websiteId=${websiteId}`
+      : `${API_URL}/api/user/activity-logs`;
+    const response = await fetch(url, {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch activity logs");
     return response.json();
   },
@@ -3266,8 +3274,9 @@ async getAllContent() {
     formData.append("websiteId", websiteId);
     if (contentId) formData.append("contentId", contentId);
 
-    const response = await fetch("/api/user/content/upload-images", {
+    const response = await fetch(`${API_URL}/api/user/content/upload-images`, {
       method: "POST",
+      credentials: "include",
       body: formData,
     });
 
@@ -3280,15 +3289,18 @@ async getAllContent() {
     if (websiteId) params.append("websiteId", websiteId);
     if (contentId) params.append("contentId", contentId);
 
-    const response = await fetch(`/api/user/content/images?${params}`);
+    const response = await fetch(`${API_URL}/api/user/content/images?${params}`, {
+      credentials: "include",
+    });
     if (!response.ok) throw new Error("Failed to fetch images");
     return response.json();
   },
 
   async replaceContentImage(contentId, oldImageUrl, newImageUrl, newAltText) {
-    const response = await fetch("/api/user/content/replace-image", {
+    const response = await fetch(`${API_URL}/api/user/content/replace-image`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         contentId,
         oldImageUrl,
@@ -3301,9 +3313,10 @@ async getAllContent() {
   },
 
   async deleteContent(contentId) {
-    const response = await fetch(`/api/user/content/${contentId}`, {
+    const response = await fetch(`${API_URL}/api/user/content/${contentId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
     });
 
     if (!response.ok) {
@@ -3314,6 +3327,8 @@ async getAllContent() {
     return response.json();
   },
 };
+
+
 
 // Utility functions
 const getStatusColor = (status) => {
