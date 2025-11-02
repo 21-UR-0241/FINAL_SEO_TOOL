@@ -44,65 +44,7 @@ export class AuthService {
     }
   }
 
-  // async createUser(userData: UserData): Promise<AuthUser> {
-  //   try {
-  //     console.log("🔍 Creating user:", {
-  //       username: userData.username,
-  //       hasEmail: !!userData.email,
-  //     });
 
-  //     // Validate input data
-  //     const validationErrors = this.validateUserData(userData);
-  //     if (validationErrors.length > 0) {
-  //       console.error("❌ Validation errors:", validationErrors);
-  //       throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
-  //     }
-
-  //     // Check if username already exists using your storage
-  //     const existingUser = await storage.getUserByUsername(
-  //       userData.username.toLowerCase().trim()
-  //     );
-  //     if (existingUser) {
-  //       console.error("❌ Username already exists:", userData.username);
-  //       throw new Error("Username already exists");
-  //     }
-
-  //     // Hash password
-  //     const hashedPassword = await this.hashPassword(userData.password);
-
-  //     // Create user using your storage interface (only fields in schema)
-  //     const insertUserData: InsertUser = {
-  //       username: userData.username.toLowerCase().trim(),
-  //       password: hashedPassword,
-  //       email: userData.email!.toLowerCase().trim(),
-  //   ...(userData.name?.trim() ? { name: userData.name.trim() } : {})
-  //     };
-
-  //     const user = await storage.createUser(insertUserData);
-
-  //     if (!user) {
-  //       throw new Error("Failed to create user");
-  //     }
-
-  //     console.log("✅ User created successfully:", user.username);
-
-  //     // Return user in format expected by routes (with email/name for compatibility)
-  //     return {
-  //       id: user.id,
-  //       username: user.username,
-  //       email: user.email, // Frontend compatibility
-  //       name: user.name, // Frontend compatibility
-  //     };
-  //   } catch (error) {
-  //     console.error("❌ Create user error:", error);
-
-  //     if (error instanceof Error && error.message.includes("already exists")) {
-  //       throw error;
-  //     }
-
-  //     throw new Error("Failed to create user account");
-  //   }
-  // }
 
   async createUser(userData: UserData): Promise<AuthUser> {
   const username = userData.username.trim().toLowerCase();
@@ -297,16 +239,6 @@ export class AuthService {
       return false;
     }
   }
-
-  // async hashPassword(password: string): Promise<string> {
-  //   try {
-  //     const saltRounds = 12;
-  //     return await bcrypt.hash(password, saltRounds);
-  //   } catch (error) {
-  //     console.error('Password hashing failed:', error);
-  //     throw new Error('Failed to hash password');
-  //   }
-  // }
 
   validatePassword(password: string): string[] {
     const errors: string[] = [];
