@@ -566,9 +566,9 @@ class AIFixService {
   ): Promise<AIFix[]> {
     await this.resetStuckFixingIssues(websiteId, userId);
 
-    // Query seo_issue_tracking table - get all detected/reappeared issues
+    // Query seo_issue_tracking table - get all open/detected/reappeared issues
     const trackedIssues = await storage.getTrackedSeoIssues(websiteId, userId, {
-      status: ["detected", "reappeared"],  // Column: status
+      status: ["open", "detected", "reappeared"],  // Column: status
       excludeRecentlyFixed: true,
       fixedWithinDays: 7,
     });
@@ -3600,12 +3600,12 @@ Make it clearer and easier to read while keeping all key information.`;
 
     if (stuckIssues.length > 0) {
       for (const issue of stuckIssues) {
-        // Update seo_issue_tracking table
-        await storage.updateSeoIssueStatus(issue.id, "detected", {
+        // Update seo_issue_tracking table - reset to 'open' status
+        await storage.updateSeoIssueStatus(issue.id, "open", {
           resolutionNotes: "Reset from stuck fixing status",  // Column: resolution_notes
         });
       }
-      this.addLog(`Reset ${stuckIssues.length} stuck issues in seo_issue_tracking`, "info");
+      this.addLog(`Reset ${stuckIssues.length} stuck issues to 'open' status in seo_issue_tracking`, "info");
     }
   }
 
@@ -3668,12 +3668,12 @@ Make it clearer and easier to read while keeping all key information.`;
           this.addLog(`✅ Marked issue ${issueId} as fixed (${issueFixes.length} pages)`, "success");
         } else if (anySuccessful) {
           const successCount = issueFixes.filter(f => f.success).length;
-          await storage.updateSeoIssueStatus(issueId, "detected", {
+          await storage.updateSeoIssueStatus(issueId, "open", {
             resolutionNotes: `Partially fixed: ${successCount}/${issueFixes.length} pages successful`,  // Column: resolution_notes
           });
           this.addLog(`⚠️ Issue ${issueId} partially fixed: ${successCount}/${issueFixes.length}`, "warning");
         } else {
-          await storage.updateSeoIssueStatus(issueId, "detected", {
+          await storage.updateSeoIssueStatus(issueId, "open", {
             resolutionNotes: `Fix failed: ${issueFixes[0].error || 'Unknown error'}`,  // Column: resolution_notes
           });
           this.addLog(`❌ Issue ${issueId} fix failed`, "error");
@@ -3687,8 +3687,8 @@ Make it clearer and easier to read while keeping all key information.`;
 
       for (const issue of fixingIssues) {
         if (!fixesByIssueId.has(issue.id)) {
-          await storage.updateSeoIssueStatus(issue.id, "detected", {
-            resolutionNotes: "No fixes were applied for this issue - reset to detected",  // Column: resolution_notes
+          await storage.updateSeoIssueStatus(issue.id, "open", {
+            resolutionNotes: "No fixes were applied for this issue - reset to open",  // Column: resolution_notes
           });
           this.addLog(`⚠️ Reset orphaned issue ${issue.id}`, "warning");
         }
@@ -3711,7 +3711,7 @@ Make it clearer and easier to read while keeping all key information.`;
 
     if (stuckIssues.length > 0) {
       for (const issue of stuckIssues) {
-        await storage.updateSeoIssueStatus(issue.id, "detected", {
+        await storage.updateSeoIssueStatus(issue.id, "open", {
           resolutionNotes: "Reset from stuck fixing state",  // Column: resolution_notes
         });
       }
