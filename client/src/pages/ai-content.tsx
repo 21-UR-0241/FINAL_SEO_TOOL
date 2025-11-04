@@ -834,44 +834,6 @@ const loadContent = async () => {
 };
 
 
-  // const validateForm = () => {
-  //   const errors = {};
-
-  //   // Require either website OR niche
-  //   if (!formData.websiteId && !formData.niche) {
-  //     errors.niche = "Please select a niche for standalone content OR select a website above";
-  //   }
-  //   if (!formData.topic.trim()) errors.topic = "Topic is required";
-  //   if (formData.wordCount < 100 || formData.wordCount > 5000) {
-  //     errors.wordCount = "Word count must be between 100 and 5000";
-  //   }
-  //   if (
-  //     !formData.aiProvider ||
-  //     !["openai", "anthropic", "gemini"].includes(formData.aiProvider)
-  //   ) {
-  //     errors.aiProvider = "Please select a valid AI provider";
-  //   }
-
-  //   if (formData.includeImages) {
-  //     if (formData.imageCount < 1 || formData.imageCount > 3) {
-  //       errors.imageCount = "Image count must be between 1 and 3";
-  //     }
-
-  //     const validStyles = [
-  //       "natural",
-  //       "digital_art",
-  //       "photographic",
-  //       "cinematic",
-  //     ];
-  //     if (!validStyles.includes(formData.imageStyle)) {
-  //       errors.imageStyle = "Please select a valid image style";
-  //     }
-  //   }
-
-  //   setFormErrors(errors);
-  //   return Object.keys(errors).length === 0;
-  // };
-
   const validateEditForm = () => {
     const errors = {};
     if (!editFormData.title.trim()) errors.title = "Title is required";

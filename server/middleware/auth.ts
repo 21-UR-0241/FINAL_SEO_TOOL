@@ -121,12 +121,7 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
   next();
 };
 
-/**
- * Optional auth middleware - attaches user if authenticated but doesn't require it
- * Useful for routes that work for both authenticated and unauthenticated users
- * 
- * Usage: app.get('/api/public-but-personalized', optionalAuth, handler)
- */
+
 export const optionalAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (req.session?.userId) {
