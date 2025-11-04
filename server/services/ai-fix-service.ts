@@ -1,7 +1,4 @@
 
-
-
-
 import { aiService } from "server/services/ai-service";
 import { wordpressService } from "server/services/wordpress-service";
 import { wordPressAuthService } from "server/services/wordpress-auth";
@@ -514,24 +511,24 @@ class AIFixService {
   ): Promise<AIFix[]> {
     await this.resetStuckFixingIssues(websiteId, userId);
 
-    // Query seo_issue_tracking table for auto-fixable issues
-    const trackedIssues = await storage.getSeoIssueTracking(websiteId, userId, {
-      auto_fixable: true,  // Column: auto_fixable (boolean)
+    // Query seo_issue_tracking table using original method name
+    const trackedIssues = await storage.getTrackedSeoIssues(websiteId, userId, {
+      autoFixableOnly: true,  // Maps to: auto_fixable column
       status: ["detected", "reappeared"],  // Column: status
       excludeRecentlyFixed: true,
       fixedWithinDays: 7,
     });
     
     this.addLog(`Found ${trackedIssues.length} fixable issues from seo_issue_tracking table`);
-    const issueTypes = [...new Set(trackedIssues.map(i => i.issue_type))];  // Column: issue_type
+    const issueTypes = [...new Set(trackedIssues.map(i => i.issueType))];  // Column: issue_type
     this.addLog(`Issue types found: ${issueTypes.join(', ')}`, "info");
 
     return trackedIssues.map((issue) => ({
-      type: issue.issue_type,  // Column: issue_type
-      description: issue.issue_description || issue.issue_title,  // Columns: issue_description, issue_title
-      element: issue.element_path || issue.issue_type,  // Column: element_path
-      before: issue.current_value || "Current state",  // Column: current_value
-      after: issue.recommended_value || "Improved state",  // Column: recommended_value
+      type: issue.issueType,  // Column: issue_type (returned as issueType)
+      description: issue.issueDescription || issue.issueTitle,  // Columns: issue_description, issue_title
+      element: issue.elementPath || issue.issueType,  // Column: element_path (returned as elementPath)
+      before: issue.currentValue || "Current state",  // Column: current_value (returned as currentValue)
+      after: issue.recommendedValue || "Improved state",  // Column: recommended_value (returned as recommendedValue)
       impact: this.mapSeverityToImpact(issue.severity),  // Column: severity
       trackedIssueId: issue.id,  // Column: id
       success: false,
@@ -3536,16 +3533,15 @@ Make it clearer and easier to read while keeping all key information.`;
     userId: string
   ): Promise<void> {
     // Query seo_issue_tracking table for stuck issues
-    const stuckIssues = await storage.getSeoIssueTracking(websiteId, userId, {
+    const stuckIssues = await storage.getTrackedSeoIssues(websiteId, userId, {
       status: ["fixing"],  // Column: status
     });
 
     if (stuckIssues.length > 0) {
       for (const issue of stuckIssues) {
         // Update seo_issue_tracking table
-        await storage.updateSeoIssueTracking(issue.id, {
-          status: "detected",  // Column: status
-          resolution_notes: "Reset from stuck fixing status",  // Column: resolution_notes
+        await storage.updateSeoIssueStatus(issue.id, "detected", {
+          resolutionNotes: "Reset from stuck fixing status",  // Column: resolution_notes
         });
       }
       this.addLog(`Reset ${stuckIssues.length} stuck issues in seo_issue_tracking`, "info");
@@ -3562,12 +3558,10 @@ Make it clearer and easier to read while keeping all key information.`;
 
     if (issueIds.length > 0) {
       // Bulk update seo_issue_tracking table
-      await storage.bulkUpdateSeoIssueTracking(
+      await storage.bulkUpdateSeoIssueStatuses(
         issueIds,
-        {
-          status: "fixing",  // Column: status
-          fix_session_id: fixSessionId,  // Column: fix_session_id
-        }
+        "fixing",
+        fixSessionId
       );
       this.addLog(`Marked ${issueIds.length} issues as fixing in seo_issue_tracking`);
     }
@@ -3604,40 +3598,36 @@ Make it clearer and easier to read while keeping all key information.`;
         
         if (allSuccessful) {
           // Update seo_issue_tracking table
-          await storage.updateSeoIssueTracking(issueId, {
-            status: "fixed",  // Column: status
-            fix_method: "ai_automatic",  // Column: fix_method
-            fix_session_id: fixSessionId,  // Column: fix_session_id
-            resolution_notes: `Fixed across ${issueFixes.length} page(s): ${issueFixes.map(f => f.description).join('; ')}`,  // Column: resolution_notes
-            fixed_at: new Date(),  // Column: fixed_at
+          await storage.updateSeoIssueStatus(issueId, "fixed", {
+            fixMethod: "ai_automatic",  // Column: fix_method
+            fixSessionId,  // Column: fix_session_id
+            resolutionNotes: `Fixed across ${issueFixes.length} page(s): ${issueFixes.map(f => f.description).join('; ')}`,  // Column: resolution_notes
+            fixedAt: new Date(),  // Column: fixed_at
           });
           this.addLog(`✅ Marked issue ${issueId} as fixed (${issueFixes.length} pages)`, "success");
         } else if (anySuccessful) {
           const successCount = issueFixes.filter(f => f.success).length;
-          await storage.updateSeoIssueTracking(issueId, {
-            status: "detected",  // Column: status
-            resolution_notes: `Partially fixed: ${successCount}/${issueFixes.length} pages successful`,  // Column: resolution_notes
+          await storage.updateSeoIssueStatus(issueId, "detected", {
+            resolutionNotes: `Partially fixed: ${successCount}/${issueFixes.length} pages successful`,  // Column: resolution_notes
           });
           this.addLog(`⚠️ Issue ${issueId} partially fixed: ${successCount}/${issueFixes.length}`, "warning");
         } else {
-          await storage.updateSeoIssueTracking(issueId, {
-            status: "detected",  // Column: status
-            resolution_notes: `Fix failed: ${issueFixes[0].error || 'Unknown error'}`,  // Column: resolution_notes
+          await storage.updateSeoIssueStatus(issueId, "detected", {
+            resolutionNotes: `Fix failed: ${issueFixes[0].error || 'Unknown error'}`,  // Column: resolution_notes
           });
           this.addLog(`❌ Issue ${issueId} fix failed`, "error");
         }
       }
 
       // Query seo_issue_tracking for any issues still in fixing status
-      const fixingIssues = await storage.getSeoIssueTracking(websiteId, userId, {
+      const fixingIssues = await storage.getTrackedSeoIssues(websiteId, userId, {
         status: ["fixing"],  // Column: status
       });
 
       for (const issue of fixingIssues) {
         if (!fixesByIssueId.has(issue.id)) {
-          await storage.updateSeoIssueTracking(issue.id, {
-            status: "detected",  // Column: status
-            resolution_notes: "No fixes were applied for this issue - reset to detected",  // Column: resolution_notes
+          await storage.updateSeoIssueStatus(issue.id, "detected", {
+            resolutionNotes: "No fixes were applied for this issue - reset to detected",  // Column: resolution_notes
           });
           this.addLog(`⚠️ Reset orphaned issue ${issue.id}`, "warning");
         }
@@ -3654,15 +3644,14 @@ Make it clearer and easier to read while keeping all key information.`;
     fixSessionId: string
   ): Promise<void> {
     // Query seo_issue_tracking for stuck issues
-    const stuckIssues = await storage.getSeoIssueTracking(websiteId, userId, {
+    const stuckIssues = await storage.getTrackedSeoIssues(websiteId, userId, {
       status: ["fixing"],  // Column: status
     });
 
     if (stuckIssues.length > 0) {
       for (const issue of stuckIssues) {
-        await storage.updateSeoIssueTracking(issue.id, {
-          status: "detected",  // Column: status
-          resolution_notes: "Reset from stuck fixing state",  // Column: resolution_notes
+        await storage.updateSeoIssueStatus(issue.id, "detected", {
+          resolutionNotes: "Reset from stuck fixing state",  // Column: resolution_notes
         });
       }
     }
@@ -4153,6 +4142,8 @@ Make it clearer and easier to read while keeping all key information.`;
 }
 
 export const aiFixService = new AIFixService();
+
+
 
 
 
