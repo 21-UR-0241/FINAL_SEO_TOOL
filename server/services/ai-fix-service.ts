@@ -504,26 +504,87 @@ class AIFixService {
     return website;
   }
 
-  // ==================== CORRECTED: Uses seo_issue_tracking table ====================
+  // List of issue types that can be auto-fixed
+  private readonly FIXABLE_ISSUE_TYPES = new Set([
+    // Image issues
+    'missing_alt_text',
+    'images_missing_alt_text',
+    'images_missing_lazy_loading',
+    'missing_image_dimensions',
+    
+    // Meta & Title issues
+    'missing_meta_description',
+    'meta_description_too_long',
+    'meta_description_too_short',
+    'duplicate_meta_descriptions',
+    'title_tag_too_long',
+    'title_tag_too_short',
+    'poor_title_tag',
+    'missing_title_tag',
+    'missing_page_title',
+    
+    // Heading issues
+    'heading_structure',
+    'heading_structure_could_improve',
+    'improper_heading_hierarchy',
+    'missing_h1',
+    'missing_h1_tag',
+    'multiple_h1_tags',
+    
+    // Content issues
+    'thin_content',
+    'content_too_short',
+    'content_could_be_expanded',
+    'low_content_depth',
+    'poor_readability',
+    'low_readability',
+    
+    // E-A-T issues
+    'limited_expertise_signals',
+    'limited_trustworthiness_signals',
+    'low_eat_signals',
+    
+    // Link issues
+    'external_links_missing_attributes',
+    'broken_internal_links',
+    
+    // Schema & structured data
+    'missing_schema_markup',
+    'missing_schema',
+    'missing_open_graph_tags',
+    'missing_faq_schema',
+    
+    // Technical SEO
+    'missing_canonical_url',
+    'missing_viewport_meta_tag',
+  ]);
+
+  // ==================== CORRECTED: Works without auto_fixable column ====================
   private async getFixableIssues(
     websiteId: string,
     userId: string
   ): Promise<AIFix[]> {
     await this.resetStuckFixingIssues(websiteId, userId);
 
-    // Query seo_issue_tracking table using original method name
+    // Query seo_issue_tracking table - get all detected/reappeared issues
     const trackedIssues = await storage.getTrackedSeoIssues(websiteId, userId, {
-      autoFixableOnly: true,  // Maps to: auto_fixable column
       status: ["detected", "reappeared"],  // Column: status
       excludeRecentlyFixed: true,
       fixedWithinDays: 7,
     });
     
-    this.addLog(`Found ${trackedIssues.length} fixable issues from seo_issue_tracking table`);
-    const issueTypes = [...new Set(trackedIssues.map(i => i.issueType))];  // Column: issue_type
-    this.addLog(`Issue types found: ${issueTypes.join(', ')}`, "info");
+    this.addLog(`Found ${trackedIssues.length} tracked issues from seo_issue_tracking table`);
+    
+    // Filter to only fixable issue types (in JavaScript, not SQL)
+    const fixableIssues = trackedIssues.filter(issue => 
+      this.FIXABLE_ISSUE_TYPES.has(issue.issueType)
+    );
+    
+    this.addLog(`Filtered to ${fixableIssues.length} auto-fixable issues`);
+    const issueTypes = [...new Set(fixableIssues.map(i => i.issueType))];
+    this.addLog(`Fixable issue types: ${issueTypes.join(', ')}`, "info");
 
-    return trackedIssues.map((issue) => ({
+    return fixableIssues.map((issue) => ({
       type: issue.issueType,  // Column: issue_type (returned as issueType)
       description: issue.issueDescription || issue.issueTitle,  // Columns: issue_description, issue_title
       element: issue.elementPath || issue.issueType,  // Column: element_path (returned as elementPath)
