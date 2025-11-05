@@ -797,21 +797,106 @@ router.get('/accounts/:accountId/statistics', requireAuth, async (req: Authentic
 // GSC API ENDPOINTS
 // ============================================================================
 
+
 router.get('/properties', requireAuth, validateAccountId, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { accountId } = req.query;
     
+    console.log('========================================');
+    console.log('📋 FETCHING PROPERTIES');
+    console.log('User ID:', userId);
+    console.log('Account ID:', accountId);
+    console.log('========================================');
+    
+    // Step 1: Get account credentials
+    console.log('Step 1: Fetching account credentials...');
     const account = await gscStorage.getGscAccountWithCredentials(userId, accountId as string);
     
     if (!account) {
+      console.error('❌ Account not found');
       return res.status(401).json({ error: 'Account not found or not authenticated' });
     }
     
+    console.log('✅ Account found:', {
+      id: account.id,
+      email: account.email,
+      hasAccessToken: !!account.accessToken,
+      hasRefreshToken: !!account.refreshToken,
+      tokenExpiry: account.tokenExpiry ? new Date(account.tokenExpiry).toISOString() : 'none',
+      isExpired: account.tokenExpiry ? account.tokenExpiry < Date.now() : 'unknown'
+    });
+    
+    // Step 2: Get OAuth configuration
+    console.log('Step 2: Fetching OAuth configuration...');
+    const config = await gscStorage.getGscConfiguration(userId);
+    
+    if (!config) {
+      console.error('❌ OAuth configuration not found');
+      return res.status(400).json({ 
+        error: 'OAuth configuration not found. Please configure your credentials first.' 
+      });
+    }
+    
+    console.log('✅ Config found:', {
+      hasClientId: !!config.clientId,
+      hasClientSecret: !!config.clientSecret,
+      redirectUri: config.redirectUri,
+      clientIdPrefix: config.clientId?.substring(0, 20) + '...'
+    });
+    
+    // Step 3: Check if token needs refresh
+    const timeUntilExpiry = account.tokenExpiry - Date.now();
+    const needsRefresh = timeUntilExpiry < 300000; // 5 minutes
+    
+    console.log('Step 3: Token status:', {
+      timeUntilExpiry: Math.floor(timeUntilExpiry / 1000) + ' seconds',
+      needsRefresh,
+      hasRefreshToken: !!account.refreshToken
+    });
+    
+    if (needsRefresh && account.refreshToken) {
+      console.log('🔄 Refreshing token...');
+      
+      const oauth2Client = new google.auth.OAuth2(
+        config.clientId,
+        config.clientSecret,
+        config.redirectUri || getRedirectUri()
+      );
+      
+      oauth2Client.setCredentials({
+        refresh_token: account.refreshToken
+      });
+      
+      try {
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        
+        console.log('✅ Token refreshed successfully');
+        
+        await gscStorage.updateGscAccount(userId, accountId as string, {
+          accessToken: credentials.access_token!,
+          tokenExpiry: credentials.expiry_date!
+        });
+        
+        account.accessToken = credentials.access_token!;
+        account.tokenExpiry = credentials.expiry_date!;
+        
+      } catch (refreshError: any) {
+        console.error('❌ Token refresh failed:', refreshError.message);
+        return res.status(401).json({ 
+          error: 'Token expired and refresh failed. Please re-authenticate.',
+          needsReauth: true,
+          details: refreshError.message
+        });
+      }
+    }
+    
+    // Step 4: Create OAuth client and fetch properties
+    console.log('Step 4: Creating OAuth client...');
     const oauth2Client = new google.auth.OAuth2(
-      account.clientId,
-      account.clientSecret,
-      account.redirectUri || getRedirectUri()
+      config.clientId,
+      config.clientSecret,
+      config.redirectUri || getRedirectUri()
     );
     
     oauth2Client.setCredentials({
@@ -820,33 +905,123 @@ router.get('/properties', requireAuth, validateAccountId, async (req: Authentica
       expiry_date: account.tokenExpiry
     });
     
+    console.log('Step 5: Calling Google Search Console API...');
     const searchconsole = google.searchconsole({ version: 'v1', auth: oauth2Client });
-    const { data } = await searchconsole.sites.list();
     
-    for (const site of (data.siteEntry || [])) {
-      await gscStorage.saveGscProperty(userId, accountId as string, {
+    try {
+      const { data } = await searchconsole.sites.list();
+      
+      console.log('✅ API call successful');
+      console.log('Raw sites data:', JSON.stringify(data, null, 2));
+      
+      // Save properties to database
+      console.log('Step 6: Saving properties to database...');
+      for (const site of (data.siteEntry || [])) {
+        await gscStorage.saveGscProperty(userId, accountId as string, {
+          siteUrl: site.siteUrl!,
+          permissionLevel: site.permissionLevel!,
+          siteType: site.siteUrl?.startsWith('sc-domain:') ? 'DOMAIN' : 'SITE',
+          verified: true
+        });
+      }
+      
+      const properties = (data.siteEntry || []).map(site => ({
         siteUrl: site.siteUrl!,
         permissionLevel: site.permissionLevel!,
-        siteType: site.siteUrl?.startsWith('sc-domain:') ? 'DOMAIN' : 'SITE',
-        verified: true
-      });
+        siteType: site.siteUrl?.startsWith('sc-domain:') ? 'DOMAIN' as const : 'SITE' as const,
+        verified: true,
+        accountId: accountId
+      }));
+      
+      console.log(`✅ Found ${properties.length} GSC properties`);
+      console.log('Properties:', properties);
+      console.log('========================================');
+      
+      res.json(properties);
+      
+    } catch (apiError: any) {
+      console.error('========================================');
+      console.error('❌ GSC API ERROR');
+      console.error('Error code:', apiError.code);
+      console.error('Error message:', apiError.message);
+      console.error('Error details:', JSON.stringify(apiError, null, 2));
+      console.error('========================================');
+      
+      if (apiError.code === 401 || apiError.code === 403) {
+        return res.status(401).json({ 
+          error: 'Authentication failed. Please re-authenticate your account.',
+          needsReauth: true,
+          details: apiError.message
+        });
+      }
+      
+      throw apiError;
     }
     
-    const properties = (data.siteEntry || []).map(site => ({
-      siteUrl: site.siteUrl!,
-      permissionLevel: site.permissionLevel!,
-      siteType: site.siteUrl?.startsWith('sc-domain:') ? 'DOMAIN' as const : 'SITE' as const,
-      verified: true,
-      accountId: accountId
-    }));
+  } catch (error: any) {
+    console.error('========================================');
+    console.error('❌ FATAL ERROR');
+    console.error('Error:', error);
+    console.error('Stack:', error.stack);
+    console.error('========================================');
     
-    console.log(`✅ Found ${properties.length} GSC properties`);
-    res.json(properties);
-  } catch (error) {
-    console.error('Error fetching GSC properties:', error);
-    res.status(500).json({ error: 'Failed to fetch properties' });
+    res.status(500).json({ 
+      error: 'Failed to fetch properties',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
+// router.get('/properties', requireAuth, validateAccountId, async (req: AuthenticatedRequest, res: Response) => {
+//   try {
+//     const userId = req.user!.id;
+//     const { accountId } = req.query;
+    
+//     const account = await gscStorage.getGscAccountWithCredentials(userId, accountId as string);
+    
+//     if (!account) {
+//       return res.status(401).json({ error: 'Account not found or not authenticated' });
+//     }
+    
+//     const oauth2Client = new google.auth.OAuth2(
+//       account.clientId,
+//       account.clientSecret,
+//       account.redirectUri || getRedirectUri()
+//     );
+    
+//     oauth2Client.setCredentials({
+//       access_token: account.accessToken,
+//       refresh_token: account.refreshToken,
+//       expiry_date: account.tokenExpiry
+//     });
+    
+//     const searchconsole = google.searchconsole({ version: 'v1', auth: oauth2Client });
+//     const { data } = await searchconsole.sites.list();
+    
+//     for (const site of (data.siteEntry || [])) {
+//       await gscStorage.saveGscProperty(userId, accountId as string, {
+//         siteUrl: site.siteUrl!,
+//         permissionLevel: site.permissionLevel!,
+//         siteType: site.siteUrl?.startsWith('sc-domain:') ? 'DOMAIN' : 'SITE',
+//         verified: true
+//       });
+//     }
+    
+//     const properties = (data.siteEntry || []).map(site => ({
+//       siteUrl: site.siteUrl!,
+//       permissionLevel: site.permissionLevel!,
+//       siteType: site.siteUrl?.startsWith('sc-domain:') ? 'DOMAIN' as const : 'SITE' as const,
+//       verified: true,
+//       accountId: accountId
+//     }));
+    
+//     console.log(`✅ Found ${properties.length} GSC properties`);
+//     res.json(properties);
+//   } catch (error) {
+//     console.error('Error fetching GSC properties:', error);
+//     res.status(500).json({ error: 'Failed to fetch properties' });
+//   }
+// });
 
 router.post('/index', requireAuth, validateAccountId, async (req: AuthenticatedRequest, res: Response) => {
   try {
