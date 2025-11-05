@@ -789,54 +789,70 @@ const GoogleSearchConsole = () => {
         `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
       );
 
-      const handleMessage = async (event) => {
-        // Get backend origin from API_BASE_URL
-        let backendOrigin;
-        try {
-          backendOrigin = new URL(API_BASE_URL).origin;
-        } catch (e) {
-          backendOrigin = API_BASE_URL;
-        }
-        
-        const allowedOrigins = [backendOrigin, window.location.origin, CLIENT_URL];
-        
-        console.log('📨 Received message from:', event.origin);
-        console.log('✅ Allowed origins:', allowedOrigins);
-        
-        if (!allowedOrigins.includes(event.origin)) {
-          console.log('❌ Message from unauthorized origin:', event.origin);
-          return;
-        }
-
-        if (event.data.type === "GOOGLE_AUTH_SUCCESS") {
-          const { code } = event.data;
-
-          window.removeEventListener("message", handleMessage);
-          messageHandlerRef.current = null;
-
-          if (authWindowRef.current && !authWindowRef.current.closed) {
-            authWindowRef.current.close();
+        const handleMessage = async (event) => {
+          // Get backend origin from API_BASE_URL
+          let backendOrigin;
+          try {
+            backendOrigin = new URL(API_BASE_URL).origin;
+          } catch (e) {
+            backendOrigin = API_BASE_URL;
           }
-          authWindowRef.current = null;
-
-          await handleOAuthCallback(code);
-          setIsAuthenticating(false);
-        } else if (event.data.type === "GOOGLE_AUTH_ERROR") {
-          window.removeEventListener("message", handleMessage);
-          messageHandlerRef.current = null;
-
-          if (authWindowRef.current && !authWindowRef.current.closed) {
-            authWindowRef.current.close();
+          
+          // EXPLICIT URLs for your deployment
+          const allowedOrigins = [
+            'https://final-seo-tool-6uwv.onrender.com',  // Your backend
+            'https://final-seo-tool.vercel.app',         // Your frontend
+            backendOrigin,
+            window.location.origin,
+            CLIENT_URL,
+          ];
+          
+          console.log('📨 Received message from:', event.origin);
+          console.log('✅ Allowed origins:', allowedOrigins);
+          console.log('🔍 Message type:', event.data?.type);
+          console.log('📦 Full event data:', event.data);
+          
+          if (!allowedOrigins.includes(event.origin)) {
+            console.log('❌ Message from unauthorized origin:', event.origin);
+            console.log('❌ This origin is NOT in the allowed list');
+            return;
           }
-          authWindowRef.current = null;
 
-          showNotification(
-            "error",
-            event.data.error || "Authentication failed"
-          );
-          setIsAuthenticating(false);
-        }
-      };
+          console.log('✅ Origin authorized!');
+
+          if (event.data.type === "GOOGLE_AUTH_SUCCESS") {
+            const { code } = event.data;
+            console.log('✅ Auth code received:', code ? 'Yes (length: ' + code.length + ')' : 'No');
+
+            window.removeEventListener("message", handleMessage);
+            messageHandlerRef.current = null;
+
+            if (authWindowRef.current && !authWindowRef.current.closed) {
+              authWindowRef.current.close();
+              console.log('🪟 Closed auth popup window');
+            }
+            authWindowRef.current = null;
+
+            console.log('🔄 Exchanging code for token...');
+            await handleOAuthCallback(code);
+            setIsAuthenticating(false);
+          } else if (event.data.type === "GOOGLE_AUTH_ERROR") {
+            console.error('❌ Auth error received:', event.data.error);
+            
+            window.removeEventListener("message", handleMessage);
+            messageHandlerRef.current = null;
+
+            if (authWindowRef.current && !authWindowRef.current.closed) {
+              authWindowRef.current.close();
+            }
+            authWindowRef.current = null;
+
+            showNotification("error", event.data.error || "Authentication failed");
+            setIsAuthenticating(false);
+          } else {
+            console.log('⚠️ Unknown message type:', event.data?.type);
+          }
+        };
 
       messageHandlerRef.current = handleMessage;
       window.addEventListener("message", handleMessage);
@@ -1440,13 +1456,380 @@ const GoogleSearchConsole = () => {
           </div>
         </div>
       ) : (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-gray-500 py-8">
-            <p>Selected: {selectedAccount.email}</p>
-            <p>Property: {selectedProperty.siteUrl}</p>
-            <p className="text-sm mt-2">The rest of the UI tabs will appear here</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {/* Tab Navigation */}
+    <div className="flex space-x-1 border-b border-gray-200 mb-6">
+      {[
+        { id: "index", label: "URL Indexing", icon: Send },
+        { id: "inspect", label: "URL Inspection", icon: Search },
+        { id: "sitemap", label: "Sitemap", icon: FileText },
+        { id: "performance", label: "Performance", icon: BarChart },
+      ].map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => setActiveTab(tab.id)}
+          className={`flex items-center space-x-2 px-4 py-2 border-b-2 transition-colors ${
+            activeTab === tab.id
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          <tab.icon className="w-4 h-4" />
+          <span>{tab.label}</span>
+        </button>
+      ))}
+    </div>
+
+    {/* Tab Content */}
+    <div className="space-y-6">
+      {/* URL Indexing Tab */}
+      {activeTab === "index" && (
+        <div className="space-y-6">
+          {/* Single URL Indexing */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Submit URL for Indexing
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  URL to Index
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="url"
+                    value={urlToIndex}
+                    onChange={(e) => setUrlToIndex(e.target.value)}
+                    placeholder="https://example.com/page"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                  <button
+                    onClick={handleIndexUrl}
+                    disabled={loading || !urlToIndex}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    <span>Submit</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bulk URL Indexing */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Bulk URL Indexing
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  URLs (one per line)
+                </label>
+                <textarea
+                  value={bulkUrls}
+                  onChange={(e) => setBulkUrls(e.target.value)}
+                  placeholder="https://example.com/page1&#10;https://example.com/page2&#10;https://example.com/page3"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows="6"
+                  disabled={loading}
+                />
+              </div>
+              <button
+                onClick={handleBulkIndex}
+                disabled={loading || !bulkUrls}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span>Submit All</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Indexing Queue */}
+          {indexingQueue.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Indexing Queue ({indexingQueue.length})
+                </h3>
+                <button
+                  onClick={clearIndexingQueue}
+                  className="text-sm text-red-600 hover:text-red-700 flex items-center space-x-1"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Clear</span>
+                </button>
+              </div>
+              <div className="space-y-2">
+                {indexingQueue.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      {item.status === "success" && (
+                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      )}
+                      {item.status === "error" && (
+                        <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      )}
+                      {item.status === "pending" && (
+                        <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
+                      )}
+                      <span className="text-sm text-gray-900 truncate">
+                        {item.url}
+                      </span>
+                    </div>
+                    {item.message && (
+                      <span className="text-xs text-red-600 ml-2">
+                        {item.message}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* URL Inspection Tab */}
+      {activeTab === "inspect" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Inspect URL
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  URL to Inspect
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="url"
+                    value={urlToInspect}
+                    onChange={(e) => setUrlToInspect(e.target.value)}
+                    placeholder="https://example.com/page"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                  <button
+                    onClick={handleInspectUrl}
+                    disabled={loading || !urlToInspect}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    <span>Inspect</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Inspection Results */}
+          {inspectionResult && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Inspection Results
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">
+                    Index Status
+                  </span>
+                  <span
+                    className={`text-sm font-semibold ${
+                      inspectionResult.indexStatus === "Submitted and indexed"
+                        ? "text-green-600"
+                        : "text-yellow-600"
+                    }`}
+                  >
+                    {inspectionResult.indexStatus}
+                  </span>
+                </div>
+                {inspectionResult.lastCrawlTime && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">
+                      Last Crawled
+                    </span>
+                    <span className="text-sm text-gray-900">
+                      {new Date(
+                        inspectionResult.lastCrawlTime
+                      ).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+                {inspectionResult.googleCanonical && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">
+                      Google Canonical
+                    </span>
+                    <a
+                      href={inspectionResult.googleCanonical}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline flex items-center space-x-1"
+                    >
+                      <span className="truncate max-w-xs">
+                        {inspectionResult.googleCanonical}
+                      </span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sitemap Tab */}
+      {activeTab === "sitemap" && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Submit Sitemap
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Sitemap URL
+              </label>
+              <div className="flex space-x-2">
+                <input
+                  type="url"
+                  value={sitemapUrl}
+                  onChange={(e) => setSitemapUrl(e.target.value)}
+                  placeholder="https://example.com/sitemap.xml"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={loading}
+                />
+                <button
+                  onClick={handleSubmitSitemap}
+                  disabled={loading || !sitemapUrl}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4" />
+                  )}
+                  <span>Submit</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Performance Tab */}
+      {activeTab === "performance" && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Performance Data (Last 28 Days)
+            </h3>
+            <button
+              onClick={loadPerformanceData}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              <span>Load Data</span>
+            </button>
+          </div>
+
+          {performanceData.length > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-4 gap-4">
+                {["clicks", "impressions", "ctr", "position"].map((metric) => {
+                  const total = performanceData.reduce(
+                    (sum, day) => sum + (day[metric] || 0),
+                    0
+                  );
+                  const avg =
+                    metric === "position"
+                      ? (total / performanceData.length).toFixed(1)
+                      : metric === "ctr"
+                      ? ((total / performanceData.length) * 100).toFixed(2) +
+                        "%"
+                      : total.toLocaleString();
+
+                  return (
+                    <div
+                      key={metric}
+                      className="bg-gray-50 rounded-lg p-4 text-center"
+                    >
+                      <div className="text-sm text-gray-600 capitalize mb-1">
+                        {metric === "ctr" ? "CTR" : metric}
+                      </div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {avg}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4">
+                <div className="text-sm font-medium text-gray-700 mb-2">
+                  Daily Performance
+                </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {performanceData.map((day, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <span className="text-sm text-gray-900">{day.date}</span>
+                      <div className="flex space-x-4 text-sm">
+                        <span className="text-gray-600">
+                          Clicks: <strong>{day.clicks}</strong>
+                        </span>
+                        <span className="text-gray-600">
+                          Impressions: <strong>{day.impressions}</strong>
+                        </span>
+                        <span className="text-gray-600">
+                          CTR:{" "}
+                          <strong>{(day.ctr * 100).toFixed(2)}%</strong>
+                        </span>
+                        <span className="text-gray-600">
+                          Pos: <strong>{day.position.toFixed(1)}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 py-8">
+              <BarChart className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>Click "Load Data" to view performance metrics</p>
+            </div>
+       )}
+        </div>
+      )}
+    </div>
+  </div>
       )}
     </div>
   );
