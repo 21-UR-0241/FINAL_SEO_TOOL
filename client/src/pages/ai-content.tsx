@@ -75,8 +75,8 @@ const api = {
   
   async getAllContent() {
     const response = await fetch(`${API_URL}/api/user/content/all`,{
-      credentials: "include";
-    })
+      credentials: "include"
+    });
     if (!response.ok) {
       const text = await response.text();
       console.error("Get all content error:", text);
