@@ -29,10 +29,13 @@ import {
 } from "lucide-react";
 import AutoContentScheduler from "./auto-content-scheduler";
 import { sanitizeHtmlContent, sanitizeFormInput } from "@/utils/sanitize-HTML";
+import { API_URL } from "@/config/api";
 
 const api = {
   async getWebsites() {
-    const response = await fetch("/api/user/websites");
+     const response = await fetch(`${API_URL}/api/user/websites`, {
+       credentials: "include",
+     });
     if (!response.ok) throw new Error("Failed to fetch websites");
     return response.json();
   },
@@ -40,8 +43,10 @@ const api = {
   // Change parameter type from number to string
   async getWebsiteContent(websiteId: string) {
     console.log('🔍 Fetching content for website ID:', websiteId, typeof websiteId);
-    const response = await fetch(`/api/user/websites/${websiteId}/content`);
-    
+    const response = await fetch(`${API_URL}/api/user/websites/${websiteId}/content`, {
+    credentials: "include",
+     });
+
     console.log('📡 Response status:', response.status);
     
     if (!response.ok) {
@@ -69,7 +74,9 @@ const api = {
   },
   
   async getAllContent() {
-    const response = await fetch("/api/user/content/all");
+    const response = await fetch(`${API_URL}/api/user/content/all`,{
+      credentials: "include";
+    })
     if (!response.ok) {
       const text = await response.text();
       console.error("Get all content error:", text);
@@ -80,11 +87,13 @@ const api = {
   },
   
   async generateContent(data: any) {
-    const response = await fetch("/api/user/content/generate", {
+    const response = await fetch(`${API_URL}/api/user/content/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
+
     if (!response.ok) {
       const text = await response.text();
       console.error("Generate content error:", text);
@@ -100,11 +109,13 @@ const api = {
   
   // Change contentId to string as well (likely also a UUID)
   async updateContent(contentId: string, data: any) {
-    const response = await fetch(`/api/user/content/${contentId}`, {
+    const response = await fetch(`${API_URL}/api/user/content/${contentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
+
     if (!response.ok) {
       const text = await response.text();
       console.error("Update content error:", text);
@@ -119,10 +130,12 @@ const api = {
   },
   
   async publishContent(contentId: string) {
-    const response = await fetch(`/api/user/content/${contentId}/publish`, {
+     const response = await fetch(`${API_URL}/api/user/content/${contentId}/publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
     });
+
     if (!response.ok) {
       const responseText = await response.text();
       console.error("Publish API Error Response:", responseText);
@@ -140,9 +153,11 @@ const api = {
   
   async getActivityLogs(websiteId?: string) {
     const url = websiteId
-      ? `/api/user/activity-logs?websiteId=${websiteId}`
-      : "/api/user/activity-logs";
-    const response = await fetch(url);
+      ? `${API_URL}/api/user/activity-logs?websiteId=${websiteId}`
+      : `${API_URL}/api/user/activity-logs`;
+    const response = await fetch(url,{
+      credentials: "include";
+    });
     if (!response.ok) {
       const text = await response.text();
       console.error("Get activity logs error:", text);
@@ -157,10 +172,12 @@ const api = {
     formData.append("websiteId", websiteId.toString());
     if (contentId) formData.append("contentId", contentId.toString());
     
-    const response = await fetch("/api/user/content/upload-images", {
+   const response = await fetch(`${API_URL}/api/user/content/upload-images`, {
       method: "POST",
+      credentials: "include",
       body: formData,
     });
+
     if (!response.ok) {
       const text = await response.text();
       console.error("Upload images error:", text);
@@ -173,7 +190,9 @@ const api = {
     const params = new URLSearchParams();
     if (websiteId) params.append("websiteId", websiteId.toString());
     if (contentId) params.append("contentId", contentId.toString());
-    const response = await fetch(`/api/user/content/images?${params}`);
+        const response = await fetch(`${API_URL}/api/user/content/images?${params}`, {
+      credentials: "include",
+    });
     if (!response.ok) {
       const text = await response.text();
       console.error("Get user images error:", text);
@@ -188,9 +207,10 @@ const api = {
     newImageUrl: string,
     newAltText: string
   ) {
-    const response = await fetch("/api/user/content/replace-image", {
+    const response = await fetch(`${API_URL}/api/user/content/replace-image`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         contentId,
         oldImageUrl,
@@ -207,9 +227,10 @@ const api = {
   },
   
   async deleteContent(contentId: string) {
-    const response = await fetch(`/api/user/content/${contentId}`, {
+   const response = await fetch(`${API_URL}/api/user/content/${contentId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
     });
     if (!response.ok) {
       const text = await response.text();
