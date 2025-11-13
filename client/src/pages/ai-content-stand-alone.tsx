@@ -29,6 +29,7 @@ import {
   SortAsc,
 } from "lucide-react";
 import { sanitizeHtmlContent, sanitizeFormInput } from "@/utils/sanitize-HTML";
+import { API_URL } from "@/config/api";
 
 const NICHES = [
   { value: "reputation_sites", label: "Good Reputation Sites & Reviews" },
@@ -48,7 +49,9 @@ const NICHES = [
 // API utility functions
 const api = {
   async getAllStandaloneContent() {
-    const response = await fetch("/api/user/content/all");
+      const response = await fetch(`${API_URL}/api/user/content/all`, {
+       credentials: "include",
+     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || "Failed to fetch standalone content");
@@ -56,9 +59,10 @@ const api = {
     return response.json();
   },
   async generateContent(data: any) {
-    const response = await fetch("/api/user/content/generate", {
+    const response = await fetch(`${API_URL}/api/user/content/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -68,9 +72,10 @@ const api = {
     return response.json();
   },
   async updateContent(contentId: number, data: any) {
-    const response = await fetch(`/api/user/content/${contentId}`, {
+    const response = await fetch(`${API_URL}/api/user/content/${contentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -80,9 +85,10 @@ const api = {
     return response.json();
   },
   async deleteContent(contentId: number) {
-    const response = await fetch(`/api/user/content/${contentId}`, {
+      const response = await fetch(`${API_URL}/api/user/content/${contentId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
     });
     if (!response.ok) {
       const error = await response.json();
@@ -94,10 +100,13 @@ const api = {
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append("images", file));
     if (contentId) formData.append("contentId", contentId.toString());
-    const response = await fetch("/api/user/content/upload-images", {
+  
+   const response = await fetch(`${API_URL}/api/user/content/upload-images`, {
       method: "POST",
+      credentials: "include",
       body: formData,
     });
+    
     if (!response.ok) throw new Error("Failed to upload images");
     return response.json();
   },
