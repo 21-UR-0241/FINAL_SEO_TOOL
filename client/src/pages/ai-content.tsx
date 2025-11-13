@@ -156,7 +156,7 @@ const api = {
       ? `${API_URL}/api/user/activity-logs?websiteId=${websiteId}`
       : `${API_URL}/api/user/activity-logs`;
     const response = await fetch(url,{
-      credentials: "include";
+      credentials: "include"
     });
     if (!response.ok) {
       const text = await response.text();
