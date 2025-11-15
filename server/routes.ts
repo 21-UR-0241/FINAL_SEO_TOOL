@@ -3727,15 +3727,266 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
 
 
 
-  app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
+//   app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const userId = req.user!.id;
+//     const { websiteId, niche, ...contentData } = req.body; // 🔥 ADD: Extract niche
+
+//     console.log('🔍 DEBUG: Raw request body:', {
+//       websiteId: websiteId || 'none',
+//       niche: niche || 'none', // 🔥 ADD
+//       contentType: websiteId ? 'website' : 'standalone', // 🔥 ADD
+//       contentData: {
+//         includeImages: contentData.includeImages,
+//         imageCount: contentData.imageCount,
+//         imageStyle: contentData.imageStyle,
+//         aiProvider: contentData.aiProvider,
+//         topic: contentData.topic
+//       }
+//     });
+
+//     // 🔥 ADD: Validate EITHER websiteId OR niche (not both, not neither)
+//     if (!websiteId && !niche) {
+//       res.status(400).json({ 
+//         message: "Either websiteId or niche must be provided for content generation" 
+//       });
+//       return;
+//     }
+
+//     if (websiteId && niche) {
+//       res.status(400).json({ 
+//         message: "Cannot specify both websiteId and niche - choose one" 
+//       });
+//       return;
+//     }
+
+//     // 🔥 MODIFY: Only check website ownership IF websiteId is provided
+//     let website = null;
+//     if (websiteId) {
+//       website = await storage.getUserWebsite(websiteId, userId);
+//       if (!website) {
+//         res.status(403).json({ message: "Website not found or access denied" });
+//         return;
+//       }
+//       console.log(`✅ Generating content for website: ${website.name}`);
+//     } else {
+//       console.log(`✅ Generating standalone content for niche: ${niche}`);
+//     }
+    
+//     const { 
+//       topic, 
+//       keywords, 
+//       tone, 
+//       wordCount, 
+//       brandVoice, 
+//       targetAudience, 
+//       eatCompliance,
+//       aiProvider = 'openai',
+//       includeImages = false,
+//       imageCount = 0,
+//       imageStyle = 'natural'
+//     } = contentData;
+    
+//     if (!topic) {
+//       res.status(400).json({ message: "Topic is required" });
+//       return;
+//     }
+
+//     // Check for user's OpenAI key OR environment key for images
+//     if (includeImages) {
+//       const userApiKeys = await storage.getUserApiKeys(userId);
+//       const hasUserOpenAIKey = userApiKeys.some(
+//         key => key.provider === 'openai' && 
+//                key.isActive && 
+//                key.validationStatus === 'valid'
+//       );
+//       const hasSystemOpenAIKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
+      
+//       if (!hasUserOpenAIKey && !hasSystemOpenAIKey) {
+//         res.status(400).json({ 
+//           message: "Image generation requires an OpenAI API key. Please add your OpenAI API key in settings or contact support." 
+//         });
+//         return;
+//       }
+      
+//       console.log(`🎨 Image generation available via ${hasUserOpenAIKey ? 'user' : 'system'} OpenAI key`);
+//     }
+
+//     if (includeImages && (imageCount < 1 || imageCount > 3)) {
+//       res.status(400).json({ 
+//         message: "Image count must be between 1 and 3" 
+//       });
+//       return;
+//     }
+
+//     if (aiProvider && !['openai', 'anthropic', 'gemini'].includes(aiProvider)) {
+//       res.status(400).json({ 
+//         message: "AI provider must be 'openai', 'anthropic', or 'gemini'" 
+//       });
+//       return;
+//     }
+
+//     console.log(`🤖 Generating ${websiteId ? 'website' : 'standalone'} content with ${aiProvider.toUpperCase()} for topic: ${topic}`);
+//     if (includeImages) {
+//       console.log(`🎨 Will also generate ${imageCount} images with DALL-E 3`);
+//     }
+
+//     let result;
+//     try {
+//       result = await aiService.generateContent({
+//         websiteId: websiteId || undefined, // 🔥 MODIFY: Make optional
+//         niche: niche || undefined, // 🔥 ADD: Pass niche
+//         topic,
+//         keywords: keywords || [],
+//         tone: tone || "professional", 
+//         wordCount: wordCount || 800,
+//         seoOptimized: true,
+//         brandVoice: brandVoice || "professional",
+//         targetAudience,
+//         eatCompliance: eatCompliance || false,
+//         aiProvider: aiProvider as 'openai' | 'anthropic' | 'gemini',
+//         userId: userId,
+//         includeImages,
+//         imageCount,
+//         imageStyle
+//       });
+//     } catch (error: any) {
+//       // Clear cache if API key error
+//       if (error.message?.includes('Invalid API key') || error.message?.includes('authentication')) {
+//         console.log('🔄 Clearing API key cache due to authentication error');
+//         aiService.clearApiKeyCache(userId, aiProvider as any);
+//         if (includeImages) {
+//           imageService.clearApiKeyCache(userId);
+//         }
+//       }
+//       throw error;
+//     }
+
+//     // CHECK IF CONTENT WAS ALREADY SAVED (it has a contentId from generateContent)
+//     let content;
+//     if (result.contentId) {
+//       // Content was already saved in generateContent (for auto-scheduling features)
+//       console.log(`✅ Using already saved content with ID: ${result.contentId}`);
+//       content = await storage.getContent(result.contentId);
+      
+//       if (!content) {
+//         throw new Error(`Content with ID ${result.contentId} not found after save`);
+//       }
+//     } else {
+//       // Fallback: Save content if it wasn't already saved (shouldn't happen with current code)
+//       console.log(`💾 Saving content (fallback path)...`);
+//       content = await storage.createContent({
+//         userId,
+//         websiteId: websiteId || null, // 🔥 MODIFY: Can be null
+//         niche: niche || null, // 🔥 ADD: Include niche
+//         title: result.title,
+//         body: result.content,
+//         excerpt: result.excerpt,
+//         metaDescription: result.metaDescription,
+//         metaTitle: result.metaTitle,
+//         seoScore: Math.max(1, Math.min(100, Math.round(result.seoScore))),
+//         readabilityScore: Math.max(1, Math.min(100, Math.round(result.readabilityScore))), 
+//         brandVoiceScore: Math.max(1, Math.min(100, Math.round(result.brandVoiceScore))),
+//         tokensUsed: Math.max(1, result.tokensUsed),
+//         costUsd: Math.max(1, Math.round((result.costUsd || 0.001) * 100)),
+//         eatCompliance: result.eatCompliance,
+//         seoKeywords: result.keywords,
+//         aiModel: aiProvider === 'openai' ? 'gpt-4o' : aiProvider === 'anthropic' ? 'claude-3-5-sonnet-20250106' : 'gemini-1.5-pro',
+//         hasImages: includeImages && result.images?.length > 0,
+//         imageCount: result.images?.length || 0,
+//         imageCostCents: Math.round((result.totalImageCost || 0) * 100)
+//       });
+      
+//       console.log(`✅ Content saved with scores - SEO: ${content.seoScore}, Readability: ${content.readabilityScore}, Brand: ${content.brandVoiceScore}`);
+//     }
+
+//     // Save images to database if they exist (only if not already saved)
+//     if (result.images && result.images.length > 0 && !result.contentId) {
+//       for (const image of result.images) {
+//         await storage.createContentImage({
+//           contentId: content.id,
+//           userId,
+//           websiteId: websiteId || null, // 🔥 MODIFY: Can be null for standalone
+//           originalUrl: image.cloudinaryUrl || image.url,
+//           cloudinaryUrl: image.cloudinaryUrl,
+//           cloudinaryPublicId: image.cloudinaryPublicId,
+//           filename: image.filename,
+//           altText: image.altText,
+//           generationPrompt: image.prompt,
+//           costCents: Math.round(image.cost * 100),
+//           imageStyle,
+//           size: '1024x1024',
+//           status: 'generated'
+//         });
+//       }
+//     }
+
+//     // Create activity log (only if not already created)
+//     if (!result.contentId) {
+//       await storage.createActivityLog({
+//         userId,
+//         websiteId: websiteId || null, // 🔥 MODIFY: Can be null for standalone
+//         type: "content_generated",
+//         description: `AI ${websiteId ? 'website' : 'standalone'} content generated: "${result.title}" (${result.aiProvider.toUpperCase()}${result.images?.length ? ` + ${result.images.length} DALL-E images` : ''})`, // 🔥 MODIFY
+//         metadata: { 
+//           contentId: content.id,
+//           contentType: websiteId ? 'website' : 'standalone', // 🔥 ADD
+//           niche: niche || null, // 🔥 ADD
+//           contentAiProvider: result.aiProvider,
+//           imageAiProvider: result.images?.length ? 'dall-e-3' : null,
+//           tokensUsed: content.tokensUsed,
+//           textCostCents: content.costUsd,
+//           hasImages: !!result.images?.length,
+//           imageCount: result.images?.length || 0,
+//           imageCostCents: Math.round((result.totalImageCost || 0) * 100),
+//           apiKeySource: {
+//             content: 'user',
+//             images: includeImages ? 'user' : null
+//           }
+//         }
+//       });
+//     }
+
+//     res.json({ content, aiResult: result });
+//   } catch (error) {
+//     console.error("Content generation error:", error);
+    
+//     let statusCode = 500;
+//     let errorMessage = error instanceof Error ? error.message : "Failed to generate content";
+    
+//     if (error instanceof Error) {
+//       if (error.name === 'AIProviderError') {
+//         statusCode = 400;
+//         if (error.message.includes('No API key available')) {
+//           errorMessage = error.message;
+//         }
+//       } else if (error.name === 'AnalysisError') {
+//         statusCode = 422;
+//         errorMessage = `Content generated successfully, but analysis failed: ${error.message}`;
+//       } else if (error.message.includes('Image generation failed')) {
+//         statusCode = 422;
+//         errorMessage = `Content generated successfully, but image generation failed: ${error.message}`;
+//       }
+//     }
+    
+//     res.status(statusCode).json({ 
+//       message: errorMessage,
+//       error: error instanceof Error ? error.name : 'UnknownError'
+//     });
+//   }
+// });
+
+
+app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user!.id;
-    const { websiteId, niche, ...contentData } = req.body; // 🔥 ADD: Extract niche
-
+    const { websiteId, niche, language = "english", ...contentData } = req.body; // ✅ ADD language with default
+    
     console.log('🔍 DEBUG: Raw request body:', {
       websiteId: websiteId || 'none',
-      niche: niche || 'none', // 🔥 ADD
-      contentType: websiteId ? 'website' : 'standalone', // 🔥 ADD
+      niche: niche || 'none',
+      language: language || 'english', // ✅ ADD
+      contentType: websiteId ? 'website' : 'standalone',
       contentData: {
         includeImages: contentData.includeImages,
         imageCount: contentData.imageCount,
@@ -3745,14 +3996,13 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
       }
     });
 
-    // 🔥 ADD: Validate EITHER websiteId OR niche (not both, not neither)
+    // Validate EITHER websiteId OR niche (not both, not neither)
     if (!websiteId && !niche) {
       res.status(400).json({ 
         message: "Either websiteId or niche must be provided for content generation" 
       });
       return;
     }
-
     if (websiteId && niche) {
       res.status(400).json({ 
         message: "Cannot specify both websiteId and niche - choose one" 
@@ -3760,7 +4010,21 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
       return;
     }
 
-    // 🔥 MODIFY: Only check website ownership IF websiteId is provided
+    // ✅ ADD: Validate language
+    const VALID_LANGUAGES = [
+      "english", "spanish", "french", "german", "italian", "portuguese",
+      "russian", "japanese", "chinese", "korean", "dutch", "swedish",
+      "polish", "turkish", "thai", "vietnamese"
+    ];
+    
+    if (!VALID_LANGUAGES.includes(language)) {
+      res.status(400).json({ 
+        message: `Invalid language: ${language}. Must be one of: ${VALID_LANGUAGES.join(", ")}` 
+      });
+      return;
+    }
+
+    // Only check website ownership IF websiteId is provided
     let website = null;
     if (websiteId) {
       website = await storage.getUserWebsite(websiteId, userId);
@@ -3826,7 +4090,8 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
       return;
     }
 
-    console.log(`🤖 Generating ${websiteId ? 'website' : 'standalone'} content with ${aiProvider.toUpperCase()} for topic: ${topic}`);
+    console.log(`🤖 Generating ${websiteId ? 'website' : 'standalone'} content with ${aiProvider.toUpperCase()} in ${language.toUpperCase()} for topic: ${topic}`);
+    
     if (includeImages) {
       console.log(`🎨 Will also generate ${imageCount} images with DALL-E 3`);
     }
@@ -3834,8 +4099,8 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
     let result;
     try {
       result = await aiService.generateContent({
-        websiteId: websiteId || undefined, // 🔥 MODIFY: Make optional
-        niche: niche || undefined, // 🔥 ADD: Pass niche
+        websiteId: websiteId || undefined,
+        niche: niche || undefined,
         topic,
         keywords: keywords || [],
         tone: tone || "professional", 
@@ -3848,7 +4113,8 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
         userId: userId,
         includeImages,
         imageCount,
-        imageStyle
+        imageStyle,
+        language: language, // ✅ ADD: Pass language to aiService
       });
     } catch (error: any) {
       // Clear cache if API key error
@@ -3862,10 +4128,9 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
       throw error;
     }
 
-    // CHECK IF CONTENT WAS ALREADY SAVED (it has a contentId from generateContent)
+    // CHECK IF CONTENT WAS ALREADY SAVED
     let content;
     if (result.contentId) {
-      // Content was already saved in generateContent (for auto-scheduling features)
       console.log(`✅ Using already saved content with ID: ${result.contentId}`);
       content = await storage.getContent(result.contentId);
       
@@ -3873,12 +4138,11 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
         throw new Error(`Content with ID ${result.contentId} not found after save`);
       }
     } else {
-      // Fallback: Save content if it wasn't already saved (shouldn't happen with current code)
       console.log(`💾 Saving content (fallback path)...`);
       content = await storage.createContent({
         userId,
-        websiteId: websiteId || null, // 🔥 MODIFY: Can be null
-        niche: niche || null, // 🔥 ADD: Include niche
+        websiteId: websiteId || null,
+        niche: niche || null,
         title: result.title,
         body: result.content,
         excerpt: result.excerpt,
@@ -3894,7 +4158,8 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
         aiModel: aiProvider === 'openai' ? 'gpt-4o' : aiProvider === 'anthropic' ? 'claude-3-5-sonnet-20250106' : 'gemini-1.5-pro',
         hasImages: includeImages && result.images?.length > 0,
         imageCount: result.images?.length || 0,
-        imageCostCents: Math.round((result.totalImageCost || 0) * 100)
+        imageCostCents: Math.round((result.totalImageCost || 0) * 100),
+        language: language, // ✅ ADD: Save language to database
       });
       
       console.log(`✅ Content saved with scores - SEO: ${content.seoScore}, Readability: ${content.readabilityScore}, Brand: ${content.brandVoiceScore}`);
@@ -3906,7 +4171,7 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
         await storage.createContentImage({
           contentId: content.id,
           userId,
-          websiteId: websiteId || null, // 🔥 MODIFY: Can be null for standalone
+          websiteId: websiteId || null,
           originalUrl: image.cloudinaryUrl || image.url,
           cloudinaryUrl: image.cloudinaryUrl,
           cloudinaryPublicId: image.cloudinaryPublicId,
@@ -3925,13 +4190,14 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
     if (!result.contentId) {
       await storage.createActivityLog({
         userId,
-        websiteId: websiteId || null, // 🔥 MODIFY: Can be null for standalone
+        websiteId: websiteId || null,
         type: "content_generated",
-        description: `AI ${websiteId ? 'website' : 'standalone'} content generated: "${result.title}" (${result.aiProvider.toUpperCase()}${result.images?.length ? ` + ${result.images.length} DALL-E images` : ''})`, // 🔥 MODIFY
+        description: `AI ${websiteId ? 'website' : 'standalone'} content generated in ${language.toUpperCase()}: "${result.title}" (${result.aiProvider.toUpperCase()}${result.images?.length ? ` + ${result.images.length} DALL-E images` : ''})`,
         metadata: { 
           contentId: content.id,
-          contentType: websiteId ? 'website' : 'standalone', // 🔥 ADD
-          niche: niche || null, // 🔥 ADD
+          contentType: websiteId ? 'website' : 'standalone',
+          niche: niche || null,
+          language: language, // ✅ ADD: Log language
           contentAiProvider: result.aiProvider,
           imageAiProvider: result.images?.length ? 'dall-e-3' : null,
           tokensUsed: content.tokensUsed,
@@ -3975,6 +4241,7 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
     });
   }
 });
+
 
   // ADD: New endpoint to check image generation availability
   app.get("/api/user/image-generation/status", requireAuth, async (req: Request, res: Response): Promise<void> => {

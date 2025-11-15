@@ -222,6 +222,14 @@ export const content = pgTable(
     // 🔥 ADD: Niche column for standalone content
     niche: varchar("niche", { length: 255 }), // e.g., "technology", "health", etc.
     
+      language: varchar("language", { length: 50 })
+      .notNull()
+      .default("english"), // e.g., "english", "spanish", "french", etc.
+
+
+
+
+
     title: text("title").notNull(),
     body: text("body").notNull(),
     excerpt: text("excerpt"),
