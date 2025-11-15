@@ -210,11 +210,11 @@ function getNicheContext(niche: string) {
 
 // Interface for user API keys from database
 interface UserApiKey {
-  id: string;
+ id: string;
   userId: string;
-  provider: string; // 'openai', 'anthropic', 'google_gemini'
+  provider: string;
   keyName: string;
-  encryptedKey: string; // Changed from encryptedKey to match DB schema
+  encryptedApiKey: string; // ✅ MUST match storage.ts normalizeApiKey method
   maskedKey: string;
   isActive: boolean;
   validationStatus: 'valid' | 'invalid' | 'pending';
@@ -420,69 +420,153 @@ export class AIService {
    */
 private async getApiKey(provider: AIProvider, userId: string): Promise<{ key: string; type: 'user' | 'system' } | null> {
   const cacheKey = `${userId}-${provider}`;
-  console.log(`🔍 DEBUG getApiKey called:`, { provider, userId, cacheKey });
+  
+  console.log(`🔍 [getApiKey] Starting lookup for provider: ${provider}, userId: ${userId}`);
 
   // Check cache first
   const cached = this.apiKeyCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-    console.log(`✅ Using cached API key for ${provider}`);
+    console.log(`✅ [getApiKey] Using cached ${cached.type} API key for ${provider}`);
     return { key: cached.key, type: cached.type };
   }
 
   try {
     // Try to get user's API key first
+    console.log(`🔍 [getApiKey] Fetching user API keys from database...`);
     const userApiKeys = await storage.getUserApiKeys(userId);
+    
+    console.log(`📊 [getApiKey] Database returned ${userApiKeys?.length || 0} keys`);
+    
     if (userApiKeys && userApiKeys.length > 0) {
-      const providerMap: Record<AIProvider, string> = {
-        'openai': 'openai',
-        'anthropic': 'anthropic',
-        'gemini': 'gemini'
+      // Log all keys for debugging
+      console.log(`📋 [getApiKey] Available keys:`, userApiKeys.map((k: any) => ({
+        id: k.id,
+        provider: k.provider,
+        keyName: k.keyName,
+        isActive: k.isActive,
+        validationStatus: k.validationStatus,
+        hasEncryptedApiKey: !!k.encryptedApiKey,
+        maskedKey: k.maskedKey
+      })));
+
+      // Map AI providers to database provider names
+      // Check your database to see exactly what provider values are stored
+      const providerMap: Record<AIProvider, string[]> = {
+        'openai': ['openai', 'openai_api'],
+        'anthropic': ['anthropic', 'anthropic_api', 'claude'],
+        'gemini': ['gemini', 'google_gemini', 'google', 'google_api']
       };
-      const dbProvider = providerMap[provider];
-      const validKey = userApiKeys.find(
-        (key: any) =>
-          key.provider === dbProvider &&
-          key.isActive &&
-          key.validationStatus === 'valid'
-      );
-      
-      // 🔧 FIX: Use encryptedKey (not encryptedApiKey) to match what DB returns
-      if (validKey && validKey.encryptedKey) {
-        try {
-          const decryptedKey = apiKeyEncryptionService.decrypt(validKey.encryptedKey);
-          // Cache with type information
-          this.apiKeyCache.set(cacheKey, {
-            key: decryptedKey,
-            type: 'user',
-            timestamp: Date.now()
-          });
-          console.log(`✅ Using user's API key for ${provider}`);
-          return { key: decryptedKey, type: 'user' };
-        } catch (decryptError: any) {
-          console.error(`Failed to decrypt user's ${provider} key:`, decryptError.message);
+
+      const possibleProviderNames = providerMap[provider];
+      console.log(`🔍 [getApiKey] Looking for providers matching: ${possibleProviderNames.join(', ')}`);
+
+      // Find valid key with flexible provider matching
+      const validKey = userApiKeys.find((key: any) => {
+        const providerMatch = possibleProviderNames.some(name => 
+          key.provider?.toLowerCase() === name.toLowerCase()
+        );
+        const isValid = key.isActive && key.validationStatus === 'valid';
+        
+        console.log(`🔍 [getApiKey] Checking key "${key.keyName}":`, {
+          provider: key.provider,
+          providerMatch,
+          isActive: key.isActive,
+          validationStatus: key.validationStatus,
+          isValid,
+          hasEncryptedData: !!key.encryptedApiKey
+        });
+        
+        return providerMatch && isValid;
+      });
+
+      if (validKey) {
+        console.log(`✅ [getApiKey] Found valid key: "${validKey.keyName}" (provider: ${validKey.provider})`);
+        
+        // Use encryptedApiKey property (matches storage.ts normalizeApiKey)
+        const encryptedKey = validKey.encryptedApiKey;
+        
+        if (!encryptedKey) {
+          console.error(`❌ [getApiKey] Key found but encryptedApiKey is empty or null`);
+          console.error(`   Key object keys:`, Object.keys(validKey));
+        } else {
+          console.log(`🔐 [getApiKey] Attempting to decrypt key (length: ${encryptedKey.length} chars)...`);
+          
+          try {
+            const decryptedKey = apiKeyEncryptionService.decrypt(encryptedKey);
+            
+            if (!decryptedKey || decryptedKey.length < 10) {
+              console.error(`❌ [getApiKey] Decryption returned invalid key (length: ${decryptedKey?.length || 0})`);
+            } else {
+              // Validate key format before caching
+              const keyPrefix = decryptedKey.substring(0, 3);
+              console.log(`✅ [getApiKey] Successfully decrypted key (starts with: ${keyPrefix}...)`);
+              
+              // Cache with type information
+              this.apiKeyCache.set(cacheKey, {
+                key: decryptedKey,
+                type: 'user',
+                timestamp: Date.now()
+              });
+              
+              console.log(`✅ [getApiKey] Cached user's ${provider} API key for future use`);
+              
+              // Increment usage count
+              try {
+                await storage.incrementApiKeyUsage(userId, validKey.provider);
+              } catch (usageError) {
+                console.warn(`⚠️ [getApiKey] Failed to increment usage:`, usageError);
+              }
+              
+              return { key: decryptedKey, type: 'user' };
+            }
+          } catch (decryptError: any) {
+            console.error(`❌ [getApiKey] Decryption failed:`, {
+              error: decryptError.message,
+              keyId: validKey.id,
+              provider: validKey.provider
+            });
+          }
         }
+      } else {
+        const availableProviders = userApiKeys.map((k: any) => k.provider).join(', ');
+        console.warn(`⚠️ [getApiKey] No valid ${provider} key found.`);
+        console.warn(`   Available providers: ${availableProviders || 'none'}`);
+        console.warn(`   Active keys: ${userApiKeys.filter(k => k.isActive).length}`);
+        console.warn(`   Valid keys: ${userApiKeys.filter(k => k.validationStatus === 'valid').length}`);
       }
+    } else {
+      console.log(`ℹ️ [getApiKey] No API keys found in database for user ${userId}`);
     }
   } catch (error: any) {
-    console.warn(`Failed to fetch user's API keys: ${error.message}`);
+    console.error(`❌ [getApiKey] Error fetching user API keys:`, {
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 3)
+    });
   }
 
   // Fallback to environment variables (system keys)
-  console.log(`⚠️ No user API key found for ${provider}, falling back to environment variables`);
+  console.log(`🔄 [getApiKey] Falling back to environment variables for ${provider}...`);
+  
   let systemKey: string | null = null;
+  let envVarName = '';
+  
   switch (provider) {
     case 'openai':
       systemKey = process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || null;
+      envVarName = 'OPENAI_API_KEY';
       break;
     case 'anthropic':
       systemKey = process.env.ANTHROPIC_API_KEY || null;
+      envVarName = 'ANTHROPIC_API_KEY';
       break;
     case 'gemini':
       systemKey = process.env.GOOGLE_GEMINI_API_KEY || null;
+      envVarName = 'GOOGLE_GEMINI_API_KEY';
       break;
   }
 
   if (systemKey) {
+    console.log(`✅ [getApiKey] Using system environment key: ${envVarName} (starts with: ${systemKey.substring(0, 3)}...)`);
     // Cache system key with type
     this.apiKeyCache.set(cacheKey, {
       key: systemKey,
@@ -492,6 +576,11 @@ private async getApiKey(provider: AIProvider, userId: string): Promise<{ key: st
     return { key: systemKey, type: 'system' };
   }
 
+  console.error(`❌ [getApiKey] No API key available for ${provider}`);
+  console.error(`   - User keys checked: ${userId}`);
+  console.error(`   - System env var checked: ${envVarName}`);
+  console.error(`   - Result: NONE FOUND`);
+  
   return null;
 }
 
