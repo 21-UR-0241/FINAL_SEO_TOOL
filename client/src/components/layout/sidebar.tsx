@@ -229,12 +229,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
   { name: "Websites", href: "/websites", icon: Globe },
   { name: "AI Content", href: "/ai-content", icon: Bot },
-  { 
-    name: "Standalone Content", 
-    href: "/ai-content-stand-alone", 
-    icon: FileText, // or use Sparkles for a different look
-    description: "Create content for any niche"
-  },
+  { name: "Standalone Content", href: "/ai-content-stand-alone", icon: FileText},
   { name: "SEO Analysis", href: "/seo-analysis", icon: Search },
   { name: "Search Console", href: "/googlesearchconsole", icon: SearchCheck },
   { name: "Content Schedule", href: "/content-schedule", icon: Calendar },
