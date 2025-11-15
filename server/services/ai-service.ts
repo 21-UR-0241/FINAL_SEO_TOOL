@@ -410,220 +410,80 @@ export class AIService {
   /**
    * Get the API key for a provider, checking user's keys first, then falling back to env vars
    */
-private async getApiKey(
-  provider: AIProvider,
-  userId: string
-): Promise<{ key: string; type: 'user' | 'system' } | null> {
-  const cacheKey = `${userId}-${provider}`;
-  console.log(`🔍 DEBUG getApiKey called:`, { provider, userId, cacheKey });
+  private async getApiKey(provider: AIProvider, userId: string): Promise<{ key: string; type: 'user' | 'system' } | null> {
+    const cacheKey = `${userId}-${provider}`;
+    console.log(`🔍 DEBUG getApiKey called:`, { provider, userId, cacheKey });
 
-  // Check cache first
-  const cached = this.apiKeyCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-    console.log(`✅ Using cached API key for ${provider}`);
-    return { key: cached.key, type: cached.type };
-  }
-
-  try {
-    // Try to get user's API key first
-    const userApiKeys = await storage.getUserApiKeys(userId);
-
-    console.log(`📦 Database returned:`, {
-      keysFound: userApiKeys?.length || 0,
-      providers: userApiKeys?.map((k: any) => k.provider) || [],
-    });
-
-    if (userApiKeys && userApiKeys.length > 0) {
-      // ✅ FIXED: Use lowercase provider directly (no map needed)
-      const dbProvider = provider.toLowerCase();
-
-      console.log(`🔎 Looking for provider: ${dbProvider}`);
-
-      const validKey = userApiKeys.find((key: any) => {
-        // ✅ FIXED: Use correct snake_case column names
-        const isProviderMatch = key.provider === dbProvider;
-        const isActive = key.is_active === true;
-        const isValid = key.validation_status === 'valid';
-        const hasKey = !!key.encrypted_api_key;
-
-        console.log(`Checking key:`, {
-          storedProvider: key.provider,
-          lookingFor: dbProvider,
-          isProviderMatch,
-          isActive,
-          isValid,
-          hasKey
-        });
-
-        return isProviderMatch && isActive && isValid && hasKey;
-      });
-
-      if (validKey && validKey.encrypted_api_key) {
-        try {
-          console.log(`🔐 Attempting to decrypt key...`);
-
-          // ✅ FIXED: Use correct column name
-          const decryptedKey = apiKeyEncryptionService.decrypt(
-            validKey.encrypted_api_key
-          );
-
-          if (!decryptedKey || decryptedKey.trim() === '') {
-            console.error(`❌ Decryption resulted in empty key`);
-            throw new Error('Decrypted key is empty');
-          }
-
-          // Cache with type information
-          this.apiKeyCache.set(cacheKey, {
-            key: decryptedKey,
-            type: 'user',
-            timestamp: Date.now()
-          });
-
-          console.log(`✅ Successfully decrypted and cached user's API key for ${provider}`);
-          return { key: decryptedKey, type: 'user' };
-        } catch (decryptError: any) {
-          console.error(`❌ Failed to decrypt user's ${provider} key:`, {
-            message: decryptError.message,
-            stack: decryptError.stack,
-            encryptedKeyLength: validKey.encrypted_api_key?.length
-          });
-        }
-      } else {
-        console.warn(`⚠️ No valid key found for ${dbProvider}`);
-      }
-    } else {
-      console.warn(`⚠️ No API keys found in database for userId: ${userId}`);
+    // Check cache first
+    const cached = this.apiKeyCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+      console.log(`✅ Using cached API key for ${provider}`);
+      return { key: cached.key, type: cached.type };
     }
-  } catch (error: any) {
-    console.error(`❌ Failed to fetch user's API keys:`, {
-      message: error.message,
-      stack: error.stack,
-      userId
-    });
+
+    try {
+      // Try to get user's API key first
+      const userApiKeys = await storage.getUserApiKeys(userId);
+      if (userApiKeys && userApiKeys.length > 0) {
+        const providerMap: Record<AIProvider, string> = {
+          'openai': 'openai',
+          'anthropic': 'anthropic',
+          'gemini': 'gemini'
+        };
+        const dbProvider = providerMap[provider];
+        const validKey = userApiKeys.find(
+          (key: any) =>
+            key.provider === dbProvider &&
+            key.isActive &&
+            key.validationStatus === 'valid'
+        );
+        if (validKey && validKey.encryptedKey) {
+          try {
+            const decryptedKey = apiKeyEncryptionService.decrypt(validKey.encryptedKey);
+            // Cache with type information
+            this.apiKeyCache.set(cacheKey, {
+              key: decryptedKey,
+              type: 'user',
+              timestamp: Date.now()
+            });
+            console.log(`✅ Using user's API key for ${provider}`);
+            return { key: decryptedKey, type: 'user' };
+          } catch (decryptError: any) {
+            console.error(`Failed to decrypt user's ${provider} key:`, decryptError.message);
+          }
+        }
+      }
+    } catch (error: any) {
+      console.warn(`Failed to fetch user's API keys: ${error.message}`);
+    }
+
+    // Fallback to environment variables (system keys)
+    console.log(`⚠️ No user API key found for ${provider}, falling back to environment variables`);
+    let systemKey: string | null = null;
+    switch (provider) {
+      case 'openai':
+        systemKey = process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || null;
+        break;
+      case 'anthropic':
+        systemKey = process.env.ANTHROPIC_API_KEY || null;
+        break;
+      case 'gemini':
+        systemKey = process.env.GOOGLE_GEMINI_API_KEY || null;
+        break;
+    }
+
+    if (systemKey) {
+      // Cache system key with type
+      this.apiKeyCache.set(cacheKey, {
+        key: systemKey,
+        type: 'system',
+        timestamp: Date.now()
+      });
+      return { key: systemKey, type: 'system' };
+    }
+
+    return null;
   }
-
-  // Fallback to environment variables (system keys)
-  console.log(
-    `⚠️ No user API key found for ${provider}, falling back to environment variables`
-  );
-
-  let systemKey: string | null = null;
-
-  switch (provider) {
-    case 'openai':
-      systemKey =
-        process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || null;
-      break;
-    case 'anthropic':
-      systemKey = process.env.ANTHROPIC_API_KEY || null;
-      break;
-    case 'gemini':
-      systemKey = process.env.GOOGLE_GEMINI_API_KEY || null;
-      break;
-    default:
-      console.warn(`⚠️ Unknown provider: ${provider}`);
-      return null;
-  }
-
-  // ✅ FIXED: Don't cache null values
-  if (systemKey) {
-    console.log(`📦 Environment variable found for ${provider}`);
-    // Cache system key with type
-    this.apiKeyCache.set(cacheKey, {
-      key: systemKey,
-      type: 'system',
-      timestamp: Date.now()
-    });
-    console.log(`✅ Using system API key for ${provider}`);
-    return { key: systemKey, type: 'system' };
-  }
-
-  console.error(`❌ NO API KEY AVAILABLE for ${provider}:`, {
-    provider,
-    userId,
-    userDatabaseChecked: true,
-    environmentVariablesChecked: true
-  });
-
-  return null;
-}
-
-
-
-  // private async getApiKey(provider: AIProvider, userId: string): Promise<{ key: string; type: 'user' | 'system' } | null> {
-  //   const cacheKey = `${userId}-${provider}`;
-  //   console.log(`🔍 DEBUG getApiKey called:`, { provider, userId, cacheKey });
-
-  //   // Check cache first
-  //   const cached = this.apiKeyCache.get(cacheKey);
-  //   if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-  //     console.log(`✅ Using cached API key for ${provider}`);
-  //     return { key: cached.key, type: cached.type };
-  //   }
-
-  //   try {
-  //     // Try to get user's API key first
-  //     const userApiKeys = await storage.getUserApiKeys(userId);
-  //     if (userApiKeys && userApiKeys.length > 0) {
-  //       const providerMap: Record<AIProvider, string> = {
-  //         'openai': 'openai',
-  //         'anthropic': 'anthropic',
-  //         'gemini': 'gemini'
-  //       };
-  //       const dbProvider = providerMap[provider];
-  //       const validKey = userApiKeys.find(
-  //         (key: any) =>
-  //           key.provider === dbProvider &&
-  //           key.isActive &&
-  //           key.validationStatus === 'valid'
-  //       );
-  //       if (validKey && validKey.encryptedKey) {
-  //         try {
-  //           const decryptedKey = apiKeyEncryptionService.decrypt(validKey.encryptedKey);
-  //           // Cache with type information
-  //           this.apiKeyCache.set(cacheKey, {
-  //             key: decryptedKey,
-  //             type: 'user',
-  //             timestamp: Date.now()
-  //           });
-  //           console.log(`✅ Using user's API key for ${provider}`);
-  //           return { key: decryptedKey, type: 'user' };
-  //         } catch (decryptError: any) {
-  //           console.error(`Failed to decrypt user's ${provider} key:`, decryptError.message);
-  //         }
-  //       }
-  //     }
-  //   } catch (error: any) {
-  //     console.warn(`Failed to fetch user's API keys: ${error.message}`);
-  //   }
-
-  //   // Fallback to environment variables (system keys)
-  //   console.log(`⚠️ No user API key found for ${provider}, falling back to environment variables`);
-  //   let systemKey: string | null = null;
-  //   switch (provider) {
-  //     case 'openai':
-  //       systemKey = process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || null;
-  //       break;
-  //     case 'anthropic':
-  //       systemKey = process.env.ANTHROPIC_API_KEY || null;
-  //       break;
-  //     case 'gemini':
-  //       systemKey = process.env.GOOGLE_GEMINI_API_KEY || null;
-  //       break;
-  //   }
-
-  //   if (systemKey) {
-  //     // Cache system key with type
-  //     this.apiKeyCache.set(cacheKey, {
-  //       key: systemKey,
-  //       type: 'system',
-  //       timestamp: Date.now()
-  //     });
-  //     return { key: systemKey, type: 'system' };
-  //   }
-
-  //   return null;
-  // }
 
   /**
    * Create an OpenAI client with the appropriate API key
