@@ -436,52 +436,127 @@ export default function Settings() {
     });
   };
 
+  // const handleAddApiKey = () => {
+  //   const sanitizedKeyName = Sanitizer.sanitizeText(newKeyForm.keyName);
+
+  //   if (!newKeyForm.provider || !sanitizedKeyName || !newKeyForm.apiKey) {
+  //     toast({
+  //       title: "Missing Information",
+  //       description: "Please fill in all fields.",
+  //       variant: "destructive",
+  //     });
+  //     return;
+  //   }
+
+  //   if (sanitizedKeyName.length < 2 || sanitizedKeyName.length > 100) {
+  //     toast({
+  //       title: "Invalid Key Name",
+  //       description: "Key name must be between 2 and 100 characters.",
+  //       variant: "destructive",
+  //     });
+  //     return;
+  //   }
+
+  //   const apiKey = newKeyForm.apiKey.trim();
+  //   if (newKeyForm.provider === "openai" && !apiKey.startsWith("sk-")) {
+  //     toast({
+  //       title: "Invalid API Key Format",
+  //       description: "OpenAI API keys should start with 'sk-'",
+  //       variant: "destructive",
+  //     });
+  //     return;
+  //   }
+
+  //   if (newKeyForm.provider === "anthropic" && !apiKey.startsWith("sk-ant-")) {
+  //     toast({
+  //       title: "Invalid API Key Format",
+  //       description: "Anthropic API keys should start with 'sk-ant-'",
+  //       variant: "destructive",
+  //     });
+  //     return;
+  //   }
+
+  //   addApiKey.mutate({
+  //     provider: newKeyForm.provider,
+  //     keyName: sanitizedKeyName,
+  //     apiKey: apiKey,
+  //   });
+  // };
+
+
   const handleAddApiKey = () => {
-    const sanitizedKeyName = Sanitizer.sanitizeText(newKeyForm.keyName);
+  // Trim and sanitize
+  const apiKey = newKeyForm.apiKey.trim();
+  const sanitizedKeyName = Sanitizer.sanitizeText(newKeyForm.keyName.trim());
+  
+  // Debug log
+  console.log('🔑 Submitting API Key:', {
+    provider: newKeyForm.provider,
+    keyName: sanitizedKeyName,
+    apiKey: apiKey.substring(0, 10) + '...' // Don't log full key
+  });
 
-    if (!newKeyForm.provider || !sanitizedKeyName || !newKeyForm.apiKey) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (sanitizedKeyName.length < 2 || sanitizedKeyName.length > 100) {
-      toast({
-        title: "Invalid Key Name",
-        description: "Key name must be between 2 and 100 characters.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const apiKey = newKeyForm.apiKey.trim();
-    if (newKeyForm.provider === "openai" && !apiKey.startsWith("sk-")) {
-      toast({
-        title: "Invalid API Key Format",
-        description: "OpenAI API keys should start with 'sk-'",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newKeyForm.provider === "anthropic" && !apiKey.startsWith("sk-ant-")) {
-      toast({
-        title: "Invalid API Key Format",
-        description: "Anthropic API keys should start with 'sk-ant-'",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    addApiKey.mutate({
-      provider: newKeyForm.provider,
-      keyName: sanitizedKeyName,
-      apiKey: apiKey,
+  // Validate all fields exist
+  if (!newKeyForm.provider) {
+    toast({
+      title: "Missing Information",
+      description: "Please select a provider.",
+      variant: "destructive",
     });
-  };
+    return;
+  }
+
+  if (!sanitizedKeyName || sanitizedKeyName.length === 0) {
+    toast({
+      title: "Invalid Key Name",
+      description: "Key name cannot be empty after sanitization.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (!apiKey || apiKey.length === 0) {
+    toast({
+      title: "Missing Information",
+      description: "API key cannot be empty.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (sanitizedKeyName.length < 2 || sanitizedKeyName.length > 100) {
+    toast({
+      title: "Invalid Key Name",
+      description: "Key name must be between 2 and 100 characters.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (newKeyForm.provider === "openai" && !apiKey.startsWith("sk-")) {
+    toast({
+      title: "Invalid API Key Format",
+      description: "OpenAI API keys should start with 'sk-'",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (newKeyForm.provider === "anthropic" && !apiKey.startsWith("sk-ant-")) {
+    toast({
+      title: "Invalid API Key Format",
+      description: "Anthropic API keys should start with 'sk-ant-'",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  addApiKey.mutate({
+    provider: newKeyForm.provider,
+    keyName: sanitizedKeyName,
+    apiKey: apiKey,
+  });
+};
 
   const handleValidateKey = (keyId: string) => {
     setValidatingKeys((prev) => new Set(prev).add(keyId));
