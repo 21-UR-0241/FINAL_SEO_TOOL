@@ -3492,6 +3492,41 @@ app.get("/api/admin/system-api-usage", requireAdmin, async (req: Request, res: R
 // ============================================
 // GET: Fetch all API keys for user
 // ============================================
+import { Request, Response } from 'express';
+import { eq } from 'drizzle-orm';
+import { aiUsageTracking, userApiKeys } from './schema';
+import { db } from './db';
+
+// Helper function to safely convert date to ISO string
+function safeToISOString(date: any): string | null {
+  if (!date) return null;
+  try {
+    return new Date(date).toISOString();
+  } catch {
+    return null;
+  }
+}
+
+// Helper function to format API key response
+function formatApiKeyResponse(key: any) {
+  return {
+    id: key?.id,
+    provider: key?.provider,
+    keyName: key?.key_name,
+    maskedKey: key?.masked_key,
+    isActive: key?.is_active,
+    validationStatus: key?.validation_status,
+    lastValidated: safeToISOString(key?.last_validated),
+    validationError: key?.validation_error,
+    usageCount: key?.usage_count || 0,
+    lastUsed: safeToISOString(key?.last_used),
+    createdAt: safeToISOString(key?.created_at)
+  };
+}
+
+// ============================================
+// GET: Fetch all API keys for user
+// ============================================
 app.get(
   "/api/user/api-keys",
   requireAuth,
@@ -3502,19 +3537,15 @@ app.get(
 
       const apiKeys = await storage.getUserApiKeys(userId);
 
-      const transformedKeys = apiKeys.map((key: any) => ({
-        id: key.id,
-        provider: key.provider,
-        keyName: key.key_name,
-        maskedKey: key.masked_key,
-        isActive: key.is_active,
-        validationStatus: key.validation_status,
-        lastValidated: key.last_validated?.toISOString(),
-        validationError: key.validation_error,
-        usageCount: key.usage_count,
-        lastUsed: key.last_used?.toISOString(),
-        createdAt: key.created_at.toISOString()
-      }));
+      if (!apiKeys || apiKeys.length === 0) {
+        console.log(`ℹ️ No API keys found for user ${userId}`);
+        res.json([]);
+        return;
+      }
+
+      const transformedKeys = apiKeys.map((key: any) =>
+        formatApiKeyResponse(key)
+      );
 
       console.log(`✅ Found ${transformedKeys.length} API keys for user ${userId}`);
       res.json(transformedKeys);
@@ -3536,10 +3567,13 @@ app.post(
       const userId = req.user!.id;
       const { provider, keyName, apiKey } = req.body;
 
-      console.log(`🔑 Adding API key for user: ${userId}, provider: ${provider}`);
+      console.log(
+        `🔑 Adding API key for user: ${userId}, provider: ${provider}`
+      );
 
       // Validation
       if (!provider || !keyName || !apiKey) {
+        console.warn(`⚠️ Missing required fields for user ${userId}`);
         res.status(400).json({
           message: "Provider, key name, and API key are required"
         });
@@ -3547,17 +3581,22 @@ app.post(
       }
 
       if (!apiValidationService.getSupportedProviders().includes(provider)) {
+        console.warn(`⚠️ Invalid provider: ${provider}`);
         res.status(400).json({ message: "Invalid provider" });
         return;
       }
 
       // Check for existing active key
+      console.log(`🔍 Checking for existing ${provider} keys for user ${userId}`);
       const existingKeys = await storage.getUserApiKeys(userId);
       const existingProviderKey = existingKeys.find(
         (k: any) => k.provider === provider && k.is_active === true
       );
 
       if (existingProviderKey) {
+        console.warn(
+          `⚠️ User ${userId} already has an active ${provider} key`
+        );
         res.status(400).json({
           message: `You already have an active ${apiValidationService.getProviderDisplayName(
             provider
@@ -3569,44 +3608,66 @@ app.post(
       // Create API key entry
       let newApiKey;
       try {
+        console.log(`📝 Creating API key entry in database...`);
         newApiKey = await storage.createUserApiKey(userId, {
           provider,
           keyName,
           apiKey
         });
+        console.log(`✅ API key created with ID: ${newApiKey.id}`);
       } catch (createError: any) {
         console.error(`❌ Failed to create API key:`, createError.message);
         res.status(400).json({
-          message: createError instanceof Error ? createError.message : "Invalid API key format"
+          message:
+            createError instanceof Error
+              ? createError.message
+              : "Invalid API key format"
         });
         return;
       }
 
-      // Validate API key asynchronously
+      // Validate API key
       console.log(`🔍 Validating ${provider} API key...`);
-
       let validationResult;
       try {
-        validationResult = await apiValidationService.validateApiKey(provider, apiKey);
+        validationResult = await apiValidationService.validateApiKey(
+          provider,
+          apiKey
+        );
+        console.log(
+          `✅ Validation result for ${provider}:`,
+          validationResult.valid
+        );
       } catch (validationError: any) {
-        console.error(`❌ Validation failed for ${provider}:`, validationError.message);
+        console.error(
+          `❌ Validation error for ${provider}:`,
+          validationError.message
+        );
         validationResult = {
           valid: false,
-          error: validationError instanceof Error ? validationError.message : "Validation failed"
+          error:
+            validationError instanceof Error
+              ? validationError.message
+              : "Validation failed"
         };
       }
 
       // Update validation status
+      console.log(`📝 Updating validation status...`);
       await storage.updateUserApiKey(userId, newApiKey.id, {
         validation_status: validationResult.valid ? 'valid' : 'invalid',
         last_validated: new Date(),
         validation_error: validationResult.error || null
       });
 
+      // Fetch updated key
       const updatedKey = await storage.getUserApiKey(userId, newApiKey.id);
 
       // If validation failed, delete the key and return error
       if (!validationResult.valid) {
+        console.warn(
+          `⚠️ Validation failed for ${provider}, deleting key ${newApiKey.id}`
+        );
         await storage.deleteUserApiKey(userId, newApiKey.id);
 
         res.status(400).json({
@@ -3638,21 +3699,11 @@ app.post(
         }
       });
 
-      console.log(`✅ API key added and validated successfully for user ${userId}`);
+      console.log(
+        `✅ API key added and validated successfully for user ${userId}`
+      );
 
-      res.status(201).json({
-        id: updatedKey!.id,
-        provider: updatedKey!.provider,
-        keyName: updatedKey!.key_name,
-        maskedKey: updatedKey!.masked_key,
-        isActive: updatedKey!.is_active,
-        validationStatus: updatedKey!.validation_status,
-        lastValidated: updatedKey!.last_validated?.toISOString(),
-        validationError: updatedKey!.validation_error,
-        usageCount: updatedKey!.usage_count,
-        lastUsed: updatedKey!.last_used?.toISOString(),
-        createdAt: updatedKey!.created_at.toISOString()
-      });
+      res.status(201).json(formatApiKeyResponse(updatedKey));
     } catch (error: any) {
       console.error("❌ Failed to add API key:", error);
       res.status(500).json({
@@ -3678,27 +3729,42 @@ app.post(
 
       const apiKey = await storage.getUserApiKey(userId, keyId);
       if (!apiKey) {
+        console.warn(`⚠️ API key ${keyId} not found for user ${userId}`);
         res.status(404).json({ message: "API key not found" });
         return;
       }
 
       const decryptedKey = await storage.getDecryptedApiKey(userId, keyId);
       if (!decryptedKey) {
+        console.error(
+          `❌ Cannot decrypt API key ${keyId} for user ${userId}`
+        );
         res.status(400).json({ message: "Cannot decrypt API key" });
         return;
       }
 
       let validationResult;
       try {
+        console.log(`🔐 Running validation for ${apiKey.provider}...`);
         validationResult = await apiValidationService.validateApiKey(
           apiKey.provider,
           decryptedKey
         );
+        console.log(
+          `✅ Validation completed for ${apiKey.provider}:`,
+          validationResult.valid
+        );
       } catch (validationError: any) {
-        console.error(`❌ Validation failed for ${apiKey.provider}:`, validationError.message);
+        console.error(
+          `❌ Validation error for ${apiKey.provider}:`,
+          validationError.message
+        );
         validationResult = {
           valid: false,
-          error: validationError instanceof Error ? validationError.message : "Validation failed"
+          error:
+            validationError instanceof Error
+              ? validationError.message
+              : "Validation failed"
         };
       }
 
@@ -3713,9 +3779,9 @@ app.post(
       await storage.createActivityLog({
         userId,
         type: "api_key_validated",
-        description: `API key validation ${validationResult.valid ? 'successful' : 'failed'}: ${
-          apiKey.key_name
-        }`,
+        description: `API key validation ${
+          validationResult.valid ? 'successful' : 'failed'
+        }: ${apiKey.key_name}`,
         metadata: {
           keyId,
           provider: apiKey.provider,
@@ -3733,7 +3799,7 @@ app.post(
       res.json({
         isValid: validationResult.valid,
         error: validationResult.error,
-        lastValidated: new Date().toISOString()
+        lastValidated: safeToISOString(new Date())
       });
     } catch (error: any) {
       console.error("❌ Failed to validate API key:", error);
@@ -3760,6 +3826,7 @@ app.delete(
 
       const apiKey = await storage.getUserApiKey(userId, keyId);
       if (!apiKey) {
+        console.warn(`⚠️ API key ${keyId} not found for user ${userId}`);
         res.status(404).json({ message: "API key not found" });
         return;
       }
@@ -3767,12 +3834,15 @@ app.delete(
       const deleted = await storage.deleteUserApiKey(userId, keyId);
 
       if (!deleted) {
+        console.warn(`⚠️ Failed to delete API key ${keyId}`);
         res.status(404).json({ message: "API key not found" });
         return;
       }
 
       // Clear cache after deleting
-      console.log(`🔄 Clearing API key cache for ${apiKey.provider}`);
+      console.log(
+        `🔄 Clearing API key cache for ${apiKey.provider} after deletion`
+      );
       aiService.clearApiKeyCache(userId, apiKey.provider);
       if (apiKey.provider === 'openai') {
         imageService.clearApiKeyCache(userId);
@@ -3813,6 +3883,8 @@ app.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = req.user!.id;
+      console.log(`📊 Fetching API key status for user: ${userId}`);
+
       const userKeys = await storage.getUserApiKeys(userId);
 
       const providers: any = {
@@ -3837,46 +3909,56 @@ app.get(
       };
 
       // Check user keys
-      for (const key of userKeys) {
-        const provider = key.provider as keyof typeof providers;
-        
-        if (key.is_active && providers[provider]) {
-          try {
-            const usageStats = await storage.getApiKeyUsageStats(userId, key.provider);
+      if (userKeys && userKeys.length > 0) {
+        for (const key of userKeys) {
+          const provider = key.provider as keyof typeof providers;
 
-            providers[provider] = {
-              configured: true,
-              keyName: key.key_name,
-              status: key.validation_status === 'valid' ? 'active' : 'invalid',
-              keyId: key.id,
-              usage: {
-                totalUsageCount: key.usage_count || 0,
-                totalTokens: usageStats?.userKeyUsage?.tokens || 0,
-                totalCostCents: usageStats?.userKeyUsage?.costCents || 0,
-                lastUsed: key.last_used
-              }
-            };
+          if (key.is_active && providers[provider]) {
+            try {
+              console.log(
+                `📊 Getting usage stats for ${key.provider} (user key)`
+              );
+              const usageStats = await storage.getApiKeyUsageStats(
+                userId,
+                key.provider
+              );
 
-            console.log(`Usage stats for ${key.provider}:`, {
-              totalTokens: providers[provider].usage.totalTokens,
-              totalCostCents: providers[provider].usage.totalCostCents,
-              operationsCount: providers[provider].usage.totalUsageCount
-            });
-          } catch (statsError: any) {
-            console.error(`⚠️ Failed to get usage stats for ${key.provider}:`, statsError.message);
-            
-            providers[provider] = {
-              configured: true,
-              keyName: key.key_name,
-              status: key.validation_status === 'valid' ? 'active' : 'invalid',
-              keyId: key.id,
-              usage: {
-                totalUsageCount: key.usage_count || 0,
-                totalTokens: 0,
-                totalCostCents: 0,
-                lastUsed: key.last_used
-              }
-            };
+              providers[provider] = {
+                configured: true,
+                keyName: key.key_name,
+                status: key.validation_status === 'valid' ? 'active' : 'invalid',
+                keyId: key.id,
+                usage: {
+                  totalUsageCount: key.usage_count || 0,
+                  totalTokens: usageStats?.userKeyUsage?.tokens || 0,
+                  totalCostCents: usageStats?.userKeyUsage?.costCents || 0,
+                  lastUsed: safeToISOString(key.last_used)
+                }
+              };
+
+              console.log(
+                `✅ Usage stats for ${key.provider}:`,
+                providers[provider].usage
+              );
+            } catch (statsError: any) {
+              console.error(
+                `⚠️ Failed to get usage stats for ${key.provider}:`,
+                statsError.message
+              );
+
+              providers[provider] = {
+                configured: true,
+                keyName: key.key_name,
+                status: key.validation_status === 'valid' ? 'active' : 'invalid',
+                keyId: key.id,
+                usage: {
+                  totalUsageCount: key.usage_count || 0,
+                  totalTokens: 0,
+                  totalCostCents: 0,
+                  lastUsed: safeToISOString(key.last_used)
+                }
+              };
+            }
           }
         }
       }
@@ -3891,7 +3973,13 @@ app.get(
       for (const [provider, envVar] of Object.entries(systemKeys)) {
         if (envVar && !providers[provider].configured) {
           try {
-            const usageStats = await storage.getApiKeyUsageStats(userId, provider);
+            console.log(
+              `📊 Getting usage stats for ${provider} (system key)`
+            );
+            const usageStats = await storage.getApiKeyUsageStats(
+              userId,
+              provider
+            );
 
             providers[provider] = {
               configured: true,
@@ -3906,14 +3994,16 @@ app.get(
               }
             };
 
-            console.log(`Usage stats for system ${provider}:`, {
-              totalTokens: providers[provider].usage.totalTokens,
-              totalCostCents: providers[provider].usage.totalCostCents,
-              operationsCount: providers[provider].usage.totalUsageCount
-            });
+            console.log(
+              `✅ Usage stats for system ${provider}:`,
+              providers[provider].usage
+            );
           } catch (statsError: any) {
-            console.error(`⚠️ Failed to get usage stats for system ${provider}:`, statsError.message);
-            
+            console.error(
+              `⚠️ Failed to get usage stats for system ${provider}:`,
+              statsError.message
+            );
+
             providers[provider] = {
               configured: true,
               keyName: `System ${provider} Key`,
@@ -3930,6 +4020,7 @@ app.get(
         }
       }
 
+      console.log(`✅ API key status retrieved for user ${userId}`);
       res.json({ providers });
     } catch (error: any) {
       console.error("❌ Failed to fetch API key status:", error);
@@ -3950,8 +4041,14 @@ app.put(
       const keyId = req.params.id;
       const { isActive } = req.body;
 
+      console.log(
+        `⚙️ Updating API key ${keyId} for user ${userId}:`,
+        isActive
+      );
+
       const apiKey = await storage.getUserApiKey(userId, keyId);
       if (!apiKey) {
+        console.warn(`⚠️ API key ${keyId} not found for user ${userId}`);
         res.status(404).json({ message: "API key not found" });
         return;
       }
@@ -3973,14 +4070,9 @@ app.put(
       }
 
       const updatedKey = await storage.getUserApiKey(userId, keyId);
-      
-      res.json({
-        id: updatedKey!.id,
-        provider: updatedKey!.provider,
-        keyName: updatedKey!.key_name,
-        isActive: updatedKey!.is_active,
-        validationStatus: updatedKey!.validation_status
-      });
+
+      console.log(`✅ API key updated for user ${userId}`);
+      res.json(formatApiKeyResponse(updatedKey));
     } catch (error: any) {
       console.error("❌ Failed to update API key:", error);
       res.status(500).json({
@@ -4002,18 +4094,22 @@ app.get(
       const userId = req.user!.id;
       const keyId = req.params.id;
 
+      console.log(`📊 Fetching usage for API key ${keyId}`);
+
       // Handle system keys
       if (keyId.startsWith('system-')) {
         const provider = keyId.replace('system-', '');
+        console.log(`📊 Fetching system key usage for ${provider}`);
+
         const usageStats = await storage.getApiKeyUsageStats(userId, provider);
 
         res.json({
           keyId: keyId,
           provider: provider,
           keyName: `System ${provider} Key`,
-          totalUsageCount: usageStats.systemKeyUsage?.operations || 0,
-          totalTokens: usageStats.systemKeyUsage?.tokens || 0,
-          totalCostCents: usageStats.systemKeyUsage?.costCents || 0,
+          totalUsageCount: usageStats?.systemKeyUsage?.operations || 0,
+          totalTokens: usageStats?.systemKeyUsage?.tokens || 0,
+          totalCostCents: usageStats?.systemKeyUsage?.costCents || 0,
           keyType: 'system',
           lastUsed: null
         });
@@ -4023,21 +4119,27 @@ app.get(
       // Handle user keys
       const apiKey = await storage.getUserApiKey(userId, keyId);
       if (!apiKey) {
+        console.warn(`⚠️ API key ${keyId} not found for user ${userId}`);
         res.status(404).json({ message: "API key not found" });
         return;
       }
 
-      const usageStats = await storage.getApiKeyUsageStats(userId, apiKey.provider);
+      const usageStats = await storage.getApiKeyUsageStats(
+        userId,
+        apiKey.provider
+      );
+
+      console.log(`✅ Usage stats retrieved for ${apiKey.provider}`);
 
       res.json({
         keyId: apiKey.id,
         provider: apiKey.provider,
         keyName: apiKey.key_name,
         totalUsageCount: apiKey.usage_count || 0,
-        totalTokens: usageStats.userKeyUsage?.tokens || 0,
-        totalCostCents: usageStats.userKeyUsage?.costCents || 0,
+        totalTokens: usageStats?.userKeyUsage?.tokens || 0,
+        totalCostCents: usageStats?.userKeyUsage?.costCents || 0,
         keyType: 'user',
-        lastUsed: apiKey.last_used
+        lastUsed: safeToISOString(apiKey.last_used)
       });
     } catch (error: any) {
       console.error("❌ Failed to fetch API key usage:", error);
@@ -4055,6 +4157,7 @@ app.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = req.user!.id;
+      console.log(`📊 Fetching usage summary for user ${userId}`);
 
       const userKeys = await storage.getUserApiKeys(userId);
 
@@ -4070,6 +4173,8 @@ app.get(
         })
         .from(aiUsageTracking)
         .where(eq(aiUsageTracking.user_id, userId));
+
+      console.log(`📊 Retrieved ${allUsageData.length} usage records`);
 
       // Process and aggregate data
       const aggregated: Record<string, Record<string, any>> = {};
@@ -4102,7 +4207,10 @@ app.get(
         aggregated[key].tokens += row.tokensUsed || 0;
         aggregated[key].costCents += (row.costUsd || 0) * 100;
 
-        if (!aggregated[key].lastUsed || new Date(row.createdAt) > new Date(aggregated[key].lastUsed)) {
+        if (
+          !aggregated[key].lastUsed ||
+          new Date(row.createdAt) > new Date(aggregated[key].lastUsed)
+        ) {
           aggregated[key].lastUsed = row.createdAt;
         }
 
@@ -4116,22 +4224,58 @@ app.get(
       const summary = {
         providers: {
           openai: {
-            user: { operations: 0, tokens: 0, costCents: 0, lastUsed: null, breakdown: {} },
-            system: { operations: 0, tokens: 0, costCents: 0, lastUsed: null, breakdown: {} },
+            user: {
+              operations: 0,
+              tokens: 0,
+              costCents: 0,
+              lastUsed: null,
+              breakdown: {}
+            },
+            system: {
+              operations: 0,
+              tokens: 0,
+              costCents: 0,
+              lastUsed: null,
+              breakdown: {}
+            },
             configured: false,
             userKeyName: null as string | null,
             userKeyStatus: null as string | null
           },
           anthropic: {
-            user: { operations: 0, tokens: 0, costCents: 0, lastUsed: null, breakdown: {} },
-            system: { operations: 0, tokens: 0, costCents: 0, lastUsed: null, breakdown: {} },
+            user: {
+              operations: 0,
+              tokens: 0,
+              costCents: 0,
+              lastUsed: null,
+              breakdown: {}
+            },
+            system: {
+              operations: 0,
+              tokens: 0,
+              costCents: 0,
+              lastUsed: null,
+              breakdown: {}
+            },
             configured: false,
             userKeyName: null as string | null,
             userKeyStatus: null as string | null
           },
           gemini: {
-            user: { operations: 0, tokens: 0, costCents: 0, lastUsed: null, breakdown: {} },
-            system: { operations: 0, tokens: 0, costCents: 0, lastUsed: null, breakdown: {} },
+            user: {
+              operations: 0,
+              tokens: 0,
+              costCents: 0,
+              lastUsed: null,
+              breakdown: {}
+            },
+            system: {
+              operations: 0,
+              tokens: 0,
+              costCents: 0,
+              lastUsed: null,
+              breakdown: {}
+            },
             configured: false,
             userKeyName: null as string | null,
             userKeyStatus: null as string | null
@@ -4154,7 +4298,7 @@ app.get(
             operations: data.operations,
             tokens: data.tokens,
             costCents: data.costCents,
-            lastUsed: data.lastUsed,
+            lastUsed: safeToISOString(data.lastUsed),
             breakdown: data.operationBreakdown
           };
 
@@ -4172,21 +4316,27 @@ app.get(
       };
 
       // Add configuration status for user keys
-      for (const key of userKeys) {
-        const providerMap: Record<string, keyof typeof summary.providers> = {
-          openai: 'openai',
-          anthropic: 'anthropic',
-          gemini: 'gemini',
-          google_gemini: 'gemini',
-          google_pagespeed: 'gemini'
-        };
+      if (userKeys && userKeys.length > 0) {
+        for (const key of userKeys) {
+          const providerMap: Record<string, keyof typeof summary.providers> = {
+            openai: 'openai',
+            anthropic: 'anthropic',
+            gemini: 'gemini',
+            google_gemini: 'gemini',
+            google_pagespeed: 'gemini'
+          };
 
-        const mappedProvider = providerMap[key.provider];
-        if (key.is_active && mappedProvider && summary.providers[mappedProvider]) {
-          const provider = summary.providers[mappedProvider];
-          provider.configured = true;
-          provider.userKeyName = key.key_name;
-          provider.userKeyStatus = key.validation_status;
+          const mappedProvider = providerMap[key.provider];
+          if (
+            key.is_active &&
+            mappedProvider &&
+            summary.providers[mappedProvider]
+          ) {
+            const provider = summary.providers[mappedProvider];
+            provider.configured = true;
+            provider.userKeyName = key.key_name;
+            provider.userKeyStatus = key.validation_status;
+          }
         }
       }
 
@@ -4197,18 +4347,23 @@ app.get(
       ) {
         summary.providers.openai.configured = true;
       }
-      if (!summary.providers.anthropic.userKeyName && process.env.ANTHROPIC_API_KEY) {
+      if (
+        !summary.providers.anthropic.userKeyName &&
+        process.env.ANTHROPIC_API_KEY
+      ) {
         summary.providers.anthropic.configured = true;
       }
-      if (!summary.providers.gemini.userKeyName && process.env.GOOGLE_GEMINI_API_KEY) {
+      if (
+        !summary.providers.gemini.userKeyName &&
+        process.env.GOOGLE_GEMINI_API_KEY
+      ) {
         summary.providers.gemini.configured = true;
       }
 
-      console.log(`✅ Usage summary fetched for user ${userId}:`, {
+      console.log(`✅ Usage summary retrieved for user ${userId}:`, {
         totalOps: summary.totals.combined.operations,
         userOps: summary.totals.user.operations,
-        systemOps: summary.totals.system.operations,
-        rows: allUsageData.length
+        systemOps: summary.totals.system.operations
       });
 
       res.json(summary);
@@ -4221,6 +4376,9 @@ app.get(
     }
   }
 );
+
+
+
   // ===========================================================================
   // WEBSITE MANAGEMENT ROUTES
   // ===========================================================================
