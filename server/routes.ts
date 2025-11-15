@@ -3487,16 +3487,6 @@ app.get("/api/admin/system-api-usage", requireAdmin, async (req: Request, res: R
 
 
 
-
-
-// ============================================
-// GET: Fetch all API keys for user
-// ============================================
-import { Request, Response } from 'express';
-import { eq } from 'drizzle-orm';
-import { aiUsageTracking, userApiKeys } from './schema';
-import { db } from './db';
-
 // Helper function to safely convert date to ISO string
 function safeToISOString(date: any): string | null {
   if (!date) return null;
