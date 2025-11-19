@@ -1253,7 +1253,7 @@ app.post("/api/auth/send-verification", async (req: Request, res: Response): Pro
 app.get("/api/auth/google/url", async (req, res) => {
   try {
     const clientId = process.env.GOOGLE_CLIENT_ID!;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI!;
+    const redirectUri = process.env.GOOGLE_REDIRECT_AUTH_URI!;
 
     if (!clientId || !redirectUri) {
       return res.status(500).json({
@@ -1289,32 +1289,34 @@ app.get("/api/auth/google/url", async (req, res) => {
   }
 });
 
-/**
- * GET /api/auth/google/callback
- * Handles the OAuth callback from Google
- */
+
+
+
+
+
 app.get("/api/auth/google/callback", async (req, res) => {
   try {
     const { code, state, error } = req.query;
+    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
 
     if (error) {
       console.error("Google OAuth error:", error);
-      return res.redirect(`/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+      return res.redirect(`${clientUrl}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
     }
 
     // CSRF check
     if (!state || state !== req.session.oauthState) {
-      return res.redirect(`/auth?google_error=${encodeURIComponent("Invalid state parameter")}`);
+      return res.redirect(`${clientUrl}/auth?google_error=${encodeURIComponent("Invalid state parameter")}`);
     }
     delete req.session.oauthState;
 
     if (!code) {
-      return res.redirect(`/auth?google_error=${encodeURIComponent("No authorization code received")}`);
+      return res.redirect(`${clientUrl}/auth?google_error=${encodeURIComponent("No authorization code received")}`);
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID!;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI!; // MUST match Google Cloud
+    const redirectUri = process.env.GOOGLE_REDIRECT_AUTH_URI!;
 
     // Exchange code for tokens
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -1332,7 +1334,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
     if (!tokenResponse.ok) {
       const text = await tokenResponse.text();
       console.error("Token exchange failed:", text);
-      return res.redirect(`/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`);
+      return res.redirect(`${clientUrl}/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`);
     }
 
     const { access_token, refresh_token, expires_in } = await tokenResponse.json();
@@ -1343,7 +1345,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
     });
 
     if (!userInfoResponse.ok) {
-      return res.redirect(`/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`);
+      return res.redirect(`${clientUrl}/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`);
     }
 
     const { id: googleId, email, name, picture } = await userInfoResponse.json();
@@ -1353,7 +1355,6 @@ app.get("/api/auth/google/callback", async (req, res) => {
     let user;
 
     if (existingGoogleAccount.length > 0) {
-      // Existing Google account: update tokens
       const googleAccount = existingGoogleAccount[0];
       await db.update(googleAccounts)
         .set({
@@ -1366,16 +1367,14 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
       const userResult = await db.select().from(users).where(eq(users.id, googleAccount.userId)).limit(1);
       if (userResult.length === 0) {
-        return res.redirect(`/auth?google_error=${encodeURIComponent("User account not found")}`);
+        return res.redirect(`${clientUrl}/auth?google_error=${encodeURIComponent("User account not found")}`);
       }
       user = userResult[0];
     } else {
-      // New Google account: create user if email not exists
       const existingUserByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
       if (existingUserByEmail.length > 0) {
         user = existingUserByEmail[0];
       } else {
-        // Generate unique username
         const usernameBase = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_.-]/g, "");
         let username = usernameBase;
         let counter = 1;
@@ -1396,7 +1395,6 @@ app.get("/api/auth/google/callback", async (req, res) => {
         user = newUsers[0];
       }
 
-      // Link Google account
       await db.insert(googleAccounts).values({
         userId: user.id,
         googleId,
@@ -1410,22 +1408,169 @@ app.get("/api/auth/google/callback", async (req, res) => {
       });
     }
 
-    // Set session
+    // Set session - CRITICAL: Wait for save to complete
     req.session.userId = user.id;
     req.session.isAuthenticated = true;
-    req.session.save(err => {
-      if (err) {
-        console.error("Session save error:", err);
-        return res.redirect(`/auth?google_error=${encodeURIComponent("Session creation failed")}`);
-      }
-      res.redirect("/"); // redirect to dashboard
+    
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          reject(err);
+        } else {
+          console.log("Session saved successfully for user:", user.id);
+          resolve();
+        }
+      });
     });
+
+    // Redirect back to Vercel frontend
+    res.redirect(clientUrl);
 
   } catch (err) {
     console.error("Google OAuth callback error:", err);
-    res.redirect(`/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    res.redirect(`${clientUrl}/auth?google_error=${encodeURIComponent("Authentication failed")}`);
   }
 });
+
+/**
+ * GET /api/auth/google/callback
+ * Handles the OAuth callback from Google
+ */
+// app.get("/api/auth/google/callback", async (req, res) => {
+//   try {
+//     const { code, state, error } = req.query;
+
+//     if (error) {
+//       console.error("Google OAuth error:", error);
+//       return res.redirect(`/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+//     }
+
+//     // CSRF check
+//     if (!state || state !== req.session.oauthState) {
+//       return res.redirect(`/auth?google_error=${encodeURIComponent("Invalid state parameter")}`);
+//     }
+//     delete req.session.oauthState;
+
+//     if (!code) {
+//       return res.redirect(`/auth?google_error=${encodeURIComponent("No authorization code received")}`);
+//     }
+
+//     const clientId = process.env.GOOGLE_CLIENT_ID!;
+//     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+//     const redirectUri = process.env.GOOGLE_REDIRECT_AUTH_URI!; // MUST match Google Cloud
+
+//     // Exchange code for tokens
+//     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+//       body: new URLSearchParams({
+//         code: code as string,
+//         client_id: clientId,
+//         client_secret: clientSecret,
+//         redirect_uri: redirectUri,
+//         grant_type: "authorization_code",
+//       }),
+//     });
+
+//     if (!tokenResponse.ok) {
+//       const text = await tokenResponse.text();
+//       console.error("Token exchange failed:", text);
+//       return res.redirect(`/auth?google_error=${encodeURIComponent("Failed to exchange authorization code")}`);
+//     }
+
+//     const { access_token, refresh_token, expires_in } = await tokenResponse.json();
+
+//     // Fetch Google user info
+//     const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+//       headers: { Authorization: `Bearer ${access_token}` },
+//     });
+
+//     if (!userInfoResponse.ok) {
+//       return res.redirect(`/auth?google_error=${encodeURIComponent("Failed to fetch user info")}`);
+//     }
+
+//     const { id: googleId, email, name, picture } = await userInfoResponse.json();
+
+//     // Check if Google account exists
+//     let existingGoogleAccount = await db.select().from(googleAccounts).where(eq(googleAccounts.googleId, googleId)).limit(1);
+//     let user;
+
+//     if (existingGoogleAccount.length > 0) {
+//       // Existing Google account: update tokens
+//       const googleAccount = existingGoogleAccount[0];
+//       await db.update(googleAccounts)
+//         .set({
+//           accessToken: access_token,
+//           refreshToken: refresh_token || googleAccount.refreshToken,
+//           tokenExpiry: new Date(Date.now() + expires_in * 1000),
+//           updatedAt: new Date(),
+//         })
+//         .where(eq(googleAccounts.id, googleAccount.id));
+
+//       const userResult = await db.select().from(users).where(eq(users.id, googleAccount.userId)).limit(1);
+//       if (userResult.length === 0) {
+//         return res.redirect(`/auth?google_error=${encodeURIComponent("User account not found")}`);
+//       }
+//       user = userResult[0];
+//     } else {
+//       // New Google account: create user if email not exists
+//       const existingUserByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
+//       if (existingUserByEmail.length > 0) {
+//         user = existingUserByEmail[0];
+//       } else {
+//         // Generate unique username
+//         const usernameBase = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_.-]/g, "");
+//         let username = usernameBase;
+//         let counter = 1;
+//         while ((await db.select().from(users).where(eq(users.username, username)).limit(1)).length > 0) {
+//           username = `${usernameBase}${counter}`;
+//           counter++;
+//         }
+
+//         const newUsers = await db.insert(users).values({
+//           username,
+//           email,
+//           name,
+//           password: crypto.randomBytes(32).toString("hex"),
+//           emailVerified: true,
+//           isActive: true,
+//         }).returning();
+
+//         user = newUsers[0];
+//       }
+
+//       // Link Google account
+//       await db.insert(googleAccounts).values({
+//         userId: user.id,
+//         googleId,
+//         email,
+//         name,
+//         picture,
+//         accessToken: access_token,
+//         refreshToken: refresh_token,
+//         tokenExpiry: new Date(Date.now() + expires_in * 1000),
+//         isActive: true,
+//       });
+//     }
+
+//     // Set session
+//     req.session.userId = user.id;
+//     req.session.isAuthenticated = true;
+//     req.session.save(err => {
+//       if (err) {
+//         console.error("Session save error:", err);
+//         return res.redirect(`/auth?google_error=${encodeURIComponent("Session creation failed")}`);
+//       }
+//       res.redirect("/"); // redirect to dashboard
+//     });
+
+//   } catch (err) {
+//     console.error("Google OAuth callback error:", err);
+//     res.redirect(`/auth?google_error=${encodeURIComponent("Authentication failed")}`);
+//   }
+// });
 
 /**
  * POST /api/auth/google/unlink
