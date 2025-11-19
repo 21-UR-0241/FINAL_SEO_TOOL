@@ -30,6 +30,270 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
+
+// UPDATED oauth-callback endpoint for Vercel + Render
+router.get('/oauth-callback', async (req: Request, res: Response) => {
+  try {
+    // Set CORS headers for cross-origin popup
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    
+    const { code, state, error } = req.query;
+    
+    // Get client URL from environment
+    const clientUrl = getClientUrl();
+    console.log('🔗 OAuth callback - Client URL:', clientUrl);
+    
+    if (error) {
+      const safeError = InputSanitizer.escapeHtml(error as string);
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Error</title>
+          <style>
+            body { 
+              font-family: system-ui; 
+              padding: 20px; 
+              text-align: center;
+              background: #fee;
+            }
+            .error { color: #dc2626; }
+          </style>
+        </head>
+        <body>
+          <h2 class="error">Authentication Failed</h2>
+          <p>${safeError}</p>
+          <p>This window will close automatically...</p>
+          <script>
+            const error = ${JSON.stringify(safeError)};
+            
+            console.log('Sending error to parent:', error);
+            
+            if (window.opener && !window.opener.closed) {
+              try {
+                window.opener.postMessage({ 
+                  type: 'GOOGLE_AUTH_ERROR', 
+                  error: error 
+                }, '${clientUrl}');
+                console.log('Error message sent to:', '${clientUrl}');
+              } catch(e) {
+                console.error('Failed to send error message:', e);
+              }
+            }
+            
+            setTimeout(() => window.close(), 3000);
+          </script>
+        </body>
+        </html>
+      `);
+    }
+    
+    if (!code) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Error</title>
+          <style>
+            body { 
+              font-family: system-ui; 
+              padding: 20px; 
+              text-align: center;
+              background: #fee;
+            }
+            .error { color: #dc2626; }
+          </style>
+        </head>
+        <body>
+          <h2 class="error">Missing Authorization Code</h2>
+          <p>The authentication process didn't complete properly.</p>
+          <p>This window will close automatically...</p>
+          <script>
+            console.log('No authorization code received');
+            
+            if (window.opener && !window.opener.closed) {
+              try {
+                window.opener.postMessage({ 
+                  type: 'GOOGLE_AUTH_ERROR', 
+                  error: 'Missing authorization code' 
+                }, '${clientUrl}');
+                console.log('Error message sent to:', '${clientUrl}');
+              } catch(e) {
+                console.error('Failed to send error message:', e);
+              }
+            }
+            
+            setTimeout(() => window.close(), 3000);
+          </script>
+        </body>
+        </html>
+      `);
+    }
+    
+    const safeCode = InputSanitizer.escapeHtml(code as string);
+    const safeState = state ? InputSanitizer.escapeHtml(state as string) : '';
+    
+    console.log('✅ OAuth callback successful, sending code to client');
+    
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Authentication Successful</title>
+        <style>
+          body { 
+            font-family: system-ui; 
+            padding: 20px; 
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+          }
+          .container {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 400px;
+          }
+          .success { color: #059669; }
+          button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+          }
+          button:hover { background: #5a67d8; }
+          .debug {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+            text-align: left;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2 class="success">✅ Authentication Successful!</h2>
+          <p>Completing the authentication process...</p>
+          <p id="status">Sending credentials...</p>
+          <div class="debug">
+            <strong>Debug Info:</strong><br>
+            Target: ${clientUrl}<br>
+            Status: <span id="debug-status">Initializing...</span>
+          </div>
+          <button onclick="closeWindow()">Close Window</button>
+        </div>
+        <script>
+          const code = ${JSON.stringify(safeCode)};
+          const state = ${JSON.stringify(safeState)};
+          const clientUrl = '${clientUrl}';
+          
+          console.log('OAuth Callback Page Loaded');
+          console.log('Code received:', code ? 'Yes' : 'No');
+          console.log('Target client URL:', clientUrl);
+          console.log('Window opener exists:', !!window.opener);
+          
+          function updateStatus(message, isError = false) {
+            const statusEl = document.getElementById('status');
+            const debugEl = document.getElementById('debug-status');
+            statusEl.textContent = message;
+            debugEl.textContent = message;
+            debugEl.style.color = isError ? '#dc2626' : '#059669';
+            console.log('[Status]', message);
+          }
+          
+          function sendToOpener() {
+            if (!window.opener || window.opener.closed) {
+              updateStatus('Parent window not found', true);
+              console.error('Window opener is not available');
+              return false;
+            }
+            
+            try {
+              console.log('Sending auth success message to:', clientUrl);
+              
+              window.opener.postMessage({ 
+                type: 'GOOGLE_AUTH_SUCCESS', 
+                code: code,
+                state: state
+              }, clientUrl);
+              
+              updateStatus('Credentials sent successfully!');
+              console.log('✅ Message sent successfully to:', clientUrl);
+              return true;
+            } catch(e) {
+              updateStatus('Failed to send credentials: ' + e.message, true);
+              console.error('Failed to send message:', e);
+              return false;
+            }
+          }
+          
+          // Send the message
+          const sent = sendToOpener();
+          
+          function closeWindow() {
+            console.log('Closing window...');
+            window.close();
+            
+            // Fallback: redirect to client URL if window won't close
+            setTimeout(() => {
+              if (!window.closed) {
+                console.log('Window did not close, redirecting...');
+                window.location.href = clientUrl;
+              }
+            }, 100);
+          }
+          
+          // Auto-close after 3 seconds if successful
+          if (sent) {
+            setTimeout(closeWindow, 3000);
+          }
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Authentication Error</title>
+        <style>
+          body { 
+            font-family: system-ui; 
+            padding: 20px; 
+            text-align: center;
+            background: #fee;
+          }
+          .error { color: #dc2626; }
+        </style>
+      </head>
+      <body>
+        <h2 class="error">Authentication Failed</h2>
+        <p>An unexpected error occurred. Please try again.</p>
+        <button onclick="window.close()">Close Window</button>
+      </body>
+      </html>
+    `);
+  }
+});
+
+
 // Apply middleware
 router.use(apiLimiter);
 router.use(sanitizationMiddleware.body);
@@ -315,267 +579,6 @@ router.post('/auth', requireAuth, authLimiter, async (req: AuthenticatedRequest,
   }
 });
 
-// UPDATED oauth-callback endpoint for Vercel + Render
-router.get('/oauth-callback', async (req: Request, res: Response) => {
-  try {
-    // Set CORS headers for cross-origin popup
-    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
-    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    
-    const { code, state, error } = req.query;
-    
-    // Get client URL from environment
-    const clientUrl = getClientUrl();
-    console.log('🔗 OAuth callback - Client URL:', clientUrl);
-    
-    if (error) {
-      const safeError = InputSanitizer.escapeHtml(error as string);
-      return res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Authentication Error</title>
-          <style>
-            body { 
-              font-family: system-ui; 
-              padding: 20px; 
-              text-align: center;
-              background: #fee;
-            }
-            .error { color: #dc2626; }
-          </style>
-        </head>
-        <body>
-          <h2 class="error">Authentication Failed</h2>
-          <p>${safeError}</p>
-          <p>This window will close automatically...</p>
-          <script>
-            const error = ${JSON.stringify(safeError)};
-            
-            console.log('Sending error to parent:', error);
-            
-            if (window.opener && !window.opener.closed) {
-              try {
-                window.opener.postMessage({ 
-                  type: 'GOOGLE_AUTH_ERROR', 
-                  error: error 
-                }, '${clientUrl}');
-                console.log('Error message sent to:', '${clientUrl}');
-              } catch(e) {
-                console.error('Failed to send error message:', e);
-              }
-            }
-            
-            setTimeout(() => window.close(), 3000);
-          </script>
-        </body>
-        </html>
-      `);
-    }
-    
-    if (!code) {
-      return res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Authentication Error</title>
-          <style>
-            body { 
-              font-family: system-ui; 
-              padding: 20px; 
-              text-align: center;
-              background: #fee;
-            }
-            .error { color: #dc2626; }
-          </style>
-        </head>
-        <body>
-          <h2 class="error">Missing Authorization Code</h2>
-          <p>The authentication process didn't complete properly.</p>
-          <p>This window will close automatically...</p>
-          <script>
-            console.log('No authorization code received');
-            
-            if (window.opener && !window.opener.closed) {
-              try {
-                window.opener.postMessage({ 
-                  type: 'GOOGLE_AUTH_ERROR', 
-                  error: 'Missing authorization code' 
-                }, '${clientUrl}');
-                console.log('Error message sent to:', '${clientUrl}');
-              } catch(e) {
-                console.error('Failed to send error message:', e);
-              }
-            }
-            
-            setTimeout(() => window.close(), 3000);
-          </script>
-        </body>
-        </html>
-      `);
-    }
-    
-    const safeCode = InputSanitizer.escapeHtml(code as string);
-    const safeState = state ? InputSanitizer.escapeHtml(state as string) : '';
-    
-    console.log('✅ OAuth callback successful, sending code to client');
-    
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Authentication Successful</title>
-        <style>
-          body { 
-            font-family: system-ui; 
-            padding: 20px; 
-            text-align: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-          }
-          .container {
-            background: white;
-            color: #333;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-width: 400px;
-          }
-          .success { color: #059669; }
-          button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-          }
-          button:hover { background: #5a67d8; }
-          .debug {
-            margin-top: 15px;
-            padding: 10px;
-            background: #f3f4f6;
-            border-radius: 5px;
-            font-size: 12px;
-            color: #666;
-            text-align: left;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h2 class="success">✅ Authentication Successful!</h2>
-          <p>Completing the authentication process...</p>
-          <p id="status">Sending credentials...</p>
-          <div class="debug">
-            <strong>Debug Info:</strong><br>
-            Target: ${clientUrl}<br>
-            Status: <span id="debug-status">Initializing...</span>
-          </div>
-          <button onclick="closeWindow()">Close Window</button>
-        </div>
-        <script>
-          const code = ${JSON.stringify(safeCode)};
-          const state = ${JSON.stringify(safeState)};
-          const clientUrl = '${clientUrl}';
-          
-          console.log('OAuth Callback Page Loaded');
-          console.log('Code received:', code ? 'Yes' : 'No');
-          console.log('Target client URL:', clientUrl);
-          console.log('Window opener exists:', !!window.opener);
-          
-          function updateStatus(message, isError = false) {
-            const statusEl = document.getElementById('status');
-            const debugEl = document.getElementById('debug-status');
-            statusEl.textContent = message;
-            debugEl.textContent = message;
-            debugEl.style.color = isError ? '#dc2626' : '#059669';
-            console.log('[Status]', message);
-          }
-          
-          function sendToOpener() {
-            if (!window.opener || window.opener.closed) {
-              updateStatus('Parent window not found', true);
-              console.error('Window opener is not available');
-              return false;
-            }
-            
-            try {
-              console.log('Sending auth success message to:', clientUrl);
-              
-              window.opener.postMessage({ 
-                type: 'GOOGLE_AUTH_SUCCESS', 
-                code: code,
-                state: state
-              }, clientUrl);
-              
-              updateStatus('Credentials sent successfully!');
-              console.log('✅ Message sent successfully to:', clientUrl);
-              return true;
-            } catch(e) {
-              updateStatus('Failed to send credentials: ' + e.message, true);
-              console.error('Failed to send message:', e);
-              return false;
-            }
-          }
-          
-          // Send the message
-          const sent = sendToOpener();
-          
-          function closeWindow() {
-            console.log('Closing window...');
-            window.close();
-            
-            // Fallback: redirect to client URL if window won't close
-            setTimeout(() => {
-              if (!window.closed) {
-                console.log('Window did not close, redirecting...');
-                window.location.href = clientUrl;
-              }
-            }, 100);
-          }
-          
-          // Auto-close after 3 seconds if successful
-          if (sent) {
-            setTimeout(closeWindow, 3000);
-          }
-        </script>
-      </body>
-      </html>
-    `);
-  } catch (error) {
-    console.error('OAuth callback error:', error);
-    res.status(500).send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Authentication Error</title>
-        <style>
-          body { 
-            font-family: system-ui; 
-            padding: 20px; 
-            text-align: center;
-            background: #fee;
-          }
-          .error { color: #dc2626; }
-        </style>
-      </head>
-      <body>
-        <h2 class="error">Authentication Failed</h2>
-        <p>An unexpected error occurred. Please try again.</p>
-        <button onclick="window.close()">Close Window</button>
-      </body>
-      </html>
-    `);
-  }
-});
 
 // ============================================================================
 // USER & ACCOUNT MANAGEMENT ENDPOINTS
