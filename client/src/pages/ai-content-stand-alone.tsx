@@ -4439,7 +4439,7 @@ export default function StandaloneContent() {
                       preferred AI provider
                     </p>
                   </div>
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                  <div className="space-y-4 max-h-[80vh] overflow-y-auto">
                     {/* AI Provider Selection */}
                     <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
