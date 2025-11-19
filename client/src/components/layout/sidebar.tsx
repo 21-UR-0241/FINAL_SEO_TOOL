@@ -247,23 +247,43 @@ function SidebarContent({ onLinkClick }: { onLinkClick?: () => void }) {
   const [user, setUser] = useState<any>(null);
 
   // Fetch user data
-  useEffect(() => {
-    fetch("/api/auth/me", { credentials: "include" })
-      .then((res) => {
-        if (res.ok) {
-          return res.json();
-        }
-        return null;
-      })
-      .then((data) => {
-        if (data) {
-          setUser(data);
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to fetch user:", error);
-      });
-  }, []);
+  // useEffect(() => {
+  //   fetch("/api/auth/me", { credentials: "include" })
+  //     .then((res) => {
+  //       if (res.ok) {
+  //         return res.json();
+  //       }
+  //       return null;
+  //     })
+  //     .then((data) => {
+  //       if (data) {
+  //         setUser(data);
+  //       }
+  //     })
+  //     .catch((error) => {
+  //       console.error("Failed to fetch user:", error);
+  //     });
+  // }, []);
+useEffect(() => {
+  fetch("/api/auth/me", { credentials: "include" })
+    .then((res) => {
+      if (res.ok) {
+        return res.json();
+      }
+      return null;
+    })
+    .then((data) => {
+      if (data) {
+        console.log("User data:", data); // Add this to debug
+        console.log("Is admin?", data.isAdmin); // And this
+        setUser(data);
+      }
+    })
+    .catch((error) => {
+      console.error("Failed to fetch user:", error);
+    });
+}, []);
+
 
   return (
     <div className="flex flex-col h-full">
