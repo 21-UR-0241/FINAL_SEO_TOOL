@@ -5771,7 +5771,6 @@ app.post("/api/user/auto-schedules", requireAuth, async (req: Request, res: Resp
     // Pass data WITHOUT utcTime to force backend calculation
     const newSchedule = await storage.createAutoSchedule({
       ...scheduleDataWithoutUtc,
-      name: scheduleName,
       userId,
       // Explicitly don't include utcTime
     });
