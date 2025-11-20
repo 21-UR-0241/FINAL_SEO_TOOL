@@ -3769,6 +3769,56 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
   });
 
 
+
+  app.get("/api/user/content/auto-generated", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { websiteId, scheduleId } = req.query;
+    
+    // Fetch all content
+    let content;
+    if (websiteId) {
+      const website = await storage.getUserWebsite(websiteId as string, userId);
+      if (!website) {
+        res.status(404).json({ message: "Website not found" });
+        return;
+      }
+      content = await storage.getWebsiteContent(websiteId as string);
+    } else {
+      content = await storage.getUserContent(userId);
+    }
+    
+    // Filter for auto-generated (has scheduleId)
+    let autoContent = content.filter((item: any) => item.scheduleId);
+    
+    if (scheduleId) {
+      autoContent = autoContent.filter((item: any) => item.scheduleId === scheduleId);
+    }
+    
+    // Add schedule names
+    const enhanced = await Promise.all(
+      autoContent.map(async (item: any) => {
+        const schedule = await storage.getAutoScheduleById(item.scheduleId);
+        return {
+          ...item,
+          scheduleName: schedule?.name || 'Unknown',
+          scheduleFrequency: schedule?.frequency,
+        };
+      })
+    );
+    
+    enhanced.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    
+    res.json(enhanced);
+  } catch (error) {
+    console.error("Failed to fetch auto-generated content:", error);
+    res.status(500).json({ message: "Failed to fetch content" });
+  }
+});
+
+
   // Get ALL content for user (including standalone content)
   // IMPORTANT: This route MUST come before /api/user/content/:id to avoid matching "all" as an ID
   app.get("/api/user/content/all", requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -5760,7 +5810,7 @@ app.get("/api/system/timezone-info", async (req: Request, res: Response): Promis
 app.post("/api/user/auto-schedules", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user!.id;
-    const { utcTime, ...scheduleDataWithoutUtc } = req.body; // Remove utcTime if sent
+    const { utcTime, name, ...scheduleDataWithoutUtc } = req.body; // Remove utcTime if sent
     
     console.log('API received schedule request:', {
       localTime: scheduleDataWithoutUtc.localTime,
@@ -5771,6 +5821,7 @@ app.post("/api/user/auto-schedules", requireAuth, async (req: Request, res: Resp
     // Pass data WITHOUT utcTime to force backend calculation
     const newSchedule = await storage.createAutoSchedule({
       ...scheduleDataWithoutUtc,
+      name,
       userId,
       // Explicitly don't include utcTime
     });
@@ -5839,6 +5890,213 @@ function convertLocalTimeToUTC(localTime: string, timezone: string): string {
   
   return result;
 }
+
+// ==========================================
+// AUTO-SCHEDULE API ENDPOINTS
+// ==========================================
+
+// GET all auto-schedules for a user (optionally filtered by website)
+app.get("/api/user/auto-schedules", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { websiteId } = req.query;
+    
+    console.log('📋 Fetching auto-schedules for user:', userId, websiteId ? `website: ${websiteId}` : '');
+    
+    let schedules;
+    if (websiteId) {
+      // Verify user has access to this website
+      const website = await storage.getUserWebsite(websiteId as string, userId);
+      if (!website) {
+        res.status(404).json({ message: "Website not found or access denied" });
+        return;
+      }
+      schedules = await storage.getAutoSchedulesByWebsite(websiteId as string);
+    } else {
+      schedules = await storage.getUserAutoSchedules(userId);
+    }
+    
+    console.log(`✅ Found ${schedules.length} schedules`);
+    res.json({ schedules });
+  } catch (error) {
+    console.error("Failed to fetch auto-schedules:", error);
+    res.status(500).json({ 
+      message: "Failed to fetch schedules",
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
+  }
+});
+
+// UPDATE an auto-schedule
+app.put("/api/user/auto-schedules/:scheduleId", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { scheduleId } = req.params;
+    const { utcTime, ...updateDataWithoutUtc } = req.body;
+    
+    console.log('🔄 Updating auto-schedule:', scheduleId);
+    
+    // Verify ownership
+    const existingSchedule = await storage.getAutoSchedule(scheduleId);
+    if (!existingSchedule || existingSchedule.userId !== userId) {
+      res.status(404).json({ message: "Schedule not found or access denied" });
+      return;
+    }
+    
+    // If localTime or timezone is being updated, recalculate UTC time
+    let finalUpdateData = { ...updateDataWithoutUtc };
+    if (updateDataWithoutUtc.localTime || updateDataWithoutUtc.timezone) {
+      const localTime = updateDataWithoutUtc.localTime || existingSchedule.localTime;
+      const timezone = updateDataWithoutUtc.timezone || existingSchedule.timezone;
+      
+      if (localTime && timezone) {
+        const calculatedUtcTime = convertLocalTimeToUTC(localTime, timezone);
+        finalUpdateData.utcTime = calculatedUtcTime;
+        console.log(`✅ Recalculated UTC time: ${localTime} ${timezone} → ${calculatedUtcTime} UTC`);
+      }
+    }
+    
+    await storage.updateAutoSchedule(scheduleId, finalUpdateData);
+    const updatedSchedule = await storage.getAutoSchedule(scheduleId);
+    
+    await storage.createActivityLog({
+      userId,
+      websiteId: existingSchedule.websiteId,
+      type: "auto_schedule_updated",
+      description: `Auto-generation schedule updated: ${existingSchedule.name}`,
+      metadata: { scheduleId, updates: Object.keys(finalUpdateData) }
+    });
+    
+    console.log('✅ Schedule updated successfully');
+    res.json(updatedSchedule);
+  } catch (error) {
+    console.error("Failed to update auto-schedule:", error);
+    res.status(500).json({ 
+      message: "Failed to update schedule",
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
+  }
+});
+
+// DELETE an auto-schedule
+app.delete("/api/user/auto-schedules/:scheduleId", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { scheduleId } = req.params;
+    
+    console.log('🗑️ Deleting auto-schedule:', scheduleId);
+    
+    // Verify ownership
+    const existingSchedule = await storage.getAutoSchedule(scheduleId);
+    if (!existingSchedule || existingSchedule.userId !== userId) {
+      res.status(404).json({ message: "Schedule not found or access denied" });
+      return;
+    }
+    
+    const success = await storage.deleteAutoSchedule(scheduleId);
+    
+    if (success) {
+      await storage.createActivityLog({
+        userId,
+        websiteId: existingSchedule.websiteId,
+        type: "auto_schedule_deleted",
+        description: `Auto-generation schedule deleted: ${existingSchedule.name}`,
+        metadata: { scheduleId }
+      });
+      
+      console.log('✅ Schedule deleted successfully');
+      res.json({ message: "Schedule deleted successfully" });
+    } else {
+      res.status(500).json({ message: "Failed to delete schedule" });
+    }
+  } catch (error) {
+    console.error("Failed to delete auto-schedule:", error);
+    res.status(500).json({ 
+      message: "Failed to delete schedule",
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
+  }
+});
+
+// TOGGLE schedule active status
+app.post("/api/user/auto-schedules/:scheduleId/toggle", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { scheduleId } = req.params;
+    const { isActive } = req.body;
+    
+    console.log('🔀 Toggling auto-schedule:', scheduleId, 'to', isActive);
+    
+    // Verify ownership
+    const existingSchedule = await storage.getAutoSchedule(scheduleId);
+    if (!existingSchedule || existingSchedule.userId !== userId) {
+      res.status(404).json({ message: "Schedule not found or access denied" });
+      return;
+    }
+    
+    const updatedSchedule = await storage.toggleAutoSchedule(scheduleId, isActive);
+    
+    await storage.createActivityLog({
+      userId,
+      websiteId: existingSchedule.websiteId,
+      type: isActive ? "auto_schedule_activated" : "auto_schedule_paused",
+      description: `Auto-generation schedule ${isActive ? 'activated' : 'paused'}: ${existingSchedule.name}`,
+      metadata: { scheduleId }
+    });
+    
+    console.log('✅ Schedule toggled successfully');
+    res.json(updatedSchedule);
+  } catch (error) {
+    console.error("Failed to toggle auto-schedule:", error);
+    res.status(500).json({ 
+      message: "Failed to toggle schedule",
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
+  }
+});
+
+// MANUALLY RUN a schedule now
+app.post("/api/user/auto-schedules/:scheduleId/run", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { scheduleId } = req.params;
+    
+    console.log('▶️ Manually running auto-schedule:', scheduleId);
+    
+    // Verify ownership
+    const schedule = await storage.getAutoSchedule(scheduleId);
+    if (!schedule || schedule.userId !== userId) {
+      res.status(404).json({ message: "Schedule not found or access denied" });
+      return;
+    }
+    
+    // Trigger the schedule manually using your scheduler service
+    const result = await schedulerService.runScheduleManually(scheduleId);
+    
+    await storage.createActivityLog({
+      userId,
+      websiteId: schedule.websiteId,
+      type: "auto_schedule_manual_run",
+      description: `Manually triggered auto-generation: ${schedule.name}`,
+      metadata: { scheduleId, result }
+    });
+    
+    console.log('✅ Schedule triggered successfully');
+    res.json({ 
+      message: "Schedule triggered successfully",
+      result 
+    });
+  } catch (error) {
+    console.error("Failed to run auto-schedule:", error);
+    res.status(500).json({ 
+      message: "Failed to run schedule",
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
+  }
+});
+
+
+
 
 
 
