@@ -247,6 +247,8 @@ export interface ContentGenerationRequest {
   autoPublish?: boolean;
   publishDelay?: number;
   language?: string;
+  promptType?: "system" | "custom";  // ADD THIS
+  customPrompt?: string;              // ADD THIS
 }
 
 export interface ContentGenerationResultWithPublishing extends ContentGenerationResult {
@@ -1970,113 +1972,164 @@ Don't follow a template. Let the content flow naturally:
 - Leave some questions hanging before answering them later
 Return JSON but write the content field like you're having a conversation. Include HTML tags for structure but keep the voice conversational and slightly chaotic.`;
 
-  private buildSystemPrompt(
-    request: ContentGenerationRequest,
-    language: string,
-    languagePrompt: string
-  ): string {
-    const languageCode = language.toUpperCase();
-    const languageName = this.getLanguageName(language);
+private buildSystemPrompt(
+  request: ContentGenerationRequest,
+  language: string,
+  languagePrompt: string
+): string {
+  
+  const languageCode = language.toUpperCase();
+  const languageName = this.getLanguageName(language);
 
-    // Language enforcement map
-    const languageEnforcementMap: Record<string, string> = {
-      french: `COMMANDEMENT LINGUISTIQUE ABSOLU:
+  // Language enforcement map (used for both custom and system prompts)
+  const languageEnforcementMap: Record<string, string> = {
+    french: `COMMANDEMENT LINGUISTIQUE ABSOLU:
 Vous DEVEZ écrire en français et UNIQUEMENT en français.
 Chaque mot, chaque phrase, chaque paragraphe DOIT être en français.
 Il est INTERDIT d'utiliser l'anglais ou toute autre langue.
 Si vous ne connaissez pas un mot en français, décrivez-le en français.
 Votre réponse COMPLÈTE sera en français.`,
-      spanish: `MANDATO LINGÜÍSTICO ABSOLUTO:
+    spanish: `MANDATO LINGÜÍSTICO ABSOLUTO:
 Debes escribir en español y SOLO en español.
 Cada palabra, cada oración, cada párrafo DEBE estar en español.
 Está PROHIBIDO usar inglés u otros idiomas.
 Si no conoces una palabra en español, descríbela en español.
 Tu respuesta COMPLETA será en español.`,
-      german: `ABSOLUTES SPRACHGEBOT:
+    german: `ABSOLUTES SPRACHGEBOT:
 Sie MÜSSEN auf Deutsch schreiben und NUR auf Deutsch.
 Jedes Wort, jeder Satz, jeder Absatz MUSS auf Deutsch sein.
 Es ist VERBOTEN, Englisch oder andere Sprachen zu verwenden.
 Wenn Sie ein Wort nicht auf Deutsch kennen, beschreiben Sie es auf Deutsch.
 Ihre GESAMTE Antwort wird auf Deutsch sein.`,
-      italian: `MANDATO LINGUISTICO ASSOLUTO:
+    italian: `MANDATO LINGUISTICO ASSOLUTO:
 Devi scrivere in italiano e SOLO in italiano.
 Ogni parola, ogni frase, ogni paragrafo DEVE essere in italiano.
 È VIETATO usare l'inglese o altre lingue.
 Se non conosci una parola in italiano, descrivila in italiano.
 La tua risposta COMPLETA sarà in italiano.`,
-      portuguese: `MANDATO LINGUÍSTICO ABSOLUTO:
+    portuguese: `MANDATO LINGUÍSTICO ABSOLUTO:
 Você DEVE escrever em português e SOMENTE em português.
 Cada palavra, cada frase, cada parágrafo DEVE estar em português.
 É PROIBIDO usar inglês ou outros idiomas.
 Se não conhecer uma palavra em português, descreva-a em português.
 Sua resposta COMPLETA será em português.`,
-      russian: `АБСОЛЮТНОЕ ЯЗЫКОВОЕ ТРЕБОВАНИЕ:
+    russian: `АБСОЛЮТНОЕ ЯЗЫКОВОЕ ТРЕБОВАНИЕ:
 Вы ДОЛЖНЫ писать на русском и ТОЛЬКО на русском.
 Каждое слово, каждое предложение, каждый абзац ДОЛЖНЫ быть на русском.
 ЗАПРЕЩЕНО использовать английский или другие языки.
 Если вы не знаете слово по-русски, опишите его по-русски.
 Ваш ПОЛНЫЙ ответ будет на русском.`,
-      japanese: `絶対的な言語要件:
+    japanese: `絶対的な言語要件:
 あなたは日本語で書く必要があります。日本語のみです。
 すべての単語、すべての文、すべての段落は日本語である必要があります。
 英語または他の言語を使用することは禁止されています。
 日本語で知らない単語がある場合は、日本語で説明してください。
 あなたの完全な応答は日本語になります。`,
-      chinese: `绝对语言要求:
+    chinese: `绝对语言要求:
 你必须用中文写作,仅用中文。
 每个单词、每个句子、每个段落都必须是中文。
 禁止使用英文或其他语言。
 如果你不知道一个中文词汇,用中文描述它。
 你的完整答复将是中文。`,
-      korean: `절대적 언어 요구사항:
+    korean: `절대적 언어 요구사항:
 한국어로 작성해야 합니다. 한국어만 사용합니다.
 모든 단어, 모든 문장, 모든 단락은 한국어여야 합니다.
 영어 또는 다른 언어 사용은 금지됩니다.
 한국어로 모르는 단어가 있으면 한국어로 설명하세요.
 완전한 답변은 한국어입니다.`,
-      dutch: `ABSOLUUT TAALCOMMANDEMENT:
+    dutch: `ABSOLUUT TAALCOMMANDEMENT:
 Je MOET in het Nederlands schrijven en ALLEEN in het Nederlands.
 Elk woord, elke zin, elke alinea MOET in het Nederlands zijn.
 Het is VERBODEN Engels of andere talen te gebruiken.
 Als je een woord niet in het Nederlands kent, beschrijf het dan in het Nederlands.
 Je COMPLETE antwoord wordt in het Nederlands.`,
-      swedish: `ABSOLUT SPRÅKKRAV:
+    swedish: `ABSOLUT SPRÅKKRAV:
 Du MÅSTE skriva på svenska och ENDAST på svenska.
 Varje ord, varje mening, varje stycke MÅSTE vara på svenska.
 Det är FÖRBJUDET att använda engelska eller andra språk.
 Om du inte kan ett ord på svenska, beskriv det på svenska.
 Ditt KOMPLETTA svar kommer att vara på svenska.`,
-      polish: `ABSOLUTNE WYMAGANIE JĘZYKA:
+    polish: `ABSOLUTNE WYMAGANIE JĘZYKA:
 Musisz pisać po polsku i TYLKO po polsku.
 Każde słowo, każde zdanie, każdy akapit MUSI być po polsku.
 ZABRANIA się używania angielskiego lub innych języków.
 Jeśli nie znasz słowa po polsku, opisz je po polsku.
 Twoja CAŁA odpowiedź będzie po polsku.`,
-      turkish: `MUTLAK DİL GEREKSİNİMİ:
+    turkish: `MUTLAK DİL GEREKSİNİMİ:
 Türkçe yazmalısın ve SADECE Türkçe.
 Her kelime, her cümle, her paragraf Türkçe OLMALIDIR.
 İngilizce veya diğer diller YASAKLANMIŞTIR.
 Türkçe bilmediğin bir kelime varsa, onu Türkçe olarak tanımla.
 Tüm cevabın Türkçe olması gerekir.`,
-      thai: `ข้อกำหนดภาษาที่ขาดไม่ได้:
+    thai: `ข้อกำหนดภาษาที่ขาดไม่ได้:
 คุณต้องเขียนเป็นภาษาไทยและภาษาไทยเท่านั้น
 ทุกคำ ทุกประโยค ทุกย่อหน้าต้องเป็นภาษาไทย
 ห้ามใช้ภาษาอังกฤษหรือภาษาอื่น
 หากคุณไม่รู้คำว่าไทย ให้อธิบายเป็นภาษาไทย
 คำตอบทั้งหมดของคุณต้องเป็นภาษาไทย`,
-      vietnamese: `YÊU CẦU NGÔN NGỮ TUYỆT ĐỐI:
+    vietnamese: `YÊU CẦU NGÔN NGỮ TUYỆT ĐỐI:
 Bạn PHẢI viết bằng tiếng Việt và CHỈ tiếng Việt.
 Mỗi từ, mỗi câu, mỗi đoạn phải bằng tiếng Việt.
 KHÔNG ĐƯỢC phép dùng tiếng Anh hoặc ngôn ngữ khác.
 Nếu không biết một từ tiếng Việt, hãy mô tả nó bằng tiếng Việt.
 Toàn bộ câu trả lời của bạn sẽ bằng tiếng Việt.`,
-      english: "",
-    };
+    english: "",
+  };
 
-    const languageEnforcement = languageEnforcementMap[language] || "";
-    const conversationalPrompt = this.CONVERSATIONAL_SYSTEM_PROMPT.replace('{TOPIC}', request.topic);
+  const languageEnforcement = languageEnforcementMap[language] || "";
 
+  // ✅ CUSTOM PROMPT MODE: If user provided their own prompt, use it
+  if (request.promptType === "custom" && request.customPrompt && request.customPrompt.trim()) {
+    console.log(`🎯 Using CUSTOM PROMPT for content generation in ${languageCode}`);
+    
     return `${languageEnforcement}
+⚠️ CUSTOM PROMPT MODE ⚠️
+OUTPUT LANGUAGE: ${languageCode} (${languageName})
+${languagePrompt}
+
+=== USER'S CUSTOM INSTRUCTIONS ===
+${request.customPrompt.trim()}
+
+=== ADDITIONAL CONTEXT ===
+Topic: ${request.topic}
+Keywords: ${request.keywords.join(", ")}
+Target Word Count: ${request.wordCount} words
+Tone: ${request.tone}
+${request.brandVoice ? `Brand Voice: ${request.brandVoice}` : ""}
+${request.targetAudience ? `Target Audience: ${request.targetAudience}` : ""}
+${request.niche ? `Niche: ${getNicheContext(request.niche).label}` : ""}
+
+=== RESPONSE FORMAT - MUST BE VALID JSON ===
+You MUST respond with a valid JSON object in this exact format:
+{
+  "title": "Article title in ${languageCode} (under 60 characters)",
+  "content": "Full HTML article in ${languageCode} (minimum ${Math.ceil(request.wordCount * 0.8)} words)",
+  "excerpt": "Summary in ${languageCode} (150-160 characters)",
+  "metaDescription": "Meta description in ${languageCode} (150-160 characters)",
+  "metaTitle": "SEO title in ${languageCode} (under 60 characters)",
+  "keywords": ["keyword_in_${languageCode}", "keyword_in_${languageCode}", "keyword_in_${languageCode}"]
+}
+
+CRITICAL INSTRUCTIONS:
+1. WRITE EVERYTHING IN ${languageCode} ONLY - NO EXCEPTIONS
+2. EVERY SINGLE WORD MUST BE IN ${languageCode}
+3. NO ENGLISH WORDS ANYWHERE IN THE CONTENT
+4. NO LANGUAGE MIXING
+5. NO SECTION HEADERS IN ENGLISH
+6. Follow the user's custom instructions above
+7. Use HTML tags for formatting: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>
+8. Do NOT include metadata like "Created:", "Niche:", "Keywords:" in the content field
+9. Return ONLY valid JSON, nothing before or after
+
+START WRITING IN ${languageCode}:`;
+  }
+
+  // ✅ SYSTEM PROMPT MODE: Use the default conversational prompt
+  console.log(`🤖 Using SYSTEM PROMPT for content generation in ${languageCode}`);
+  
+  const conversationalPrompt = this.CONVERSATIONAL_SYSTEM_PROMPT.replace('{TOPIC}', request.topic);
+
+  return `${languageEnforcement}
 ⚠️ ABSOLUTE LANGUAGE REQUIREMENT ⚠️
 OUTPUT LANGUAGE: ${languageCode} (${languageName})
 ${languagePrompt}
@@ -2106,7 +2159,148 @@ CRITICAL REMINDERS:
 6. Use the conversational voice style defined above in ${languageCode}
 7. If a term doesn't exist in ${language}, describe it fully in ${language}
 START WRITING IN ${languageCode}:`;
-  }
+}
+
+
+
+//   private buildSystemPrompt(
+//     request: ContentGenerationRequest,
+//     language: string,
+//     languagePrompt: string
+//   ): string {
+
+//     const languageCode = language.toUpperCase();
+//     const languageName = this.getLanguageName(language);
+
+//     // Language enforcement map
+//     const languageEnforcementMap: Record<string, string> = {
+//       french: `COMMANDEMENT LINGUISTIQUE ABSOLU:
+// Vous DEVEZ écrire en français et UNIQUEMENT en français.
+// Chaque mot, chaque phrase, chaque paragraphe DOIT être en français.
+// Il est INTERDIT d'utiliser l'anglais ou toute autre langue.
+// Si vous ne connaissez pas un mot en français, décrivez-le en français.
+// Votre réponse COMPLÈTE sera en français.`,
+//       spanish: `MANDATO LINGÜÍSTICO ABSOLUTO:
+// Debes escribir en español y SOLO en español.
+// Cada palabra, cada oración, cada párrafo DEBE estar en español.
+// Está PROHIBIDO usar inglés u otros idiomas.
+// Si no conoces una palabra en español, descríbela en español.
+// Tu respuesta COMPLETA será en español.`,
+//       german: `ABSOLUTES SPRACHGEBOT:
+// Sie MÜSSEN auf Deutsch schreiben und NUR auf Deutsch.
+// Jedes Wort, jeder Satz, jeder Absatz MUSS auf Deutsch sein.
+// Es ist VERBOTEN, Englisch oder andere Sprachen zu verwenden.
+// Wenn Sie ein Wort nicht auf Deutsch kennen, beschreiben Sie es auf Deutsch.
+// Ihre GESAMTE Antwort wird auf Deutsch sein.`,
+//       italian: `MANDATO LINGUISTICO ASSOLUTO:
+// Devi scrivere in italiano e SOLO in italiano.
+// Ogni parola, ogni frase, ogni paragrafo DEVE essere in italiano.
+// È VIETATO usare l'inglese o altre lingue.
+// Se non conosci una parola in italiano, descrivila in italiano.
+// La tua risposta COMPLETA sarà in italiano.`,
+//       portuguese: `MANDATO LINGUÍSTICO ABSOLUTO:
+// Você DEVE escrever em português e SOMENTE em português.
+// Cada palavra, cada frase, cada parágrafo DEVE estar em português.
+// É PROIBIDO usar inglês ou outros idiomas.
+// Se não conhecer uma palavra em português, descreva-a em português.
+// Sua resposta COMPLETA será em português.`,
+//       russian: `АБСОЛЮТНОЕ ЯЗЫКОВОЕ ТРЕБОВАНИЕ:
+// Вы ДОЛЖНЫ писать на русском и ТОЛЬКО на русском.
+// Каждое слово, каждое предложение, каждый абзац ДОЛЖНЫ быть на русском.
+// ЗАПРЕЩЕНО использовать английский или другие языки.
+// Если вы не знаете слово по-русски, опишите его по-русски.
+// Ваш ПОЛНЫЙ ответ будет на русском.`,
+//       japanese: `絶対的な言語要件:
+// あなたは日本語で書く必要があります。日本語のみです。
+// すべての単語、すべての文、すべての段落は日本語である必要があります。
+// 英語または他の言語を使用することは禁止されています。
+// 日本語で知らない単語がある場合は、日本語で説明してください。
+// あなたの完全な応答は日本語になります。`,
+//       chinese: `绝对语言要求:
+// 你必须用中文写作,仅用中文。
+// 每个单词、每个句子、每个段落都必须是中文。
+// 禁止使用英文或其他语言。
+// 如果你不知道一个中文词汇,用中文描述它。
+// 你的完整答复将是中文。`,
+//       korean: `절대적 언어 요구사항:
+// 한국어로 작성해야 합니다. 한국어만 사용합니다.
+// 모든 단어, 모든 문장, 모든 단락은 한국어여야 합니다.
+// 영어 또는 다른 언어 사용은 금지됩니다.
+// 한국어로 모르는 단어가 있으면 한국어로 설명하세요.
+// 완전한 답변은 한국어입니다.`,
+//       dutch: `ABSOLUUT TAALCOMMANDEMENT:
+// Je MOET in het Nederlands schrijven en ALLEEN in het Nederlands.
+// Elk woord, elke zin, elke alinea MOET in het Nederlands zijn.
+// Het is VERBODEN Engels of andere talen te gebruiken.
+// Als je een woord niet in het Nederlands kent, beschrijf het dan in het Nederlands.
+// Je COMPLETE antwoord wordt in het Nederlands.`,
+//       swedish: `ABSOLUT SPRÅKKRAV:
+// Du MÅSTE skriva på svenska och ENDAST på svenska.
+// Varje ord, varje mening, varje stycke MÅSTE vara på svenska.
+// Det är FÖRBJUDET att använda engelska eller andra språk.
+// Om du inte kan ett ord på svenska, beskriv det på svenska.
+// Ditt KOMPLETTA svar kommer att vara på svenska.`,
+//       polish: `ABSOLUTNE WYMAGANIE JĘZYKA:
+// Musisz pisać po polsku i TYLKO po polsku.
+// Każde słowo, każde zdanie, każdy akapit MUSI być po polsku.
+// ZABRANIA się używania angielskiego lub innych języków.
+// Jeśli nie znasz słowa po polsku, opisz je po polsku.
+// Twoja CAŁA odpowiedź będzie po polsku.`,
+//       turkish: `MUTLAK DİL GEREKSİNİMİ:
+// Türkçe yazmalısın ve SADECE Türkçe.
+// Her kelime, her cümle, her paragraf Türkçe OLMALIDIR.
+// İngilizce veya diğer diller YASAKLANMIŞTIR.
+// Türkçe bilmediğin bir kelime varsa, onu Türkçe olarak tanımla.
+// Tüm cevabın Türkçe olması gerekir.`,
+//       thai: `ข้อกำหนดภาษาที่ขาดไม่ได้:
+// คุณต้องเขียนเป็นภาษาไทยและภาษาไทยเท่านั้น
+// ทุกคำ ทุกประโยค ทุกย่อหน้าต้องเป็นภาษาไทย
+// ห้ามใช้ภาษาอังกฤษหรือภาษาอื่น
+// หากคุณไม่รู้คำว่าไทย ให้อธิบายเป็นภาษาไทย
+// คำตอบทั้งหมดของคุณต้องเป็นภาษาไทย`,
+//       vietnamese: `YÊU CẦU NGÔN NGỮ TUYỆT ĐỐI:
+// Bạn PHẢI viết bằng tiếng Việt và CHỈ tiếng Việt.
+// Mỗi từ, mỗi câu, mỗi đoạn phải bằng tiếng Việt.
+// KHÔNG ĐƯỢC phép dùng tiếng Anh hoặc ngôn ngữ khác.
+// Nếu không biết một từ tiếng Việt, hãy mô tả nó bằng tiếng Việt.
+// Toàn bộ câu trả lời của bạn sẽ bằng tiếng Việt.`,
+//       english: "",
+//     };
+
+//     const languageEnforcement = languageEnforcementMap[language] || "";
+//     const conversationalPrompt = this.CONVERSATIONAL_SYSTEM_PROMPT.replace('{TOPIC}', request.topic);
+
+//     return `${languageEnforcement}
+// ⚠️ ABSOLUTE LANGUAGE REQUIREMENT ⚠️
+// OUTPUT LANGUAGE: ${languageCode} (${languageName})
+// ${languagePrompt}
+// ${conversationalPrompt}
+// CRITICAL INSTRUCTIONS:
+// 1. WRITE EVERYTHING IN ${languageCode} ONLY
+// 2. EVERY SINGLE WORD MUST BE IN ${languageCode}
+// 3. NO ENGLISH WORDS ANYWHERE
+// 4. NO LANGUAGE MIXING
+// 5. NO SECTION HEADERS IN ENGLISH
+// If a term doesn't exist in ${language}, describe it fully in ${language}.
+// === RESPONSE FORMAT - MUST BE VALID JSON ===
+// {
+//   "title": "Article title in ${languageCode}",
+//   "content": "Full HTML article in ${languageCode} with conversational voice",
+//   "excerpt": "Summary in ${languageCode}",
+//   "metaDescription": "Meta description in ${languageCode}",
+//   "metaTitle": "SEO title in ${languageCode}",
+//   "keywords": ["keyword_in_${languageCode}", "keyword_in_${languageCode}"]
+// }
+// CRITICAL REMINDERS:
+// 1. WRITE EVERYTHING IN ${languageCode} ONLY
+// 2. EVERY SINGLE WORD MUST BE IN ${languageCode}
+// 3. NO ENGLISH WORDS ANYWHERE
+// 4. NO LANGUAGE MIXING
+// 5. NO SECTION HEADERS IN ENGLISH
+// 6. Use the conversational voice style defined above in ${languageCode}
+// 7. If a term doesn't exist in ${language}, describe it fully in ${language}
+// START WRITING IN ${languageCode}:`;
+//   }
 
   private getLanguageName(language: string): string {
     const languageNames: Record<string, string> = {
@@ -2297,470 +2491,965 @@ Write like someone who knows their shit${request.niche && nicheContext ? ` in th
     return prompt;
   }
 
+
+
   async generateContent(
-    request: ContentGenerationRequest
-  ): Promise<ContentGenerationResultWithPublishing> {
+  request: ContentGenerationRequest
+): Promise<ContentGenerationResultWithPublishing> {
+  try {
+    console.log(
+      `Generating content for user ${request.userId} with ${request.aiProvider.toUpperCase()} in ${
+        request.language || "english"
+      }`
+    );
+
+    // VALIDATION BLOCK
+    if (!request.websiteId && !request.niche) {
+      throw new Error(
+        "Either websiteId or niche must be provided for content generation"
+      );
+    }
+
+    const language = request.language || "english";
+    if (!VALID_LANGUAGES.includes(language)) {
+      throw new Error(
+        `Invalid language: ${language}. Must be one of: ${VALID_LANGUAGES.join(", ")}`
+      );
+    }
+
+    this.lastLanguage = language;
+    this.lastRequestTopic = request.topic;
+
+    // Log content type
+    if (request.websiteId) {
+      console.log(`📄 Generating website-specific content for website: ${request.websiteId}`);
+    } else if (request.niche) {
+      console.log(`📄 Generating standalone content for niche: ${request.niche}`);
+    }
+
+    // Log prompt type
+    if (request.promptType === "custom" && request.customPrompt) {
+      console.log(`🎯 Using CUSTOM PROMPT mode`);
+    } else {
+      console.log(`🤖 Using SYSTEM PROMPT mode (conversational)`);
+    }
+
+    // STEP 1: Check image generation
+    if (request.includeImages && request.imageCount && request.imageCount > 0) {
+      const openAiKey = await this.getApiKey('openai', request.userId);
+      if (!openAiKey) {
+        console.warn("⚠️ Image generation requested but no OpenAI API key available");
+        request.includeImages = false;
+        request.imageCount = 0;
+      } else {
+        console.log(
+          `🎨 Will generate ${request.imageCount} images with DALL-E 3 (regardless of content AI provider: ${request.aiProvider})`
+        );
+      }
+    }
+
+    if (request.isAutoGenerated) {
+      console.log(`Auto-generation detected:`, {
+        autoScheduleId: request.autoScheduleId,
+        autoPublish: request.autoPublish,
+        publishDelay: request.publishDelay,
+      });
+    }
+
+    // STEP 2: Generate content
+    const languagePrompt = this.getLanguagePrompt(language);
+    const systemPrompt = this.buildSystemPrompt(request, language, languagePrompt);
+
+    // ✅ CUSTOM PROMPT HANDLING: Use different user prompts based on mode
+    let userPrompt: string;
+    if (request.promptType === "custom" && request.customPrompt && request.customPrompt.trim()) {
+      // For custom prompts, use a minimal user message
+      // All instructions are already in the system prompt
+      userPrompt = `Generate the content based on the custom instructions and context provided in the system prompt above. 
+
+Important reminders:
+- Write in ${language.toUpperCase()} only
+- Output valid JSON in the exact format specified
+- Follow all the custom instructions provided
+- Include all required fields: title, content, excerpt, metaDescription, metaTitle, keywords
+
+Begin generation now.`;
+      
+      console.log(`📝 Using CUSTOM PROMPT with simplified user message`);
+    } else {
+      // For system prompts, use the detailed content prompt
+      userPrompt = this.buildContentPrompt(request);
+      console.log(`📝 Using SYSTEM PROMPT with detailed content instructions`);
+    }
+
+    console.log(`📝 System Prompt Language Enforcement: ${language.toUpperCase()}`);
+    console.log(`📝 User Prompt Language Code: ${language.toUpperCase()}`);
+    console.log(`📝 ${request.promptType === "custom" ? "Custom prompt" : "Conversational voice"} enabled for topic: ${request.topic}`);
+
+    const contentResponse = await this.callAI(
+      request.aiProvider,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      request.aiProvider === "openai" ? { type: "json_object" } : undefined,
+      0.7,
+      request.userId
+    );
+
+    const keyTypeUsed = contentResponse.keyType || 'system';
+    let contentResult;
+
+    // Parse JSON response
     try {
-      console.log(
-        `Generating content for user ${request.userId} with ${request.aiProvider.toUpperCase()} in ${
-          request.language || "english"
-        }`
-      );
+      let cleanedContent = contentResponse.content.trim();
+      cleanedContent = cleanedContent.replace(/^\uFEFF/, "");
+      contentResult = JSON.parse(cleanedContent);
+      console.log("✅ Successfully parsed JSON response from", request.aiProvider.toUpperCase());
+    } catch (parseError: any) {
+      console.error("❌ Initial JSON parse failed, attempting extraction...", parseError.message);
+      let cleanedContent = contentResponse.content.trim();
+      const firstBrace = cleanedContent.indexOf("{");
+      const lastBrace = cleanedContent.lastIndexOf("}");
 
-      // VALIDATION BLOCK
-      if (!request.websiteId && !request.niche) {
-        throw new Error(
-          "Either websiteId or niche must be provided for content generation"
-        );
-      }
-
-      const language = request.language || "english";
-      if (!VALID_LANGUAGES.includes(language)) {
-        throw new Error(
-          `Invalid language: ${language}. Must be one of: ${VALID_LANGUAGES.join(", ")}`
-        );
-      }
-
-      this.lastLanguage = language;
-      this.lastRequestTopic = request.topic;
-
-      // Log content type
-      if (request.websiteId) {
-        console.log(`📄 Generating website-specific content for website: ${request.websiteId}`);
-      } else if (request.niche) {
-        console.log(`📄 Generating standalone content for niche: ${request.niche}`);
-      }
-
-      // STEP 1: Check image generation
-      if (request.includeImages && request.imageCount && request.imageCount > 0) {
-        const openAiKey = await this.getApiKey('openai', request.userId);
-        if (!openAiKey) {
-          console.warn("⚠️ Image generation requested but no OpenAI API key available");
-          request.includeImages = false;
-          request.imageCount = 0;
-        } else {
-          console.log(
-            `🎨 Will generate ${request.imageCount} images with DALL-E 3 (regardless of content AI provider: ${request.aiProvider})`
-          );
-        }
-      }
-
-      if (request.isAutoGenerated) {
-        console.log(`Auto-generation detected:`, {
-          autoScheduleId: request.autoScheduleId,
-          autoPublish: request.autoPublish,
-          publishDelay: request.publishDelay,
-        });
-      }
-
-      // STEP 2: Generate content
-      const contentPrompt = this.buildContentPrompt(request);
-      const languagePrompt = this.getLanguagePrompt(language);
-      const systemPrompt = this.buildSystemPrompt(request, language, languagePrompt);
-
-      console.log(`📝 System Prompt Language Enforcement: ${language.toUpperCase()}`);
-      console.log(`📝 User Prompt Language Code: ${language.toUpperCase()}`);
-      console.log(`📝 Conversational voice enabled for topic: ${request.topic}`);
-
-      const contentResponse = await this.callAI(
-        request.aiProvider,
-        [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: contentPrompt },
-        ],
-        request.aiProvider === "openai" ? { type: "json_object" } : undefined,
-        0.7,
-        request.userId
-      );
-
-      const keyTypeUsed = contentResponse.keyType || 'system';
-      let contentResult;
-
-      // Parse JSON response
-      try {
-        let cleanedContent = contentResponse.content.trim();
-        cleanedContent = cleanedContent.replace(/^\uFEFF/, "");
-        contentResult = JSON.parse(cleanedContent);
-        console.log("✅ Successfully parsed JSON response from", request.aiProvider.toUpperCase());
-      } catch (parseError: any) {
-        console.error("❌ Initial JSON parse failed, attempting extraction...", parseError.message);
-        let cleanedContent = contentResponse.content.trim();
-        const firstBrace = cleanedContent.indexOf("{");
-        const lastBrace = cleanedContent.lastIndexOf("}");
-
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          const extractedJson = cleanedContent.substring(firstBrace, lastBrace + 1);
-          try {
-            contentResult = JSON.parse(extractedJson);
-            console.log("✅ Successfully parsed extracted JSON from", request.aiProvider.toUpperCase());
-          } catch (secondParseError: any) {
-            throw new AIProviderError(
-              request.aiProvider,
-              `Failed to parse JSON response after multiple attempts. Original error: ${parseError.message}`
-            );
-          }
-        } else {
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const extractedJson = cleanedContent.substring(firstBrace, lastBrace + 1);
+        try {
+          contentResult = JSON.parse(extractedJson);
+          console.log("✅ Successfully parsed extracted JSON from", request.aiProvider.toUpperCase());
+        } catch (secondParseError: any) {
           throw new AIProviderError(
             request.aiProvider,
-            `No valid JSON structure found in response. Response was: ${contentResponse.content.substring(0, 300)}...`
+            `Failed to parse JSON response after multiple attempts. Original error: ${parseError.message}`
           );
         }
-      }
-
-      // Validate required fields
-      if (!contentResult.title || !contentResult.content) {
+      } else {
         throw new AIProviderError(
           request.aiProvider,
-          "AI response missing required fields (title, content)"
+          `No valid JSON structure found in response. Response was: ${contentResponse.content.substring(0, 300)}...`
         );
       }
+    }
 
-      // Convert markdown to HTML
-      console.log("🔄 Converting markdown headers to HTML...");
-      if (contentResult.content && contentResult.content.includes("#")) {
-        console.log("🔍 Markdown headers detected, converting to HTML...");
-        contentResult.content = ContentFormatter.convertMarkdownToHtml(contentResult.content);
-      }
+    // Validate required fields
+    if (!contentResult.title || !contentResult.content) {
+      throw new AIProviderError(
+        request.aiProvider,
+        "AI response missing required fields (title, content)"
+      );
+    }
 
-      contentResult.content = ContentFormatter.formatForWordPress(contentResult.content);
-      console.log("✅ Content formatted for WordPress");
+    // Convert markdown to HTML
+    console.log("🔄 Converting markdown headers to HTML...");
+    if (contentResult.content && contentResult.content.includes("#")) {
+      console.log("🔍 Markdown headers detected, converting to HTML...");
+      contentResult.content = ContentFormatter.convertMarkdownToHtml(contentResult.content);
+    }
 
-      // Sanitize metadata
-      contentResult.content = this.sanitizeContentMetadata(contentResult.content);
+    contentResult.content = ContentFormatter.formatForWordPress(contentResult.content);
+    console.log("✅ Content formatted for WordPress");
 
-      // Pre-generate contentId
-      let contentId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Sanitize metadata
+    contentResult.content = this.sanitizeContentMetadata(contentResult.content);
 
-      // STEP 3: Generate images if requested
-      let images: Array<{
-        url: string;
-        filename: string;
-        altText: string;
-        prompt: string;
-        cost: number;
-        cloudinaryUrl?: string;
-        cloudinaryPublicId?: string;
-      }> = [];
-      let totalImageCost = 0;
-      let imageKeyType: 'user' | 'system' = 'system';
+    // Pre-generate contentId
+    let contentId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      if (request.includeImages && request.imageCount && request.imageCount > 0) {
-        try {
-          console.log(`🎨 Generating ${request.imageCount} images with DALL-E 3...`);
+    // STEP 3: Generate images if requested
+    let images: Array<{
+      url: string;
+      filename: string;
+      altText: string;
+      prompt: string;
+      cost: number;
+      cloudinaryUrl?: string;
+      cloudinaryPublicId?: string;
+    }> = [];
+    let totalImageCost = 0;
+    let imageKeyType: 'user' | 'system' = 'system';
 
-          const imageGenerationRequest = {
-            topic: request.topic,
-            count: request.imageCount,
-            style: request.imageStyle || "natural",
-            contentContext: contentResult.content.substring(0, 500),
-            keywords: request.keywords,
-          };
+    if (request.includeImages && request.imageCount && request.imageCount > 0) {
+      try {
+        console.log(`🎨 Generating ${request.imageCount} images with DALL-E 3...`);
 
-          const validation = imageService.validateImageRequest(imageGenerationRequest);
-          if (!validation.valid) {
-            throw new Error(
-              `Image generation validation failed: ${validation.errors.join(", ")}`
-            );
-          }
+        const imageGenerationRequest = {
+          topic: request.topic,
+          count: request.imageCount,
+          style: request.imageStyle || "natural",
+          contentContext: contentResult.content.substring(0, 500),
+          keywords: request.keywords,
+        };
 
-          const imageResult = await imageService.generateImages(
-            imageGenerationRequest,
-            request.userId,
-            request.websiteId
+        const validation = imageService.validateImageRequest(imageGenerationRequest);
+        if (!validation.valid) {
+          throw new Error(
+            `Image generation validation failed: ${validation.errors.join(", ")}`
           );
-          imageKeyType = imageResult.keyType || 'system';
-
-          // Upload to Cloudinary
-          console.log(`☁️ Uploading images to Cloudinary...`);
-
-          for (const img of imageResult.images) {
-            try {
-              const cloudinaryImage = await cloudinaryStorage.uploadFromUrl(
-                img.url,
-                request.websiteId || `niche-${request.niche}`,
-                contentId,
-                img.filename
-              );
-
-              images.push({
-                ...img,
-                url: cloudinaryImage.secureUrl,
-                cloudinaryUrl: cloudinaryImage.secureUrl,
-                cloudinaryPublicId: cloudinaryImage.publicId,
-              });
-              console.log(`✅ Image stored: ${img.filename}`);
-            } catch (uploadError: any) {
-              console.error(`❌ Failed to upload to Cloudinary: ${img.filename}`, uploadError.message);
-              images.push(img);
-            }
-          }
-
-          totalImageCost = imageResult.totalCost;
-          console.log(`✅ Generated ${images.length} images`);
-
-          if (images.length > 0) {
-            console.log("🖼️ Embedding images into content...");
-            contentResult.content = this.embedImagesInContentPrivate(
-              contentResult.content,
-              images
-            );
-            console.log(`✅ Embedded ${images.length} images`);
-          }
-        } catch (imageError: any) {
-          console.error("❌ Image generation failed:", imageError.message);
-          if (imageError.message.includes("Rate limit")) {
-            console.warn("⚠️ Rate limit reached, continuing without images");
-          } else if (imageError.message.includes("credits") || imageError.message.includes("quota")) {
-            console.warn("⚠️ Insufficient credits, continuing without images");
-          } else if (imageError.message.includes("API key")) {
-            console.warn("⚠️ API key issue, continuing without images");
-          } else {
-            console.warn(`⚠️ Image error: ${imageError.message}`);
-          }
-          images = [];
-          totalImageCost = 0;
         }
-      }
 
-      // STEP 4: Analyze content
-      const analysisResult = await this.performContentAnalysis({
-        title: contentResult.title,
-        content: contentResult.content,
-        keywords: request.keywords,
-        tone: request.tone,
-        brandVoice: request.brandVoice,
-        targetAudience: request.targetAudience,
-        eatCompliance: request.eatCompliance,
-        websiteId: request.websiteId || 'standalone',
-        aiProvider: request.aiProvider,
+        const imageResult = await imageService.generateImages(
+          imageGenerationRequest,
+          request.userId,
+          request.websiteId
+        );
+        imageKeyType = imageResult.keyType || 'system';
+
+        // Upload to Cloudinary
+        console.log(`☁️ Uploading images to Cloudinary...`);
+
+        for (const img of imageResult.images) {
+          try {
+            const cloudinaryImage = await cloudinaryStorage.uploadFromUrl(
+              img.url,
+              request.websiteId || `niche-${request.niche}`,
+              contentId,
+              img.filename
+            );
+
+            images.push({
+              ...img,
+              url: cloudinaryImage.secureUrl,
+              cloudinaryUrl: cloudinaryImage.secureUrl,
+              cloudinaryPublicId: cloudinaryImage.publicId,
+            });
+            console.log(`✅ Image stored: ${img.filename}`);
+          } catch (uploadError: any) {
+            console.error(`❌ Failed to upload to Cloudinary: ${img.filename}`, uploadError.message);
+            images.push(img);
+          }
+        }
+
+        totalImageCost = imageResult.totalCost;
+        console.log(`✅ Generated ${images.length} images`);
+
+        if (images.length > 0) {
+          console.log("🖼️ Embedding images into content...");
+          contentResult.content = this.embedImagesInContentPrivate(
+            contentResult.content,
+            images
+          );
+          console.log(`✅ Embedded ${images.length} images`);
+        }
+      } catch (imageError: any) {
+        console.error("❌ Image generation failed:", imageError.message);
+        if (imageError.message.includes("Rate limit")) {
+          console.warn("⚠️ Rate limit reached, continuing without images");
+        } else if (imageError.message.includes("credits") || imageError.message.includes("quota")) {
+          console.warn("⚠️ Insufficient credits, continuing without images");
+        } else if (imageError.message.includes("API key")) {
+          console.warn("⚠️ API key issue, continuing without images");
+        } else {
+          console.warn(`⚠️ Image error: ${imageError.message}`);
+        }
+        images = [];
+        totalImageCost = 0;
+      }
+    }
+
+    // STEP 4: Analyze content
+    const analysisResult = await this.performContentAnalysis({
+      title: contentResult.title,
+      content: contentResult.content,
+      keywords: request.keywords,
+      tone: request.tone,
+      brandVoice: request.brandVoice,
+      targetAudience: request.targetAudience,
+      eatCompliance: request.eatCompliance,
+      websiteId: request.websiteId || 'standalone',
+      aiProvider: request.aiProvider,
+      userId: request.userId,
+      language: language,
+      niche: request.niche,
+    });
+
+    // STEP 5: Calculate costs
+    const contentTokens = Math.max(1, contentResponse.tokens + analysisResult.tokensUsed);
+    const contentPricing = AI_MODELS[request.aiProvider].pricing;
+    const avgTokenCost = (contentPricing.input + contentPricing.output) / 2;
+    const textCostUsd = (contentTokens * avgTokenCost) / 1000;
+    const totalCostUsd = textCostUsd + totalImageCost;
+
+    console.log(`💰 Cost breakdown:`);
+    console.log(`   Content: $${textCostUsd.toFixed(6)}`);
+    console.log(`   Images: $${totalImageCost.toFixed(6)}`);
+    console.log(`   Total: $${totalCostUsd.toFixed(6)}`);
+
+    // STEP 6: Track AI usage
+    try {
+      await storage.trackAiUsage({
+        websiteId: request.websiteId || null,
         userId: request.userId,
-        language: language,
-        niche: request.niche,
+        model: AI_MODELS[request.aiProvider].model,
+        tokensUsed: contentTokens,
+        costUsd: Math.max(1, Math.round(textCostUsd * 1000)),
+        operation: "content_generation",
+        keyType: keyTypeUsed,
       });
 
-      // STEP 5: Calculate costs
-      const contentTokens = Math.max(1, contentResponse.tokens + analysisResult.tokensUsed);
-      const contentPricing = AI_MODELS[request.aiProvider].pricing;
-      const avgTokenCost = (contentPricing.input + contentPricing.output) / 2;
-      const textCostUsd = (contentTokens * avgTokenCost) / 1000;
-      const totalCostUsd = textCostUsd + totalImageCost;
-
-      console.log(`💰 Cost breakdown:`);
-      console.log(`   Content: $${textCostUsd.toFixed(6)}`);
-      console.log(`   Images: $${totalImageCost.toFixed(6)}`);
-      console.log(`   Total: $${totalCostUsd.toFixed(6)}`);
-
-      // STEP 6: Track AI usage
-      try {
+      if (images.length > 0) {
         await storage.trackAiUsage({
           websiteId: request.websiteId || null,
           userId: request.userId,
-          model: AI_MODELS[request.aiProvider].model,
-          tokensUsed: contentTokens,
-          costUsd: Math.max(1, Math.round(textCostUsd * 1000)),
-          operation: "content_generation",
-          keyType: keyTypeUsed,
+          model: "dall-e-3",
+          tokensUsed: 0,
+          costUsd: Math.round(totalImageCost * 100),
+          operation: "image_generation",
+          keyType: imageKeyType,
         });
-
-        if (images.length > 0) {
-          await storage.trackAiUsage({
-            websiteId: request.websiteId || null,
-            userId: request.userId,
-            model: "dall-e-3",
-            tokensUsed: 0,
-            costUsd: Math.round(totalImageCost * 100),
-            operation: "image_generation",
-            keyType: imageKeyType,
-          });
-        }
-      } catch (trackingError: any) {
-        console.warn("Tracking failed:", trackingError.message);
       }
+    } catch (trackingError: any) {
+      console.warn("Tracking failed:", trackingError.message);
+    }
 
-      // STEP 7: Generate quality checks
-      const qualityChecks = this.generateQualityChecks(contentResult.content, request);
+    // STEP 7: Generate quality checks
+    const qualityChecks = this.generateQualityChecks(contentResult.content, request);
 
-      // STEP 8: Save to database
-      let savedContentId: string | undefined;
-      let published = false;
-      let scheduledForPublishing = false;
-      let publishedAt: Date | undefined;
-      let scheduledDate: Date | undefined;
+    // STEP 8: Save to database
+    let savedContentId: string | undefined;
+    let published = false;
+    let scheduledForPublishing = false;
+    let publishedAt: Date | undefined;
+    let scheduledDate: Date | undefined;
 
-      try {
-        const contentToSave = {
-          websiteId: request.websiteId || null,
-          niche: request.niche || null,
-          userId: request.userId,
-          title: contentResult.title,
-          body: contentResult.content,
-          excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
-          metaDescription:
-            contentResult.metaDescription ||
-            this.generateMetaDescription(contentResult.title, contentResult.content),
-          metaTitle: contentResult.metaTitle || contentResult.title,
-          aiModel: AI_MODELS[request.aiProvider].model,
-          seoKeywords: contentResult.keywords || request.keywords,
-          seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
-          readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
-          brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
-          eatCompliance: request.eatCompliance || false,
-          tokensUsed: contentTokens,
-          costUsd: Math.round(totalCostUsd * 100),
-          status: 'draft',
-          hasImages: images.length > 0,
-          imageCount: images.length,
-          imageCostCents: Math.round(totalImageCost * 100),
-          language: language,
-          conversationalVoice: true,
-        };
-
-        console.log(`💾 Saving content...`);
-        const savedContent = await storage.createContent(contentToSave);
-        savedContentId = savedContent.id;
-        contentId = savedContentId;
-
-        console.log(`✅ Content saved: ${savedContentId}`);
-
-        if (!savedContentId || savedContentId.startsWith('temp-')) {
-          throw new Error(`Invalid content ID: ${savedContentId}`);
-        }
-
-        // Handle auto-publishing
-        if (request.isAutoGenerated && request.autoScheduleId && request.autoPublish) {
-          console.log(`🚀 Processing auto-publishing...`);
-
-          if (request.publishDelay === 0) {
-            scheduledDate = new Date();
-            try {
-              await storage.createContentSchedule({
-                contentId: savedContentId,
-                userId: request.userId,
-                websiteId: request.websiteId!,
-                scheduled_date: scheduledDate,
-                status: "publishing",
-                title: contentResult.title,
-                topic: request.topic,
-                metadata: {
-                  autoGenerated: true,
-                  autoScheduleId: request.autoScheduleId,
-                  publishedImmediately: true,
-                  generatedAt: new Date(),
-                },
-              });
-
-              const publishResult = await this.publishToWordPress(
-                savedContentId,
-                request.websiteId!,
-                request.userId
-              );
-
-              if (publishResult.success) {
-                published = true;
-                publishedAt = new Date();
-
-                await storage.updateContent(savedContentId, {
-                  status: "published",
-                  publishDate: publishedAt,
-                  wordpressPostId: publishResult.postId,
-                });
-
-                await storage.updateContentScheduleByContentId(savedContentId, {
-                  status: "published",
-                  published_at: publishedAt,
-                });
-
-                console.log(`✅ Published to WordPress`);
-              } else {
-                console.error(`❌ Publishing failed: ${publishResult.error}`);
-              }
-            } catch (publishError: any) {
-              console.error(`❌ Publishing error: ${publishError.message}`);
-            }
-          } else if (request.publishDelay && request.publishDelay > 0) {
-            scheduledDate = new Date();
-            scheduledDate.setHours(scheduledDate.getHours() + request.publishDelay);
-            scheduledForPublishing = true;
-
-            try {
-              await storage.createContentSchedule({
-                contentId: savedContentId,
-                userId: request.userId,
-                websiteId: request.websiteId!,
-                scheduled_date: scheduledDate,
-                status: "scheduled",
-                title: contentResult.title,
-                topic: request.topic,
-                metadata: {
-                  autoGenerated: true,
-                  autoScheduleId: request.autoScheduleId,
-                  publishDelay: request.publishDelay,
-                  generatedAt: new Date(),
-                },
-              });
-
-              console.log(`⏰ Scheduled for ${scheduledDate.toISOString()}`);
-            } catch (scheduleError: any) {
-              console.error(`❌ Schedule error: ${scheduleError.message}`);
-            }
-          }
-        }
-      } catch (saveError: any) {
-        console.error(`❌ Save failed: ${saveError.message}`);
-        throw new Error(`Content generation failed: Unable to save - ${saveError.message}`);
-      }
-
-      // STEP 9: Return result
-      const result: ContentGenerationResultWithPublishing = {
+    try {
+      const contentToSave = {
+        websiteId: request.websiteId || null,
+        niche: request.niche || null,
+        userId: request.userId,
         title: contentResult.title,
-        content: contentResult.content,
+        body: contentResult.content,
         excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
         metaDescription:
           contentResult.metaDescription ||
           this.generateMetaDescription(contentResult.title, contentResult.content),
         metaTitle: contentResult.metaTitle || contentResult.title,
-        keywords: contentResult.keywords || request.keywords,
+        aiModel: AI_MODELS[request.aiProvider].model,
+        seoKeywords: contentResult.keywords || request.keywords,
         seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
         readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
         brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
         eatCompliance: request.eatCompliance || false,
         tokensUsed: contentTokens,
-        costUsd: Number(textCostUsd.toFixed(6)),
-        aiProvider: request.aiProvider,
-        qualityChecks,
-        contentId: savedContentId,
-        published: published,
-        scheduledForPublishing: scheduledForPublishing,
-        publishedAt: publishedAt,
-        scheduledDate: scheduledDate,
-        totalCost: totalCostUsd.toFixed(6),
+        costUsd: Math.round(totalCostUsd * 100),
+        status: 'draft',
+        hasImages: images.length > 0,
+        imageCount: images.length,
+        imageCostCents: Math.round(totalImageCost * 100),
         language: language,
-        conversationalVoice: true,
+        conversationalVoice: request.promptType !== "custom", // ✅ Track if custom or system prompt was used
       };
 
-      if (images.length > 0) {
-        result.images = images.map((img) => ({
-          url: img.cloudinaryUrl || img.url,
-          filename: img.filename,
-          altText: img.altText,
-          prompt: img.prompt,
-          cost: img.cost,
-          cloudinaryUrl: img.cloudinaryUrl,
-          cloudinaryPublicId: img.cloudinaryPublicId,
-        }));
-        result.totalImageCost = totalImageCost;
+      console.log(`💾 Saving content...`);
+      const savedContent = await storage.createContent(contentToSave);
+      savedContentId = savedContent.id;
+      contentId = savedContentId;
+
+      console.log(`✅ Content saved: ${savedContentId}`);
+
+      if (!savedContentId || savedContentId.startsWith('temp-')) {
+        throw new Error(`Invalid content ID: ${savedContentId}`);
       }
 
-      console.log(`✅ Generation complete - ${language.toUpperCase()}`);
+      // Handle auto-publishing
+      if (request.isAutoGenerated && request.autoScheduleId && request.autoPublish) {
+        console.log(`🚀 Processing auto-publishing...`);
 
-      return result;
-    } catch (error: any) {
-      if (error instanceof AIProviderError || error instanceof AnalysisError) {
-        throw error;
+        if (request.publishDelay === 0) {
+          scheduledDate = new Date();
+          try {
+            await storage.createContentSchedule({
+              contentId: savedContentId,
+              userId: request.userId,
+              websiteId: request.websiteId!,
+              scheduled_date: scheduledDate,
+              status: "publishing",
+              title: contentResult.title,
+              topic: request.topic,
+              metadata: {
+                autoGenerated: true,
+                autoScheduleId: request.autoScheduleId,
+                publishedImmediately: true,
+                generatedAt: new Date(),
+              },
+            });
+
+            const publishResult = await this.publishToWordPress(
+              savedContentId,
+              request.websiteId!,
+              request.userId
+            );
+
+            if (publishResult.success) {
+              published = true;
+              publishedAt = new Date();
+
+              await storage.updateContent(savedContentId, {
+                status: "published",
+                publishDate: publishedAt,
+                wordpressPostId: publishResult.postId,
+              });
+
+              await storage.updateContentScheduleByContentId(savedContentId, {
+                status: "published",
+                published_at: publishedAt,
+              });
+
+              console.log(`✅ Published to WordPress`);
+            } else {
+              console.error(`❌ Publishing failed: ${publishResult.error}`);
+            }
+          } catch (publishError: any) {
+            console.error(`❌ Publishing error: ${publishError.message}`);
+          }
+        } else if (request.publishDelay && request.publishDelay > 0) {
+          scheduledDate = new Date();
+          scheduledDate.setHours(scheduledDate.getHours() + request.publishDelay);
+          scheduledForPublishing = true;
+
+          try {
+            await storage.createContentSchedule({
+              contentId: savedContentId,
+              userId: request.userId,
+              websiteId: request.websiteId!,
+              scheduled_date: scheduledDate,
+              status: "scheduled",
+              title: contentResult.title,
+              topic: request.topic,
+              metadata: {
+                autoGenerated: true,
+                autoScheduleId: request.autoScheduleId,
+                publishDelay: request.publishDelay,
+                generatedAt: new Date(),
+              },
+            });
+
+            console.log(`⏰ Scheduled for ${scheduledDate.toISOString()}`);
+          } catch (scheduleError: any) {
+            console.error(`❌ Schedule error: ${scheduleError.message}`);
+          }
+        }
       }
-      throw new Error(`Content generation failed: ${error.message}`);
+    } catch (saveError: any) {
+      console.error(`❌ Save failed: ${saveError.message}`);
+      throw new Error(`Content generation failed: Unable to save - ${saveError.message}`);
     }
+
+    // STEP 9: Return result
+    const result: ContentGenerationResultWithPublishing = {
+      title: contentResult.title,
+      content: contentResult.content,
+      excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
+      metaDescription:
+        contentResult.metaDescription ||
+        this.generateMetaDescription(contentResult.title, contentResult.content),
+      metaTitle: contentResult.metaTitle || contentResult.title,
+      keywords: contentResult.keywords || request.keywords,
+      seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
+      readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
+      brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
+      eatCompliance: request.eatCompliance || false,
+      tokensUsed: contentTokens,
+      costUsd: Number(textCostUsd.toFixed(6)),
+      aiProvider: request.aiProvider,
+      qualityChecks,
+      contentId: savedContentId,
+      published: published,
+      scheduledForPublishing: scheduledForPublishing,
+      publishedAt: publishedAt,
+      scheduledDate: scheduledDate,
+      totalCost: totalCostUsd.toFixed(6),
+      language: language,
+      conversationalVoice: request.promptType !== "custom", // ✅ Track prompt type
+    };
+
+    if (images.length > 0) {
+      result.images = images.map((img) => ({
+        url: img.cloudinaryUrl || img.url,
+        filename: img.filename,
+        altText: img.altText,
+        prompt: img.prompt,
+        cost: img.cost,
+        cloudinaryUrl: img.cloudinaryUrl,
+        cloudinaryPublicId: img.cloudinaryPublicId,
+      }));
+      result.totalImageCost = totalImageCost;
+    }
+
+    console.log(`✅ Generation complete - ${language.toUpperCase()} - ${request.promptType === "custom" ? "Custom Prompt" : "System Prompt"}`);
+
+    return result;
+  } catch (error: any) {
+    if (error instanceof AIProviderError || error instanceof AnalysisError) {
+      throw error;
+    }
+    throw new Error(`Content generation failed: ${error.message}`);
   }
+}
+
+  // async generateContent(
+  //   request: ContentGenerationRequest
+  // ): Promise<ContentGenerationResultWithPublishing> {
+  //   try {
+  //     console.log(
+  //       `Generating content for user ${request.userId} with ${request.aiProvider.toUpperCase()} in ${
+  //         request.language || "english"
+  //       }`
+  //     );
+
+  //     // VALIDATION BLOCK
+  //     if (!request.websiteId && !request.niche) {
+  //       throw new Error(
+  //         "Either websiteId or niche must be provided for content generation"
+  //       );
+  //     }
+
+  //     const language = request.language || "english";
+  //     if (!VALID_LANGUAGES.includes(language)) {
+  //       throw new Error(
+  //         `Invalid language: ${language}. Must be one of: ${VALID_LANGUAGES.join(", ")}`
+  //       );
+  //     }
+
+  //     this.lastLanguage = language;
+  //     this.lastRequestTopic = request.topic;
+
+  //     // Log content type
+  //     if (request.websiteId) {
+  //       console.log(`📄 Generating website-specific content for website: ${request.websiteId}`);
+  //     } else if (request.niche) {
+  //       console.log(`📄 Generating standalone content for niche: ${request.niche}`);
+  //     }
+
+  //     // STEP 1: Check image generation
+  //     if (request.includeImages && request.imageCount && request.imageCount > 0) {
+  //       const openAiKey = await this.getApiKey('openai', request.userId);
+  //       if (!openAiKey) {
+  //         console.warn("⚠️ Image generation requested but no OpenAI API key available");
+  //         request.includeImages = false;
+  //         request.imageCount = 0;
+  //       } else {
+  //         console.log(
+  //           `🎨 Will generate ${request.imageCount} images with DALL-E 3 (regardless of content AI provider: ${request.aiProvider})`
+  //         );
+  //       }
+  //     }
+
+  //     if (request.isAutoGenerated) {
+  //       console.log(`Auto-generation detected:`, {
+  //         autoScheduleId: request.autoScheduleId,
+  //         autoPublish: request.autoPublish,
+  //         publishDelay: request.publishDelay,
+  //       });
+  //     }
+
+  //     // STEP 2: Generate content
+  //     const contentPrompt = this.buildContentPrompt(request);
+  //     const languagePrompt = this.getLanguagePrompt(language);
+  //     const systemPrompt = this.buildSystemPrompt(request, language, languagePrompt);
+
+  //     console.log(`📝 System Prompt Language Enforcement: ${language.toUpperCase()}`);
+  //     console.log(`📝 User Prompt Language Code: ${language.toUpperCase()}`);
+  //     console.log(`📝 Conversational voice enabled for topic: ${request.topic}`);
+
+  //     const contentResponse = await this.callAI(
+  //       request.aiProvider,
+  //       [
+  //         { role: "system", content: systemPrompt },
+  //         { role: "user", content: contentPrompt },
+  //       ],
+  //       request.aiProvider === "openai" ? { type: "json_object" } : undefined,
+  //       0.7,
+  //       request.userId
+  //     );
+
+  //     const keyTypeUsed = contentResponse.keyType || 'system';
+  //     let contentResult;
+
+  //     // Parse JSON response
+  //     try {
+  //       let cleanedContent = contentResponse.content.trim();
+  //       cleanedContent = cleanedContent.replace(/^\uFEFF/, "");
+  //       contentResult = JSON.parse(cleanedContent);
+  //       console.log("✅ Successfully parsed JSON response from", request.aiProvider.toUpperCase());
+  //     } catch (parseError: any) {
+  //       console.error("❌ Initial JSON parse failed, attempting extraction...", parseError.message);
+  //       let cleanedContent = contentResponse.content.trim();
+  //       const firstBrace = cleanedContent.indexOf("{");
+  //       const lastBrace = cleanedContent.lastIndexOf("}");
+
+  //       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+  //         const extractedJson = cleanedContent.substring(firstBrace, lastBrace + 1);
+  //         try {
+  //           contentResult = JSON.parse(extractedJson);
+  //           console.log("✅ Successfully parsed extracted JSON from", request.aiProvider.toUpperCase());
+  //         } catch (secondParseError: any) {
+  //           throw new AIProviderError(
+  //             request.aiProvider,
+  //             `Failed to parse JSON response after multiple attempts. Original error: ${parseError.message}`
+  //           );
+  //         }
+  //       } else {
+  //         throw new AIProviderError(
+  //           request.aiProvider,
+  //           `No valid JSON structure found in response. Response was: ${contentResponse.content.substring(0, 300)}...`
+  //         );
+  //       }
+  //     }
+
+  //     // Validate required fields
+  //     if (!contentResult.title || !contentResult.content) {
+  //       throw new AIProviderError(
+  //         request.aiProvider,
+  //         "AI response missing required fields (title, content)"
+  //       );
+  //     }
+
+  //     // Convert markdown to HTML
+  //     console.log("🔄 Converting markdown headers to HTML...");
+  //     if (contentResult.content && contentResult.content.includes("#")) {
+  //       console.log("🔍 Markdown headers detected, converting to HTML...");
+  //       contentResult.content = ContentFormatter.convertMarkdownToHtml(contentResult.content);
+  //     }
+
+  //     contentResult.content = ContentFormatter.formatForWordPress(contentResult.content);
+  //     console.log("✅ Content formatted for WordPress");
+
+  //     // Sanitize metadata
+  //     contentResult.content = this.sanitizeContentMetadata(contentResult.content);
+
+  //     // Pre-generate contentId
+  //     let contentId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  //     // STEP 3: Generate images if requested
+  //     let images: Array<{
+  //       url: string;
+  //       filename: string;
+  //       altText: string;
+  //       prompt: string;
+  //       cost: number;
+  //       cloudinaryUrl?: string;
+  //       cloudinaryPublicId?: string;
+  //     }> = [];
+  //     let totalImageCost = 0;
+  //     let imageKeyType: 'user' | 'system' = 'system';
+
+  //     if (request.includeImages && request.imageCount && request.imageCount > 0) {
+  //       try {
+  //         console.log(`🎨 Generating ${request.imageCount} images with DALL-E 3...`);
+
+  //         const imageGenerationRequest = {
+  //           topic: request.topic,
+  //           count: request.imageCount,
+  //           style: request.imageStyle || "natural",
+  //           contentContext: contentResult.content.substring(0, 500),
+  //           keywords: request.keywords,
+  //         };
+
+  //         const validation = imageService.validateImageRequest(imageGenerationRequest);
+  //         if (!validation.valid) {
+  //           throw new Error(
+  //             `Image generation validation failed: ${validation.errors.join(", ")}`
+  //           );
+  //         }
+
+  //         const imageResult = await imageService.generateImages(
+  //           imageGenerationRequest,
+  //           request.userId,
+  //           request.websiteId
+  //         );
+  //         imageKeyType = imageResult.keyType || 'system';
+
+  //         // Upload to Cloudinary
+  //         console.log(`☁️ Uploading images to Cloudinary...`);
+
+  //         for (const img of imageResult.images) {
+  //           try {
+  //             const cloudinaryImage = await cloudinaryStorage.uploadFromUrl(
+  //               img.url,
+  //               request.websiteId || `niche-${request.niche}`,
+  //               contentId,
+  //               img.filename
+  //             );
+
+  //             images.push({
+  //               ...img,
+  //               url: cloudinaryImage.secureUrl,
+  //               cloudinaryUrl: cloudinaryImage.secureUrl,
+  //               cloudinaryPublicId: cloudinaryImage.publicId,
+  //             });
+  //             console.log(`✅ Image stored: ${img.filename}`);
+  //           } catch (uploadError: any) {
+  //             console.error(`❌ Failed to upload to Cloudinary: ${img.filename}`, uploadError.message);
+  //             images.push(img);
+  //           }
+  //         }
+
+  //         totalImageCost = imageResult.totalCost;
+  //         console.log(`✅ Generated ${images.length} images`);
+
+  //         if (images.length > 0) {
+  //           console.log("🖼️ Embedding images into content...");
+  //           contentResult.content = this.embedImagesInContentPrivate(
+  //             contentResult.content,
+  //             images
+  //           );
+  //           console.log(`✅ Embedded ${images.length} images`);
+  //         }
+  //       } catch (imageError: any) {
+  //         console.error("❌ Image generation failed:", imageError.message);
+  //         if (imageError.message.includes("Rate limit")) {
+  //           console.warn("⚠️ Rate limit reached, continuing without images");
+  //         } else if (imageError.message.includes("credits") || imageError.message.includes("quota")) {
+  //           console.warn("⚠️ Insufficient credits, continuing without images");
+  //         } else if (imageError.message.includes("API key")) {
+  //           console.warn("⚠️ API key issue, continuing without images");
+  //         } else {
+  //           console.warn(`⚠️ Image error: ${imageError.message}`);
+  //         }
+  //         images = [];
+  //         totalImageCost = 0;
+  //       }
+  //     }
+
+  //     // STEP 4: Analyze content
+  //     const analysisResult = await this.performContentAnalysis({
+  //       title: contentResult.title,
+  //       content: contentResult.content,
+  //       keywords: request.keywords,
+  //       tone: request.tone,
+  //       brandVoice: request.brandVoice,
+  //       targetAudience: request.targetAudience,
+  //       eatCompliance: request.eatCompliance,
+  //       websiteId: request.websiteId || 'standalone',
+  //       aiProvider: request.aiProvider,
+  //       userId: request.userId,
+  //       language: language,
+  //       niche: request.niche,
+  //     });
+
+  //     // STEP 5: Calculate costs
+  //     const contentTokens = Math.max(1, contentResponse.tokens + analysisResult.tokensUsed);
+  //     const contentPricing = AI_MODELS[request.aiProvider].pricing;
+  //     const avgTokenCost = (contentPricing.input + contentPricing.output) / 2;
+  //     const textCostUsd = (contentTokens * avgTokenCost) / 1000;
+  //     const totalCostUsd = textCostUsd + totalImageCost;
+
+  //     console.log(`💰 Cost breakdown:`);
+  //     console.log(`   Content: $${textCostUsd.toFixed(6)}`);
+  //     console.log(`   Images: $${totalImageCost.toFixed(6)}`);
+  //     console.log(`   Total: $${totalCostUsd.toFixed(6)}`);
+
+  //     // STEP 6: Track AI usage
+  //     try {
+  //       await storage.trackAiUsage({
+  //         websiteId: request.websiteId || null,
+  //         userId: request.userId,
+  //         model: AI_MODELS[request.aiProvider].model,
+  //         tokensUsed: contentTokens,
+  //         costUsd: Math.max(1, Math.round(textCostUsd * 1000)),
+  //         operation: "content_generation",
+  //         keyType: keyTypeUsed,
+  //       });
+
+  //       if (images.length > 0) {
+  //         await storage.trackAiUsage({
+  //           websiteId: request.websiteId || null,
+  //           userId: request.userId,
+  //           model: "dall-e-3",
+  //           tokensUsed: 0,
+  //           costUsd: Math.round(totalImageCost * 100),
+  //           operation: "image_generation",
+  //           keyType: imageKeyType,
+  //         });
+  //       }
+  //     } catch (trackingError: any) {
+  //       console.warn("Tracking failed:", trackingError.message);
+  //     }
+
+  //     // STEP 7: Generate quality checks
+  //     const qualityChecks = this.generateQualityChecks(contentResult.content, request);
+
+  //     // STEP 8: Save to database
+  //     let savedContentId: string | undefined;
+  //     let published = false;
+  //     let scheduledForPublishing = false;
+  //     let publishedAt: Date | undefined;
+  //     let scheduledDate: Date | undefined;
+
+  //     try {
+  //       const contentToSave = {
+  //         websiteId: request.websiteId || null,
+  //         niche: request.niche || null,
+  //         userId: request.userId,
+  //         title: contentResult.title,
+  //         body: contentResult.content,
+  //         excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
+  //         metaDescription:
+  //           contentResult.metaDescription ||
+  //           this.generateMetaDescription(contentResult.title, contentResult.content),
+  //         metaTitle: contentResult.metaTitle || contentResult.title,
+  //         aiModel: AI_MODELS[request.aiProvider].model,
+  //         seoKeywords: contentResult.keywords || request.keywords,
+  //         seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
+  //         readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
+  //         brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
+  //         eatCompliance: request.eatCompliance || false,
+  //         tokensUsed: contentTokens,
+  //         costUsd: Math.round(totalCostUsd * 100),
+  //         status: 'draft',
+  //         hasImages: images.length > 0,
+  //         imageCount: images.length,
+  //         imageCostCents: Math.round(totalImageCost * 100),
+  //         language: language,
+  //         conversationalVoice: true,
+  //       };
+
+  //       console.log(`💾 Saving content...`);
+  //       const savedContent = await storage.createContent(contentToSave);
+  //       savedContentId = savedContent.id;
+  //       contentId = savedContentId;
+
+  //       console.log(`✅ Content saved: ${savedContentId}`);
+
+  //       if (!savedContentId || savedContentId.startsWith('temp-')) {
+  //         throw new Error(`Invalid content ID: ${savedContentId}`);
+  //       }
+
+  //       // Handle auto-publishing
+  //       if (request.isAutoGenerated && request.autoScheduleId && request.autoPublish) {
+  //         console.log(`🚀 Processing auto-publishing...`);
+
+  //         if (request.publishDelay === 0) {
+  //           scheduledDate = new Date();
+  //           try {
+  //             await storage.createContentSchedule({
+  //               contentId: savedContentId,
+  //               userId: request.userId,
+  //               websiteId: request.websiteId!,
+  //               scheduled_date: scheduledDate,
+  //               status: "publishing",
+  //               title: contentResult.title,
+  //               topic: request.topic,
+  //               metadata: {
+  //                 autoGenerated: true,
+  //                 autoScheduleId: request.autoScheduleId,
+  //                 publishedImmediately: true,
+  //                 generatedAt: new Date(),
+  //               },
+  //             });
+
+  //             const publishResult = await this.publishToWordPress(
+  //               savedContentId,
+  //               request.websiteId!,
+  //               request.userId
+  //             );
+
+  //             if (publishResult.success) {
+  //               published = true;
+  //               publishedAt = new Date();
+
+  //               await storage.updateContent(savedContentId, {
+  //                 status: "published",
+  //                 publishDate: publishedAt,
+  //                 wordpressPostId: publishResult.postId,
+  //               });
+
+  //               await storage.updateContentScheduleByContentId(savedContentId, {
+  //                 status: "published",
+  //                 published_at: publishedAt,
+  //               });
+
+  //               console.log(`✅ Published to WordPress`);
+  //             } else {
+  //               console.error(`❌ Publishing failed: ${publishResult.error}`);
+  //             }
+  //           } catch (publishError: any) {
+  //             console.error(`❌ Publishing error: ${publishError.message}`);
+  //           }
+  //         } else if (request.publishDelay && request.publishDelay > 0) {
+  //           scheduledDate = new Date();
+  //           scheduledDate.setHours(scheduledDate.getHours() + request.publishDelay);
+  //           scheduledForPublishing = true;
+
+  //           try {
+  //             await storage.createContentSchedule({
+  //               contentId: savedContentId,
+  //               userId: request.userId,
+  //               websiteId: request.websiteId!,
+  //               scheduled_date: scheduledDate,
+  //               status: "scheduled",
+  //               title: contentResult.title,
+  //               topic: request.topic,
+  //               metadata: {
+  //                 autoGenerated: true,
+  //                 autoScheduleId: request.autoScheduleId,
+  //                 publishDelay: request.publishDelay,
+  //                 generatedAt: new Date(),
+  //               },
+  //             });
+
+  //             console.log(`⏰ Scheduled for ${scheduledDate.toISOString()}`);
+  //           } catch (scheduleError: any) {
+  //             console.error(`❌ Schedule error: ${scheduleError.message}`);
+  //           }
+  //         }
+  //       }
+  //     } catch (saveError: any) {
+  //       console.error(`❌ Save failed: ${saveError.message}`);
+  //       throw new Error(`Content generation failed: Unable to save - ${saveError.message}`);
+  //     }
+
+  //     // STEP 9: Return result
+  //     const result: ContentGenerationResultWithPublishing = {
+  //       title: contentResult.title,
+  //       content: contentResult.content,
+  //       excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
+  //       metaDescription:
+  //         contentResult.metaDescription ||
+  //         this.generateMetaDescription(contentResult.title, contentResult.content),
+  //       metaTitle: contentResult.metaTitle || contentResult.title,
+  //       keywords: contentResult.keywords || request.keywords,
+  //       seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
+  //       readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
+  //       brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
+  //       eatCompliance: request.eatCompliance || false,
+  //       tokensUsed: contentTokens,
+  //       costUsd: Number(textCostUsd.toFixed(6)),
+  //       aiProvider: request.aiProvider,
+  //       qualityChecks,
+  //       contentId: savedContentId,
+  //       published: published,
+  //       scheduledForPublishing: scheduledForPublishing,
+  //       publishedAt: publishedAt,
+  //       scheduledDate: scheduledDate,
+  //       totalCost: totalCostUsd.toFixed(6),
+  //       language: language,
+  //       conversationalVoice: true,
+  //     };
+
+  //     if (images.length > 0) {
+  //       result.images = images.map((img) => ({
+  //         url: img.cloudinaryUrl || img.url,
+  //         filename: img.filename,
+  //         altText: img.altText,
+  //         prompt: img.prompt,
+  //         cost: img.cost,
+  //         cloudinaryUrl: img.cloudinaryUrl,
+  //         cloudinaryPublicId: img.cloudinaryPublicId,
+  //       }));
+  //       result.totalImageCost = totalImageCost;
+  //     }
+
+  //     console.log(`✅ Generation complete - ${language.toUpperCase()}`);
+
+  //     return result;
+  //   } catch (error: any) {
+  //     if (error instanceof AIProviderError || error instanceof AnalysisError) {
+  //       throw error;
+  //     }
+  //     throw new Error(`Content generation failed: ${error.message}`);
+  //   }
+  // }
 
   async optimizeContent(
     content: string,
