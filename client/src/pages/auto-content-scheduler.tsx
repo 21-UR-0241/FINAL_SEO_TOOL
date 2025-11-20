@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from "@/config/api";
 import { useQuery } from "@tanstack/react-query";
 import {
   Calendar,
@@ -20,16 +21,26 @@ import {
 } from "lucide-react";
 
 // API functions for auto-generation
+import { API_URL } from "@/config/api"; // ← ADD THIS IMPORT AT THE TOP OF YOUR FILE
+
 const autoGenApi = {
   async getSchedules(websiteId?: string) {
-    const url = websiteId ? `/api/user/auto-schedules?websiteId=${websiteId}` : '/api/user/auto-schedules';
-    const response = await fetch(url);
+    const url = websiteId 
+      ? `${API_URL}/api/user/auto-schedules?websiteId=${websiteId}` 
+      : `${API_URL}/api/user/auto-schedules`;
+    
+    const response = await fetch(url, {
+      credentials: 'include'  // ← ADDED
+    });
     
     if (!response.ok) {
       if (response.status === 404) {
         console.log('Auto-schedules API not implemented yet');
         return [];
       }
+      
+      const errorText = await response.text();
+      console.error('Failed to fetch schedules:', errorText);
       throw new Error('Failed to fetch schedules');
     }
     
@@ -38,74 +49,117 @@ const autoGenApi = {
   },
 
   async createSchedule(data: any) {
-    const response = await fetch('/api/user/auto-schedules', {
+    console.log('🚀 Creating schedule:', {
+      name: data.name,
+      timezone: data.timezone,
+      localTime: data.localTime,
+      websiteId: data.websiteId
+    });
+    
+    const response = await fetch(`${API_URL}/api/user/auto-schedules`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',  // ← ADDED
       body: JSON.stringify(data)
     });
     
+    console.log('📡 Response status:', response.status);
+    
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Failed to create schedule');
+      const errorText = await response.text();
+      console.error('❌ Create schedule error:', errorText);
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        throw new Error(errorJson.message || 'Failed to create schedule');
+      } catch (parseError) {
+        throw new Error(errorText || `Server error: ${response.status}`);
+      }
     }
     
-    return response.json();
+    const result = await response.json();
+    console.log('✅ Schedule created:', result);
+    return result;
   },
 
   async updateSchedule(scheduleId: string, data: any) {
-    const response = await fetch(`/api/user/auto-schedules/${scheduleId}`, {
+    console.log('🔄 Updating schedule:', scheduleId);
+    
+    const response = await fetch(`${API_URL}/api/user/auto-schedules/${scheduleId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: 'include',  // ← ADDED
       body: JSON.stringify(data),
     });
     
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Failed to update schedule');
+      const errorText = await response.text();
+      console.error('❌ Update error:', errorText);
+      throw new Error(errorText || 'Failed to update schedule');
     }
     
-    return response.json();
+    const result = await response.json();
+    console.log('✅ Schedule updated:', result);
+    return result;
   },
 
   async deleteSchedule(scheduleId: string) {
-    const response = await fetch(`/api/user/auto-schedules/${scheduleId}`, {
+    console.log('🗑️ Deleting schedule:', scheduleId);
+    
+    const response = await fetch(`${API_URL}/api/user/auto-schedules/${scheduleId}`, {
       method: "DELETE",
+      credentials: 'include',  // ← ADDED
     });
     
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Failed to delete schedule');
+      const errorText = await response.text();
+      console.error('❌ Delete error:', errorText);
+      throw new Error(errorText || 'Failed to delete schedule');
     }
     
-    return response.json();
+    const result = await response.json();
+    console.log('✅ Schedule deleted');
+    return result;
   },
 
   async toggleSchedule(scheduleId: string, isActive: boolean) {
-    const response = await fetch(`/api/user/auto-schedules/${scheduleId}/toggle`, {
+    console.log('🔀 Toggling schedule:', scheduleId, 'to', isActive);
+    
+    const response = await fetch(`${API_URL}/api/user/auto-schedules/${scheduleId}/toggle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',  // ← ADDED
       body: JSON.stringify({ isActive })
     });
     
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Failed to toggle schedule');
+      const errorText = await response.text();
+      console.error('❌ Toggle error:', errorText);
+      throw new Error(errorText || 'Failed to toggle schedule');
     }
     
-    return response.json();
+    const result = await response.json();
+    console.log('✅ Schedule toggled');
+    return result;
   },
 
   async runScheduleNow(scheduleId: string) {
-    const response = await fetch(`/api/user/auto-schedules/${scheduleId}/run`, {
+    console.log('▶️ Running schedule now:', scheduleId);
+    
+    const response = await fetch(`${API_URL}/api/user/auto-schedules/${scheduleId}/run`, {
       method: "POST",
+      credentials: 'include',  // ← ADDED
     });
     
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Failed to run schedule');
+      const errorText = await response.text();
+      console.error('❌ Run error:', errorText);
+      throw new Error(errorText || 'Failed to run schedule');
     }
     
-    return response.json();
+    const result = await response.json();
+    console.log('✅ Schedule triggered');
+    return result;
   },
 };
 
@@ -234,18 +288,19 @@ export default function AutoContentScheduler({
   onScheduleCreated,
 }: AutoContentSchedulerProps) {
   // FETCH USER SETTINGS
-  const { data: userSettings } = useQuery({
-    queryKey: ["/api/user/settings"],
-    queryFn: async () => {
-      const response = await fetch("/api/user/settings", {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch settings');
-      }
-      return response.json();
-    },
-  });
+// FETCH USER SETTINGS
+const { data: userSettings } = useQuery({
+  queryKey: ["/api/user/settings"],
+  queryFn: async () => {
+    const response = await fetch(`${API_URL}/api/user/settings`, {  // ← ADDED API_URL
+      credentials: 'include'
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch settings');
+    }
+    return response.json();
+  },
+});
 
   // Helper function to get browser timezone
   const getUserTimezone = () => {
