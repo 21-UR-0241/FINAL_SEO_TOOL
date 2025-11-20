@@ -5050,6 +5050,9 @@ app.delete("/api/user/content/:id", requireAuth, async (req: Request, res: Respo
   // ===========================================================================
   // CONTENT SCHEDULING ROUTES
   // ===========================================================================
+
+
+
 // ===========================================================================
 // CONTENT SCHEDULING ROUTES WITH TIMEZONE SUPPORT
 // ===========================================================================
@@ -5768,6 +5771,7 @@ app.post("/api/user/auto-schedules", requireAuth, async (req: Request, res: Resp
     // Pass data WITHOUT utcTime to force backend calculation
     const newSchedule = await storage.createAutoSchedule({
       ...scheduleDataWithoutUtc,
+      name: scheduleName,
       userId,
       // Explicitly don't include utcTime
     });
