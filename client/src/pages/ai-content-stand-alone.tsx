@@ -28,6 +28,8 @@ import {
   Search,
   Filter,
   SortAsc,
+  FileText,        // ← ADD THIS
+  MessageSquare,
 } from "lucide-react";
 import { sanitizeHtmlContent, sanitizeFormInput } from "@/utils/sanitize-HTML";
 import { API_URL } from "@/config/api";
