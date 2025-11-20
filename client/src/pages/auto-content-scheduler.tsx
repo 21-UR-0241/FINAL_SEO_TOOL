@@ -20,8 +20,6 @@ import {
   Info,
 } from "lucide-react";
 
-// API functions for auto-generation
-import { API_URL } from "@/config/api"; // ← ADD THIS IMPORT AT THE TOP OF YOUR FILE
 
 const autoGenApi = {
   async getSchedules(websiteId?: string) {
@@ -161,6 +159,7 @@ const autoGenApi = {
     console.log('✅ Schedule triggered');
     return result;
   },
+  
 };
 
 const frequencyOptions = [

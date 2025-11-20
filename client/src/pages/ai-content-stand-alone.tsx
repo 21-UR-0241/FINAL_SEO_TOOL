@@ -432,7 +432,9 @@ export default function StandaloneContent() {
     includeImages: false,
     imageCount: 1,
     imageStyle: "natural",
-    language: "english", // ADD THIS LINE
+    language: "english",
+    promptType: "system", // NEW: 'system' or 'custom'
+    customPrompt: "", // ADD THIS LINE
   });
 
   const [editFormData, setEditFormData] = useState({
@@ -584,6 +586,18 @@ export default function StandaloneContent() {
     errors.language = "Invalid language selected";
     }
 
+        // NEW: Validate custom prompt if selected
+    if (formData.promptType === "custom") {
+      if (!formData.customPrompt.trim()) {
+        errors.customPrompt = "Custom prompt is required when selected";
+      } else if (formData.customPrompt.trim().length < 20) {
+        errors.customPrompt = "Custom prompt must be at least 20 characters";
+      } else if (formData.customPrompt.trim().length > 3000) {
+        errors.customPrompt = "Custom prompt must be under 3000 characters";
+      }
+    }
+
+
     
 
     if (!formData.wordCount) {
@@ -684,8 +698,17 @@ export default function StandaloneContent() {
       imageCount: 1,
       imageStyle: "natural",
       language: "english",
+      promptType: "system",
+      customPrompt: "",
     });
     setFormErrors({});
+    setShowLanguageDropdown(false);
+    setLanguageSearchTerm("");
+  };
+
+    // Also close dropdown when dialog closes
+  const closeGenerateDialog = () => {
+    setIsGenerateDialogOpen(false);
     setShowLanguageDropdown(false);
     setLanguageSearchTerm("");
   };
@@ -759,6 +782,8 @@ export default function StandaloneContent() {
         imageCount: formData.imageCount,
         imageStyle: formData.imageStyle,
         language: formData.language,
+        promptType: formData.promptType, // NEW
+        customPrompt: formData.promptType === "custom" ? formData.customPrompt : undefined,
       });
 
       clearInterval(progressInterval);
@@ -996,40 +1021,40 @@ export default function StandaloneContent() {
   const downloadContentAsDoc = (item: any) => {
     try {
       const htmlContent = `
-<!DOCTYPE html>
-<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head>
-  <meta charset='utf-8'>
-  <title>${item.title}</title>
-  <style>
-    body {
-      font-family: 'Calibri', sans-serif;
-      font-size: 11pt;
-      line-height: 1.6;
-      margin: 1in;
-    }
-    h1 {
-      font-size: 24pt;
-      font-weight: bold;
-      margin-bottom: 20pt;
-      color: #2c3e50;
-    }
-    p {
-      margin-bottom: 12pt;
-    }
-    img {
-      max-width: 100%;
-      height: auto;
-    }
-  </style>
-</head>
-<body>
-  <h1>${item.title}</h1>
-  <div class="content">
-    ${item.body}
-  </div>
-</body>
-</html>`;
+          <!DOCTYPE html>
+          <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+          <head>
+            <meta charset='utf-8'>
+            <title>${item.title}</title>
+            <style>
+              body {
+                font-family: 'Calibri', sans-serif;
+                font-size: 11pt;
+                line-height: 1.6;
+                margin: 1in;
+              }
+              h1 {
+                font-size: 24pt;
+                font-weight: bold;
+                margin-bottom: 20pt;
+                color: #2c3e50;
+              }
+              p {
+                margin-bottom: 12pt;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+            </style>
+          </head>
+          <body>
+            <h1>${item.title}</h1>
+            <div class="content">
+              ${item.body}
+            </div>
+          </body>
+          </html>`;
 
       const blob = new Blob(["\ufeff", htmlContent], {
         type: "application/msword",
@@ -1284,7 +1309,8 @@ export default function StandaloneContent() {
             </button>
           </div>
         </div>
-{isGenerateDialogOpen && (
+
+        {isGenerateDialogOpen && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
               <div
@@ -1403,6 +1429,116 @@ export default function StandaloneContent() {
                       )}
                     </div>
 
+                    
+                    {/* NEW: Prompt Type Selection */}
+                    <div className="border-2 border-purple-200 bg-purple-50 rounded-lg p-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Prompt Type *
+                      </label>
+                      <p className="text-xs text-gray-600 mb-4">
+                        Choose between our optimized system prompt or provide your own custom instructions
+                      </p>
+                      
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              promptType: "system",
+                              customPrompt: "",
+                            }))
+                          }
+                          className={`p-4 border-2 rounded-lg text-left transition-all ${
+                            formData.promptType === "system"
+                              ? "border-purple-500 bg-purple-100 shadow-md"
+                              : "border-gray-200 bg-white hover:border-purple-300"
+                          }`}
+                        >
+                          <div className="flex items-center mb-2">
+                            {formData.promptType === "system" && (
+                              <CheckCircle className="w-4 h-4 text-purple-600 mr-2" />
+                            )}
+                            <FileText className="w-4 h-4 text-purple-600 mr-2" />
+                            <span className="font-medium text-sm">System Prompt</span>
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            Use our optimized, SEO-focused content generation prompt
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              promptType: "custom",
+                            }))
+                          }
+                          className={`p-4 border-2 rounded-lg text-left transition-all ${
+                            formData.promptType === "custom"
+                              ? "border-purple-500 bg-purple-100 shadow-md"
+                              : "border-gray-200 bg-white hover:border-purple-300"
+                          }`}
+                        >
+                          <div className="flex items-center mb-2">
+                            {formData.promptType === "custom" && (
+                              <CheckCircle className="w-4 h-4 text-purple-600 mr-2" />
+                            )}
+                            <MessageSquare className="w-4 h-4 text-purple-600 mr-2" />
+                            <span className="font-medium text-sm">Custom Prompt</span>
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            Provide your own specific instructions for content generation
+                          </p>
+                        </button>
+                      </div>
+
+                      {/* Custom Prompt Textarea */}
+                      {formData.promptType === "custom" && (
+                        <div className="mt-4 p-4 bg-white rounded-lg border-2 border-purple-200">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Your Custom Prompt *
+                          </label>
+                          <textarea
+                            value={formData.customPrompt}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                customPrompt: e.target.value,
+                              }))
+                            }
+                            placeholder="Enter your custom instructions for content generation. Be specific about style, structure, tone, and any special requirements..."
+                            rows={6}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 text-sm"
+                          />
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="text-xs text-gray-500">
+                              {formData.customPrompt.length}
+                            </p>
+                            {formErrors.customPrompt && (
+                              <p className="text-xs text-red-600">
+                                {formErrors.customPrompt}
+                              </p>
+                            )}
+                          </div>
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                            <p className="text-xs text-blue-800">
+                              <strong>Tip:</strong> Your custom prompt will be combined with the topic, keywords, and other settings you provide below. Be clear and specific about what you want!
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {formData.promptType === "system" && (
+                        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                          <p className="text-xs text-green-800">
+                            <strong>System Prompt Benefits:</strong> Optimized for SEO, readability, and brand voice consistency. Includes automatic structure optimization and keyword placement.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Niche Selector - Replace the existing dropdown section with this */}
                       <div className="border-2 border-indigo-200 bg-indigo-50 rounded-lg p-4">
                         <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -1476,7 +1612,7 @@ export default function StandaloneContent() {
                         )}
                       </div>
 
-                                            {/* Language Selector - NATIVE SELECT DROPDOWN */}
+                    {/* Language Selector - NATIVE SELECT DROPDOWN */}
                       <div className="border-2 border-green-200 bg-green-50 rounded-lg p-4">
                         <label className="block text-sm font-medium text-gray-700 mb-3">
                           Content Language *
