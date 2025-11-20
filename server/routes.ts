@@ -1435,9 +1435,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
 });
 
 
- * POST /api/auth/google/unlink
- * Unlink Google account from user
- */
+
 app.post("/api/auth/google/unlink", async (req, res) => {
   try {
     if (!req.session.userId) return res.status(401).json({ success: false, message: "Not authenticated" });
@@ -3779,7 +3777,6 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
       res.status(500).json({ message: "Failed to fetch content" });
     }
   });
-
 
 
 app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
