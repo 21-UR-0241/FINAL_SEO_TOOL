@@ -50,6 +50,7 @@ const NICHES = [
 ];
 
 
+
 const LANGUAGES = [
   { value: "english", label: "English", flag: "🇬🇧" },
   { value: "spanish", label: "Spanish", flag: "🇪🇸" },
