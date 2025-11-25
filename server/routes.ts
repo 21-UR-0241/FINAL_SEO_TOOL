@@ -8245,11 +8245,11 @@ import multer from 'multer';
 import { cloudinaryStorage } from "./services/cloudinary-storage";
 import {db} from './db'
 import { emailService } from './services/email-service';
+import { highIntentRoutes } from "./routes/high-intent-routes";
 
 //added
 import { schedulerService } from './services/scheduler-service';
 import { users, websites, aiUsageTracking,  content, seoReports, activityLogs,googleAccounts, GoogleOAuthConfig } from "@shared/schema";
-import highIntentRoutes from "./routes/high-intent-routes";
 
 
 
