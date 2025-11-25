@@ -70,9 +70,22 @@ export interface SavedResearchSession {
   createdAt: Date;
 }
 
+// Get API base URL from environment variable
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+console.log('🔍 High Intent API_BASE_URL:', API_BASE_URL);
+
 // Helper function for authenticated requests
 const fetchWithCredentials = (url: string, options: RequestInit = {}) => {
-  return fetch(url, {
+  // Ensure url starts with / for relative URLs
+  const normalizedUrl = url.startsWith('http') ? url : 
+                       url.startsWith('/') ? url : `/${url}`;
+  
+  // Prepend API_BASE_URL if url is relative
+  const fullUrl = normalizedUrl.startsWith('http') ? normalizedUrl : `${API_BASE_URL}${normalizedUrl}`;
+  
+  console.log('🌐 High Intent API Call:', fullUrl);
+  
+  return fetch(fullUrl, {
     ...options,
     credentials: "include",
     headers: {
@@ -81,6 +94,7 @@ const fetchWithCredentials = (url: string, options: RequestInit = {}) => {
     },
   });
 };
+
 
 // High Intent Collection API
 export const highIntentApi = {
