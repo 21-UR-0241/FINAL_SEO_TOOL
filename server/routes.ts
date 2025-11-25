@@ -8245,6 +8245,7 @@ import multer from 'multer';
 import { cloudinaryStorage } from "./services/cloudinary-storage";
 import {db} from './db'
 import { emailService } from './services/email-service';
+import highIntentRoutes from "./routes/high-intent-routes";
 
 //added
 import { schedulerService } from './services/scheduler-service';
@@ -15977,6 +15978,9 @@ app.delete("/api/user/content/images/:imageId", requireAuth, async (req: Request
 });
 
 
+
+
+app.use("/api/user/high-intent", requireAuth, highIntentRoutes);
   // ===========================================================================
   // GOOGLE SEARCH CONSOLE ROUTES
   // ===========================================================================

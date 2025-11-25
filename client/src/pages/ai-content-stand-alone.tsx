@@ -719,6 +719,14 @@ export default function StandaloneContent() {
   const generateContent = async () => {
     if (!validateForm()) return;
 
+     // ADD THIS DEBUG LOG
+  console.log('🔍 Frontend sending to API:', {
+    promptType: formData.promptType,
+    hasCustomPrompt: !!formData.customPrompt,
+    customPromptLength: formData.customPrompt?.length || 0,
+    customPromptPreview: formData.customPrompt?.substring(0, 50)
+  });
+
     setIsGenerating(true);
     setGenerationProgress(0);
     setGenerationPhase("Initializing AI...");

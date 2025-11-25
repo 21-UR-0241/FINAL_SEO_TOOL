@@ -26,6 +26,7 @@ import Sidebar, { MobileSidebarProvider } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 // Auth components
 import { AuthProvider, ProtectedRoute, AuthPage, useAuth } from "@/pages/authentication";
+import HighIntentCollection from "./pages/high-intent-collection";
 
 // =============================================================================
 // PROTECTED ROUTER COMPONENT (for authenticated routes)
@@ -40,7 +41,7 @@ function ProtectedRouter() {
       {/* Put more specific route BEFORE the general one */}
       <Route path="/ai-content-stand-alone" component={StandaloneContent} />
       <Route path="/ai-content" component={AIContent} />
-      
+      <Route path="/high-intent-collection" component={HighIntentCollection} />
       <Route path="/seo-analysis" component={SEOAnalysis} />
       <Route path="/googlesearchconsole" component={GoogleSearchConsole} />
       <Route path="/content-schedule" component={ContentSchedule} />

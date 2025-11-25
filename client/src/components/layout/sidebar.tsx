@@ -14,6 +14,7 @@ import {
   SearchCheck,
   Shield,
   FileText,
+  Target,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useState, createContext, useContext, useEffect } from "react";
@@ -49,6 +50,7 @@ const navigation = [
   { name: "Websites", href: "/websites", icon: Globe },
   { name: "AI Content", href: "/ai-content", icon: Bot },
   { name: "Standalone Content", href: "/ai-content-stand-alone", icon: FileText},
+  { name: "High Intent Collection", href: "/high-intent-collection", icon: Target},
   { name: "SEO Analysis", href: "/seo-analysis", icon: Search },
   { name: "Search Console", href: "/googlesearchconsole", icon: SearchCheck },
   { name: "Content Schedule", href: "/content-schedule", icon: Calendar },
