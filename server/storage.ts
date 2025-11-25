@@ -461,36 +461,6 @@ async getVerifiedPasswordResetToken(userId: string, hashedCode: string): Promise
   
   return null;
 }
-async getUserByEmail(email: string): Promise<User | undefined> {
-  const normalizedEmail = email.toLowerCase().trim();
-  
-  // Check users table first
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, normalizedEmail))
-    .limit(1);
-  
-  if (user) {
-    return user;
-  }
-  
-  // Check userSettings for profile email
-  const [settings] = await db
-    .select({
-      userId: userSettings.userId,
-      email: userSettings.profileEmail
-    })
-    .from(userSettings)
-    .where(eq(userSettings.profileEmail, normalizedEmail))
-    .limit(1);
-  
-  if (settings?.userId) {
-    return this.getUser(settings.userId);
-  }
-  
-  return undefined;
-}
 
 async createPasswordResetToken(data: {
   userId: string;
