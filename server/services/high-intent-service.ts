@@ -831,6 +831,7 @@ ${faqHtml}
       if (words >= 2000) score += 5;
       const h2s = (content.match(/<h2/g) || []).length;
       if (h2s >= 3 && h2s <= 10) score += 10;
+      
       if (content.includes("<ul") || content.includes("<ol")) score += 5;
       if (content.includes("[IMAGE:")) score += 5;
       const kwMatches = (content.toLowerCase().match(new RegExp(kw, "g")) || []).length;
