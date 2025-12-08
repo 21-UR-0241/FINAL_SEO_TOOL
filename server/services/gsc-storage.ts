@@ -1,7 +1,747 @@
 
 
 
-// server/services/gsc-storage.ts
+// // server/services/gsc-storage.ts
+// import { Pool } from 'pg';
+// import { randomUUID } from 'crypto';
+
+// // Use your existing Neon database connection
+// const pool = new Pool({
+//   connectionString: process.env.DATABASE_URL,
+//   ssl: { rejectUnauthorized: false }
+// });
+
+// interface GscConfiguration {
+//   clientId: string;
+//   clientSecret: string;
+//   redirectUri: string;
+// }
+
+// interface GscAccount {
+//   id: string;  // This is the Google account ID (for compatibility)
+//   email: string;
+//   name: string;
+//   picture?: string;
+//   accessToken: string;
+//   refreshToken: string;
+//   tokenExpiry: number;
+//   isActive: boolean;
+// }
+
+// export const gscStorage = {
+//   // ============================================================================
+//   // CONFIGURATION MANAGEMENT
+//   // ============================================================================
+  
+//   async saveGscConfiguration(userId: string, config: GscConfiguration) {
+//     const query = `
+//       INSERT INTO gsc_configurations (user_id, client_id, client_secret, redirect_uri)
+//       VALUES ($1, $2, $3, $4)
+//       ON CONFLICT(user_id) DO UPDATE SET
+//         client_id = EXCLUDED.client_id,
+//         client_secret = EXCLUDED.client_secret,
+//         redirect_uri = EXCLUDED.redirect_uri,
+//         updated_at = NOW()
+//       RETURNING *
+//     `;
+    
+//     const values = [userId, config.clientId, config.clientSecret, config.redirectUri];
+//     await pool.query(query, values);
+//     return config;
+//   },
+
+//   async getGscConfiguration(userId: string): Promise<GscConfiguration | null> {
+//     const query = 'SELECT client_id, client_secret, redirect_uri FROM gsc_configurations WHERE user_id = $1';
+//     const result = await pool.query(query, [userId]);
+    
+//     if (result.rows.length === 0) return null;
+    
+//     const row = result.rows[0];
+//     return {
+//       clientId: row.client_id,
+//       clientSecret: row.client_secret,
+//       redirectUri: row.redirect_uri
+//     };
+//   },
+
+//   // ============================================================================
+//   // ACCOUNT MANAGEMENT
+//   // ============================================================================
+  
+//   async saveGscAccount(userId: string, account: GscAccount) {
+//     const query = `
+//       INSERT INTO gsc_accounts (
+//         id, user_id, account_id, email, name, picture, 
+//         access_token, refresh_token, token_expiry, is_active
+//       )
+//       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+//       ON CONFLICT(id) DO UPDATE SET
+//         account_id = EXCLUDED.account_id,
+//         email = EXCLUDED.email,
+//         name = EXCLUDED.name,
+//         picture = EXCLUDED.picture,
+//         access_token = EXCLUDED.access_token,
+//         refresh_token = EXCLUDED.refresh_token,
+//         token_expiry = EXCLUDED.token_expiry,
+//         is_active = EXCLUDED.is_active,
+//         updated_at = NOW()
+//       RETURNING *
+//     `;
+    
+//     // Convert milliseconds to seconds for INTEGER column
+//     const tokenExpiryInSeconds = Math.floor(account.tokenExpiry / 1000);
+    
+//     const values = [
+//       account.id,           // id (Google account ID)
+//       userId,               // user_id
+//       account.id,           // account_id (using same value as id)
+//       account.email,        // email
+//       account.name,         // name
+//       account.picture || null,  // picture
+//       account.accessToken,  // access_token
+//       account.refreshToken, // refresh_token
+//       tokenExpiryInSeconds, // token_expiry (in seconds)
+//       account.isActive !== false  // is_active
+//     ];
+    
+//     await pool.query(query, values);
+//     return account;
+//   },
+
+//   async getGscAccount(userId: string, accountId: string): Promise<GscAccount | null> {
+//     const query = 'SELECT * FROM gsc_accounts WHERE user_id = $1 AND (id = $2 OR account_id = $2)';
+//     const result = await pool.query(query, [userId, accountId]);
+    
+//     if (result.rows.length === 0) return null;
+    
+//     const row = result.rows[0];
+//     return {
+//       id: row.account_id,  // Return the Google account ID
+//       email: row.email,
+//       name: row.name,
+//       picture: row.picture,
+//       accessToken: row.access_token,
+//       refreshToken: row.refresh_token,
+//       tokenExpiry: row.token_expiry * 1000, // Convert seconds back to milliseconds
+//       isActive: row.is_active
+//     };
+//   },
+
+//   async getGscAccountWithCredentials(userId: string, accountId: string) {
+//     const query = `
+//       SELECT 
+//         a.id as db_id,
+//         a.account_id,
+//         a.email,
+//         a.name,
+//         a.picture,
+//         a.access_token,
+//         a.refresh_token,
+//         a.token_expiry,
+//         a.is_active,
+//         c.client_id,
+//         c.client_secret,
+//         c.redirect_uri
+//       FROM gsc_accounts a
+//       JOIN gsc_configurations c ON c.user_id = a.user_id
+//       WHERE a.user_id = $1 AND (a.id = $2 OR a.account_id = $2)
+//     `;
+//     const result = await pool.query(query, [userId, accountId]);
+    
+//     if (result.rows.length === 0) return null;
+    
+//     const row = result.rows[0];
+//     return {
+//       id: row.account_id,  // Return the Google account ID for compatibility
+//       accountId: row.account_id,
+//       email: row.email,
+//       name: row.name,
+//       picture: row.picture,
+//       accessToken: row.access_token,
+//       refreshToken: row.refresh_token,
+//       tokenExpiry: row.token_expiry * 1000, // Convert to milliseconds
+//       isActive: row.is_active,
+//       clientId: row.client_id,
+//       clientSecret: row.client_secret,
+//       redirectUri: row.redirect_uri
+//     };
+//   },
+
+//   async updateGscAccount(userId: string, accountId: string, updates: Partial<GscAccount>) {
+//     const fields: string[] = [];
+//     const values: any[] = [];
+//     let paramCount = 1;
+
+//     if (updates.accessToken !== undefined) {
+//       fields.push(`access_token = $${paramCount++}`);
+//       values.push(updates.accessToken);
+//     }
+
+//     if (updates.refreshToken !== undefined) {
+//       fields.push(`refresh_token = $${paramCount++}`);
+//       values.push(updates.refreshToken);
+//     }
+
+//     if (updates.tokenExpiry !== undefined) {
+//       fields.push(`token_expiry = $${paramCount++}`);
+//       values.push(Math.floor(updates.tokenExpiry / 1000)); // Convert to seconds
+//     }
+
+//     if (updates.isActive !== undefined) {
+//       fields.push(`is_active = $${paramCount++}`);
+//       values.push(updates.isActive);
+//     }
+
+//     if (fields.length === 0) return { success: true };
+
+//     values.push(userId, accountId);
+
+//     const query = `
+//       UPDATE gsc_accounts 
+//       SET ${fields.join(', ')}, updated_at = NOW()
+//       WHERE user_id = $${paramCount} AND (id = $${paramCount + 1} OR account_id = $${paramCount + 1})
+//       RETURNING *
+//     `;
+    
+//     await pool.query(query, values);
+//     return { success: true };
+//   },
+
+//   async getAllGscAccounts(userId: string): Promise<GscAccount[]> {
+//     const query = 'SELECT * FROM gsc_accounts WHERE user_id = $1 ORDER BY created_at DESC';
+//     const result = await pool.query(query, [userId]);
+    
+//     return result.rows.map(row => ({
+//       id: row.account_id,  // Return the Google account ID
+//       email: row.email,
+//       name: row.name,
+//       picture: row.picture,
+//       accessToken: row.access_token,
+//       refreshToken: row.refresh_token,
+//       tokenExpiry: row.token_expiry * 1000, // Convert to milliseconds
+//       isActive: row.is_active
+//     }));
+//   },
+
+//   // Alias for compatibility with routes
+//   async getGscAccounts(userId: string): Promise<GscAccount[]> {
+//     return this.getAllGscAccounts(userId);
+//   },
+
+//   async getAllGscAccountsWithDetails(userId: string): Promise<any[]> {
+//     const query = `
+//       SELECT 
+//         id,
+//         account_id,
+//         email,
+//         name,
+//         picture,
+//         is_active,
+//         token_expiry,
+//         refresh_token IS NOT NULL as has_refresh_token,
+//         created_at,
+//         updated_at
+//       FROM gsc_accounts 
+//       WHERE user_id = $1 
+//       ORDER BY created_at DESC
+//     `;
+//     const result = await pool.query(query, [userId]);
+    
+//     return result.rows.map(row => ({
+//       id: row.account_id,  // Use Google account ID
+//       dbId: row.id,        // Internal database ID
+//       email: row.email,
+//       name: row.name,
+//       picture: row.picture,
+//       isActive: row.is_active,
+//       tokenExpiry: row.token_expiry * 1000, // Convert to milliseconds
+//       hasRefreshToken: row.has_refresh_token,
+//       createdAt: row.created_at,
+//       updatedAt: row.updated_at
+//     }));
+//   },
+
+//   async deleteGscAccount(userId: string, accountId: string) {
+//     // Use cascade delete for proper cleanup
+//     return this.deleteGscAccountCascade(userId, accountId);
+//   },
+
+//   async deleteGscAccountCascade(userId: string, accountId: string) {
+//     const client = await pool.connect();
+    
+//     try {
+//       await client.query('BEGIN');
+      
+//       console.log(`🗑️ Starting cascade delete for account: ${accountId}`);
+      
+//       // Get all property IDs for this account
+//       const propertyResult = await client.query(
+//         'SELECT id FROM gsc_properties WHERE user_id = $1 AND account_id = $2',
+//         [userId, accountId]
+//       );
+      
+//       const propertyIds = propertyResult.rows.map(row => row.id);
+//       console.log(`Found ${propertyIds.length} properties to delete`);
+      
+//       if (propertyIds.length > 0) {
+//         // Delete URL inspections
+//         const inspectionResult = await client.query(
+//           'DELETE FROM gsc_url_inspections WHERE property_id = ANY($1) RETURNING id',
+//           [propertyIds]
+//         );
+//         console.log(`Deleted ${inspectionResult.rowCount} URL inspections`);
+        
+//         // Delete sitemaps
+//         const sitemapResult = await client.query(
+//           'DELETE FROM gsc_sitemaps WHERE property_id = ANY($1) RETURNING id',
+//           [propertyIds]
+//         );
+//         console.log(`Deleted ${sitemapResult.rowCount} sitemaps`);
+        
+//         // Delete performance data
+//         const perfResult = await client.query(
+//           'DELETE FROM gsc_performance_data WHERE property_id = ANY($1) RETURNING id',
+//           [propertyIds]
+//         );
+//         console.log(`Deleted ${perfResult.rowCount} performance records`);
+//       }
+      
+//       // Delete properties
+//       const propDeleteResult = await client.query(
+//         'DELETE FROM gsc_properties WHERE user_id = $1 AND account_id = $2 RETURNING id',
+//         [userId, accountId]
+//       );
+//       console.log(`Deleted ${propDeleteResult.rowCount} properties`);
+      
+//       // Delete indexing requests
+//       const indexingResult = await client.query(
+//         'DELETE FROM gsc_indexing_requests WHERE account_id = $1 RETURNING id',
+//         [accountId]
+//       );
+//       console.log(`Deleted ${indexingResult.rowCount} indexing requests`);
+      
+//       // Delete quota usage
+//       const quotaResult = await client.query(
+//         'DELETE FROM gsc_quota_usage WHERE account_id = $1 RETURNING id',
+//         [accountId]
+//       );
+//       console.log(`Deleted ${quotaResult.rowCount} quota records`);
+      
+//       // Finally delete the account
+//       const accountResult = await client.query(
+//         'DELETE FROM gsc_accounts WHERE user_id = $1 AND (id = $2 OR account_id = $2) RETURNING id',
+//         [userId, accountId]
+//       );
+//       console.log(`Deleted account: ${accountResult.rowCount} row(s)`);
+      
+//       await client.query('COMMIT');
+//       console.log(`✅ Cascade delete completed for account: ${accountId}`);
+//       return { success: true };
+      
+//     } catch (error) {
+//       await client.query('ROLLBACK');
+//       console.error('Error in cascade delete:', error);
+//       throw error;
+//     } finally {
+//       client.release();
+//     }
+//   },
+
+//   async getAccountStatistics(userId: string, accountId: string) {
+//     try {
+//       const queries = await Promise.all([
+//         // Count properties
+//         pool.query(
+//           'SELECT COUNT(*) as count FROM gsc_properties WHERE user_id = $1 AND account_id = $2',
+//           [userId, accountId]
+//         ),
+//         // Count indexing requests
+//         pool.query(
+//           'SELECT COUNT(*) as count FROM gsc_indexing_requests WHERE account_id = $1',
+//           [accountId]
+//         ),
+//         // Get quota usage
+//         this.getGscQuotaUsage(accountId)
+//       ]);
+      
+//       return {
+//         propertiesCount: parseInt(queries[0].rows[0].count),
+//         indexingRequestsCount: parseInt(queries[1].rows[0].count),
+//         quotaUsage: queries[2]
+//       };
+//     } catch (error) {
+//       console.error('Error getting account statistics:', error);
+//       return {
+//         propertiesCount: 0,
+//         indexingRequestsCount: 0,
+//         quotaUsage: { used: 0, limit: 200 }
+//       };
+//     }
+//   },
+
+//   async getUserGscProfile(userId: string) {
+//     try {
+//       // Get configuration
+//       const config = await this.getGscConfiguration(userId);
+      
+//       // Get all accounts
+//       const accounts = await this.getAllGscAccountsWithDetails(userId);
+      
+//       // Get statistics for each account
+//       const accountsWithStats = await Promise.all(
+//         accounts.map(async (account) => {
+//           const stats = await this.getAccountStatistics(userId, account.id);
+//           return {
+//             ...account,
+//             statistics: stats
+//           };
+//         })
+//       );
+      
+//       // Calculate totals
+//       const totalProperties = accountsWithStats.reduce(
+//         (sum, acc) => sum + acc.statistics.propertiesCount, 
+//         0
+//       );
+      
+//       const totalIndexingRequests = accountsWithStats.reduce(
+//         (sum, acc) => sum + acc.statistics.indexingRequestsCount, 
+//         0
+//       );
+      
+//       return {
+//         configuration: config ? {
+//           isConfigured: true,
+//           hasClientId: !!config.clientId,
+//           hasClientSecret: !!config.clientSecret,
+//           redirectUri: config.redirectUri
+//         } : {
+//           isConfigured: false,
+//           hasClientId: false,
+//           hasClientSecret: false
+//         },
+//         accounts: accountsWithStats,
+//         statistics: {
+//           totalAccounts: accounts.length,
+//           activeAccounts: accounts.filter(a => a.isActive).length,
+//           totalProperties,
+//           totalIndexingRequests
+//         }
+//       };
+//     } catch (error) {
+//       console.error('Error getting user GSC profile:', error);
+//       throw error;
+//     }
+//   },
+
+//   // ============================================================================
+//   // PROPERTIES MANAGEMENT
+//   // ============================================================================
+  
+//   async saveGscProperty(userId: string, accountId: string, property: any) {
+//     const propertyId = randomUUID();
+    
+//     const query = `
+//       INSERT INTO gsc_properties (
+//         id, user_id, account_id, site_url, permission_level, 
+//         site_type, verified, last_synced
+//       )
+//       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+//       ON CONFLICT(site_url) DO UPDATE SET
+//         permission_level = EXCLUDED.permission_level,
+//         verified = EXCLUDED.verified,
+//         last_synced = NOW(),
+//         updated_at = NOW()
+//       RETURNING *
+//     `;
+    
+//     const values = [
+//       propertyId,
+//       userId,
+//       accountId,
+//       property.siteUrl,
+//       property.permissionLevel,
+//       property.siteType,
+//       property.verified
+//     ];
+    
+//     await pool.query(query, values);
+//     return property;
+//   },
+
+//   async getGscProperties(userId: string, accountId?: string) {
+//     let query = 'SELECT * FROM gsc_properties WHERE user_id = $1';
+//     const values: any[] = [userId];
+    
+//     if (accountId) {
+//       query += ' AND account_id = $2';
+//       values.push(accountId);
+//     }
+    
+//     query += ' ORDER BY created_at DESC';
+    
+//     const result = await pool.query(query, values);
+//     return result.rows;
+//   },
+
+//   // ============================================================================
+//   // QUOTA MANAGEMENT
+//   // ============================================================================
+  
+//   async getGscQuotaUsage(accountId: string) {
+//     const today = new Date();
+//     today.setHours(0, 0, 0, 0);
+//     const todayDate = today.toISOString().split('T')[0];
+    
+//     // Check if record exists for today
+//     let query = `
+//       SELECT count, limit_count 
+//       FROM gsc_quota_usage 
+//       WHERE account_id = $1 AND date::date = $2::date
+//     `;
+//     let result = await pool.query(query, [accountId, todayDate]);
+    
+//     if (result.rows.length === 0) {
+//       // Create record for today
+//       const quotaId = randomUUID();
+//       query = `
+//         INSERT INTO gsc_quota_usage (id, account_id, date, count, limit_count)
+//         VALUES ($1, $2, $3::date, 0, 200)
+//         RETURNING count, limit_count
+//       `;
+//       result = await pool.query(query, [quotaId, accountId, todayDate]);
+//     }
+    
+//     return {
+//       used: result.rows[0].count || 0,
+//       limit: result.rows[0].limit_count || 200
+//     };
+//   },
+
+//   async incrementGscQuotaUsage(accountId: string, url?: string) {
+//     const quotaId = randomUUID();
+//     const today = new Date();
+//     today.setHours(0, 0, 0, 0);
+//     const todayDate = today.toISOString().split('T')[0];
+    
+//     const query = `
+//       INSERT INTO gsc_quota_usage (id, account_id, date, count, limit_count)
+//       VALUES ($1, $2, $3::date, 1, 200)
+//       ON CONFLICT(account_id, date) DO UPDATE SET
+//         count = gsc_quota_usage.count + 1,
+//         updated_at = NOW()
+//       RETURNING count
+//     `;
+    
+//     const result = await pool.query(query, [quotaId, accountId, todayDate]);
+    
+//     // Track in indexing requests if URL provided
+//     if (url) {
+//       await this.trackIndexingRequest(accountId, url, 'pending');
+//     }
+    
+//     return { success: true, count: result.rows[0].count };
+//   },
+
+//   // ============================================================================
+//   // INDEXING REQUESTS TRACKING
+//   // ============================================================================
+  
+//   async trackIndexingRequest(accountId: string, url: string, status: string) {
+//     try {
+//       const requestId = randomUUID();
+      
+//       // Get property ID for this URL
+//       const propertyQuery = `
+//         SELECT id FROM gsc_properties 
+//         WHERE account_id = $1 
+//         AND $2 LIKE site_url || '%'
+//         LIMIT 1
+//       `;
+//       const propertyResult = await pool.query(propertyQuery, [accountId, url]);
+      
+//       if (propertyResult.rows.length === 0) {
+//         return { success: false, message: 'No matching property found' };
+//       }
+      
+//       const propertyId = propertyResult.rows[0].id;
+      
+//       // Get user_id from account
+//       const userQuery = 'SELECT user_id FROM gsc_accounts WHERE id = $1 OR account_id = $1';
+//       const userResult = await pool.query(userQuery, [accountId]);
+      
+//       if (userResult.rows.length === 0) {
+//         return { success: false, message: 'Account not found' };
+//       }
+      
+//       const userId = userResult.rows[0].user_id;
+      
+//       const query = `
+//         INSERT INTO gsc_indexing_requests (
+//           id, user_id, account_id, property_id, url, type, status, created_at
+//         )
+//         VALUES ($1, $2, $3, $4, $5, 'URL_UPDATED', $6, NOW())
+//       `;
+      
+//       await pool.query(query, [requestId, userId, accountId, propertyId, url, status]);
+//       return { success: true };
+//     } catch (error) {
+//       console.error('Error tracking indexing request:', error);
+//       return { success: false, message: 'Failed to track request' };
+//     }
+//   },
+
+//   // ============================================================================
+//   // PERFORMANCE DATA
+//   // ============================================================================
+  
+//   async savePerformanceData(propertyId: string, data: any[]) {
+//     try {
+//       const query = `
+//         INSERT INTO gsc_performance_data (
+//           id, property_id, date, clicks, impressions, ctr, position
+//         )
+//         VALUES ($1, $2, $3, $4, $5, $6, $7)
+//         ON CONFLICT DO NOTHING
+//       `;
+      
+//       for (const row of data) {
+//         const perfId = randomUUID();
+//         await pool.query(query, [
+//           perfId,
+//           propertyId,
+//           row.date,
+//           row.clicks,
+//           row.impressions,
+//           row.ctr,
+//           row.position
+//         ]);
+//       }
+      
+//       return { success: true };
+//     } catch (error) {
+//       console.error('Error saving performance data:', error);
+//       return { success: false };
+//     }
+//   },
+
+//   // ============================================================================
+//   // URL INSPECTIONS
+//   // ============================================================================
+  
+//   async saveUrlInspection(propertyId: string, inspection: any) {
+//     try {
+//       const inspectionId = randomUUID();
+      
+//       const query = `
+//         INSERT INTO gsc_url_inspections (
+//           id, property_id, url, index_status, last_crawl_time,
+//           page_fetch_state, google_canonical, user_canonical,
+//           mobile_usability, rich_results_status, full_result,
+//           inspected_at
+//         )
+//         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+//       `;
+      
+//       const values = [
+//         inspectionId,
+//         propertyId,
+//         inspection.url,
+//         inspection.indexStatus,
+//         inspection.lastCrawlTime || null,
+//         inspection.pageFetchState || null,
+//         inspection.googleCanonical || null,
+//         inspection.userCanonical || null,
+//         inspection.mobileUsability || null,
+//         inspection.richResultsStatus || null,
+//         JSON.stringify(inspection)
+//       ];
+      
+//       await pool.query(query, values);
+//       return { success: true };
+//     } catch (error) {
+//       console.error('Error saving URL inspection:', error);
+//       return { success: false };
+//     }
+//   },
+
+//   // ============================================================================
+//   // SITEMAPS
+//   // ============================================================================
+  
+//   async saveSitemap(propertyId: string, sitemapUrl: string) {
+//     try {
+//       const sitemapId = randomUUID();
+      
+//       const query = `
+//         INSERT INTO gsc_sitemaps (id, property_id, sitemap_url, status, last_submitted)
+//         VALUES ($1, $2, $3, 'submitted', NOW())
+//         ON CONFLICT DO NOTHING
+//       `;
+      
+//       await pool.query(query, [sitemapId, propertyId, sitemapUrl]);
+//       return { success: true };
+//     } catch (error) {
+//       console.error('Error saving sitemap:', error);
+//       return { success: false };
+//     }
+//   },
+
+//   // ============================================================================
+//   // HELPER METHODS
+//   // ============================================================================
+  
+//   async getAccountsByGoogleId(googleAccountId: string) {
+//     const query = `
+//       SELECT user_id, email, name 
+//       FROM gsc_accounts 
+//       WHERE account_id = $1
+//     `;
+//     const result = await pool.query(query, [googleAccountId]);
+//     return result.rows;
+//   },
+
+//   // Health check method
+//   async healthCheck() {
+//     try {
+//       const result = await pool.query('SELECT NOW()');
+//       return { 
+//         healthy: true, 
+//         timestamp: result.rows[0].now 
+//       };
+//     } catch (error) {
+//       console.error('Database health check failed:', error);
+//       return { 
+//         healthy: false, 
+//         error: error instanceof Error ? error.message : 'Unknown error' 
+//       };
+//     }
+//   }
+// };
+
+// // ============================================================================
+// // TABLE MANAGEMENT
+// // ============================================================================
+
+// export const createGscTables = async () => {
+//   console.log('GSC tables already exist in Neon database');
+//   return true;
+// };
+
+// export const migrateGscTables = async () => {
+//   console.log('GSC tables already configured in Neon database');
+//   return true;
+// };
+
+// // Export pool for advanced usage if needed
+// export { pool };
+
+
+
+
+
+
+// server/services/gsc-storage.ts - FIXED VERSION
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 
@@ -65,51 +805,139 @@ export const gscStorage = {
   },
 
   // ============================================================================
-  // ACCOUNT MANAGEMENT
+  // ACCOUNT MANAGEMENT - FIXED
   // ============================================================================
   
   async saveGscAccount(userId: string, account: GscAccount) {
-    const query = `
-      INSERT INTO gsc_accounts (
-        id, user_id, account_id, email, name, picture, 
-        access_token, refresh_token, token_expiry, is_active
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      ON CONFLICT(id) DO UPDATE SET
-        account_id = EXCLUDED.account_id,
-        email = EXCLUDED.email,
-        name = EXCLUDED.name,
-        picture = EXCLUDED.picture,
-        access_token = EXCLUDED.access_token,
-        refresh_token = EXCLUDED.refresh_token,
-        token_expiry = EXCLUDED.token_expiry,
-        is_active = EXCLUDED.is_active,
-        updated_at = NOW()
-      RETURNING *
-    `;
-    
-    // Convert milliseconds to seconds for INTEGER column
-    const tokenExpiryInSeconds = Math.floor(account.tokenExpiry / 1000);
-    
-    const values = [
-      account.id,           // id (Google account ID)
-      userId,               // user_id
-      account.id,           // account_id (using same value as id)
-      account.email,        // email
-      account.name,         // name
-      account.picture || null,  // picture
-      account.accessToken,  // access_token
-      account.refreshToken, // refresh_token
-      tokenExpiryInSeconds, // token_expiry (in seconds)
-      account.isActive !== false  // is_active
-    ];
-    
-    await pool.query(query, values);
-    return account;
+    try {
+      console.log('💾 Saving GSC account to database...');
+      console.log('User ID:', userId);
+      console.log('Google Account ID:', account.id);
+      console.log('Email:', account.email);
+      console.log('Has Access Token:', !!account.accessToken);
+      console.log('Has Refresh Token:', !!account.refreshToken);
+      console.log('Token Expiry:', account.tokenExpiry);
+      
+      // Validate required fields
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('Invalid userId');
+      }
+      if (!account.id || typeof account.id !== 'string') {
+        throw new Error('Invalid account.id (Google account ID)');
+      }
+      if (!account.email || typeof account.email !== 'string') {
+        throw new Error('Invalid account.email');
+      }
+      if (!account.accessToken || typeof account.accessToken !== 'string') {
+        throw new Error('Invalid account.accessToken');
+      }
+      
+      // Generate a UUID for the database primary key
+      const dbId = randomUUID();
+      
+      // Convert milliseconds to seconds for INTEGER column
+      const tokenExpiryInSeconds = Math.floor(account.tokenExpiry / 1000);
+      
+      console.log('Generated DB ID (UUID):', dbId);
+      console.log('Token Expiry (seconds):', tokenExpiryInSeconds);
+      
+      // First, check if account already exists for this user and Google account ID
+      const checkQuery = `
+        SELECT id FROM gsc_accounts 
+        WHERE user_id = $1 AND account_id = $2
+      `;
+      const existingResult = await pool.query(checkQuery, [userId, account.id]);
+      
+      if (existingResult.rows.length > 0) {
+        // Update existing account
+        const existingDbId = existingResult.rows[0].id;
+        console.log('📝 Updating existing account with DB ID:', existingDbId);
+        
+        const updateQuery = `
+          UPDATE gsc_accounts SET
+            email = $1,
+            name = $2,
+            picture = $3,
+            access_token = $4,
+            refresh_token = $5,
+            token_expiry = $6,
+            is_active = $7,
+            updated_at = NOW()
+          WHERE id = $8
+          RETURNING *
+        `;
+        
+        const updateValues = [
+          account.email,
+          account.name,
+          account.picture || null,
+          account.accessToken,
+          account.refreshToken || '',
+          tokenExpiryInSeconds,
+          account.isActive !== false,
+          existingDbId
+        ];
+        
+        const result = await pool.query(updateQuery, updateValues);
+        
+        if (result.rowCount === 0) {
+          throw new Error('Update failed - no rows affected');
+        }
+        
+        console.log('✅ Account updated successfully');
+        console.log('Updated row:', result.rows[0]);
+        return account;
+      } else {
+        // Insert new account
+        console.log('➕ Inserting new account');
+        
+        const insertQuery = `
+          INSERT INTO gsc_accounts (
+            id, user_id, account_id, email, name, picture, 
+            access_token, refresh_token, token_expiry, is_active
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *
+        `;
+        
+        const insertValues = [
+          dbId,                          // id (DB UUID)
+          userId,                        // user_id
+          account.id,                    // account_id (Google account ID)
+          account.email,                 // email
+          account.name,                  // name
+          account.picture || null,       // picture
+          account.accessToken,           // access_token
+          account.refreshToken || '',    // refresh_token
+          tokenExpiryInSeconds,          // token_expiry (in seconds)
+          account.isActive !== false     // is_active
+        ];
+        
+        const result = await pool.query(insertQuery, insertValues);
+        
+        if (result.rowCount === 0) {
+          throw new Error('Insert failed - no rows affected');
+        }
+        
+        console.log('✅ Account inserted successfully');
+        console.log('Inserted row:', result.rows[0]);
+        return account;
+      }
+      
+    } catch (error: any) {
+      console.error('========================================');
+      console.error('❌ ERROR SAVING GSC ACCOUNT');
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error detail:', error.detail);
+      console.error('Error stack:', error.stack);
+      console.error('========================================');
+      throw error;
+    }
   },
 
   async getGscAccount(userId: string, accountId: string): Promise<GscAccount | null> {
-    const query = 'SELECT * FROM gsc_accounts WHERE user_id = $1 AND (id = $2 OR account_id = $2)';
+    const query = 'SELECT * FROM gsc_accounts WHERE user_id = $1 AND account_id = $2';
     const result = await pool.query(query, [userId, accountId]);
     
     if (result.rows.length === 0) return null;
@@ -144,7 +972,7 @@ export const gscStorage = {
         c.redirect_uri
       FROM gsc_accounts a
       JOIN gsc_configurations c ON c.user_id = a.user_id
-      WHERE a.user_id = $1 AND (a.id = $2 OR a.account_id = $2)
+      WHERE a.user_id = $1 AND a.account_id = $2
     `;
     const result = await pool.query(query, [userId, accountId]);
     
@@ -199,7 +1027,7 @@ export const gscStorage = {
     const query = `
       UPDATE gsc_accounts 
       SET ${fields.join(', ')}, updated_at = NOW()
-      WHERE user_id = $${paramCount} AND (id = $${paramCount + 1} OR account_id = $${paramCount + 1})
+      WHERE user_id = $${paramCount} AND account_id = $${paramCount + 1}
       RETURNING *
     `;
     
@@ -262,7 +1090,6 @@ export const gscStorage = {
   },
 
   async deleteGscAccount(userId: string, accountId: string) {
-    // Use cascade delete for proper cleanup
     return this.deleteGscAccountCascade(userId, accountId);
   },
 
@@ -329,7 +1156,7 @@ export const gscStorage = {
       
       // Finally delete the account
       const accountResult = await client.query(
-        'DELETE FROM gsc_accounts WHERE user_id = $1 AND (id = $2 OR account_id = $2) RETURNING id',
+        'DELETE FROM gsc_accounts WHERE user_id = $1 AND account_id = $2 RETURNING id',
         [userId, accountId]
       );
       console.log(`Deleted account: ${accountResult.rowCount} row(s)`);
@@ -350,17 +1177,14 @@ export const gscStorage = {
   async getAccountStatistics(userId: string, accountId: string) {
     try {
       const queries = await Promise.all([
-        // Count properties
         pool.query(
           'SELECT COUNT(*) as count FROM gsc_properties WHERE user_id = $1 AND account_id = $2',
           [userId, accountId]
         ),
-        // Count indexing requests
         pool.query(
           'SELECT COUNT(*) as count FROM gsc_indexing_requests WHERE account_id = $1',
           [accountId]
         ),
-        // Get quota usage
         this.getGscQuotaUsage(accountId)
       ]);
       
@@ -381,13 +1205,9 @@ export const gscStorage = {
 
   async getUserGscProfile(userId: string) {
     try {
-      // Get configuration
       const config = await this.getGscConfiguration(userId);
-      
-      // Get all accounts
       const accounts = await this.getAllGscAccountsWithDetails(userId);
       
-      // Get statistics for each account
       const accountsWithStats = await Promise.all(
         accounts.map(async (account) => {
           const stats = await this.getAccountStatistics(userId, account.id);
@@ -398,7 +1218,6 @@ export const gscStorage = {
         })
       );
       
-      // Calculate totals
       const totalProperties = accountsWithStats.reduce(
         (sum, acc) => sum + acc.statistics.propertiesCount, 
         0
@@ -493,7 +1312,6 @@ export const gscStorage = {
     today.setHours(0, 0, 0, 0);
     const todayDate = today.toISOString().split('T')[0];
     
-    // Check if record exists for today
     let query = `
       SELECT count, limit_count 
       FROM gsc_quota_usage 
@@ -502,7 +1320,6 @@ export const gscStorage = {
     let result = await pool.query(query, [accountId, todayDate]);
     
     if (result.rows.length === 0) {
-      // Create record for today
       const quotaId = randomUUID();
       query = `
         INSERT INTO gsc_quota_usage (id, account_id, date, count, limit_count)
@@ -535,7 +1352,6 @@ export const gscStorage = {
     
     const result = await pool.query(query, [quotaId, accountId, todayDate]);
     
-    // Track in indexing requests if URL provided
     if (url) {
       await this.trackIndexingRequest(accountId, url, 'pending');
     }
@@ -551,7 +1367,6 @@ export const gscStorage = {
     try {
       const requestId = randomUUID();
       
-      // Get property ID for this URL
       const propertyQuery = `
         SELECT id FROM gsc_properties 
         WHERE account_id = $1 
@@ -566,8 +1381,7 @@ export const gscStorage = {
       
       const propertyId = propertyResult.rows[0].id;
       
-      // Get user_id from account
-      const userQuery = 'SELECT user_id FROM gsc_accounts WHERE id = $1 OR account_id = $1';
+      const userQuery = 'SELECT user_id FROM gsc_accounts WHERE account_id = $1';
       const userResult = await pool.query(userQuery, [accountId]);
       
       if (userResult.rows.length === 0) {
@@ -735,5 +1549,3 @@ export const migrateGscTables = async () => {
 
 // Export pool for advanced usage if needed
 export { pool };
-
-
