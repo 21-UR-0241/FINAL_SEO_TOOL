@@ -31,6 +31,82 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
+// 🚨 CRITICAL: Log when this file loads
+console.log('');
+console.log('═══════════════════════════════════════════════════════════');
+console.log('🔥 GSC ROUTES MODULE IS LOADING');
+console.log('   Time:', new Date().toISOString());
+console.log('   File: server/routes/gsc.routes.ts');
+console.log('═══════════════════════════════════════════════════════════');
+console.log('');
+
+// 🚨 CRITICAL: Test route at the absolute beginning (no middleware)
+router.all('/test-route-exists', (req: Request, res: Response) => {
+  console.log('🎯 TEST ROUTE HIT!');
+  res.json({
+    success: true,
+    message: 'GSC routes ARE being registered!',
+    method: req.method,
+    path: req.path,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 🚨 CRITICAL: Catch-all logger for GSC routes
+router.use((req: Request, res: Response, next: NextFunction) => {
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('📥 GSC ROUTE REQUEST');
+  console.log('   Method:', req.method);
+  console.log('   Path:', req.path);
+  console.log('   Full URL:', req.originalUrl);
+  console.log('   Base URL:', req.baseUrl);
+  console.log('   Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('   Body:', JSON.stringify(req.body, null, 2));
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('');
+  next();
+});
+
+// ============================================================================
+// SIMPLIFIED refresh-token route (NO MIDDLEWARE, NO VALIDATION)
+// Place this IMMEDIATELY after the catch-all logger
+// ============================================================================
+
+router.post('/refresh-token', async (req: Request, res: Response) => {
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('🔄 REFRESH-TOKEN ROUTE HIT!!!');
+  console.log('   Method:', req.method);
+  console.log('   Path:', req.path);
+  console.log('   Body:', req.body);
+  console.log('   Headers:', req.headers);
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('');
+
+  // For now, just respond to prove the route works
+  res.json({
+    success: true,
+    message: 'Refresh token route is working!',
+    receivedAccountId: req.body.accountId,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ============================================================================
+// Add this at the VERY END of the file, before export
+// ============================================================================
+
+console.log('');
+console.log('═══════════════════════════════════════════════════════════');
+console.log('✅ GSC ROUTES FILE FULLY LOADED');
+console.log('   All routes defined and ready');
+console.log('   Exporting router...');
+console.log('═══════════════════════════════════════════════════════════');
+console.log('');
+
+
+
 // Apply middleware
 router.use(apiLimiter);
 router.use(sanitizationMiddleware.body);
