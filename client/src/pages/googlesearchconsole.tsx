@@ -704,7 +704,9 @@ const GoogleSearchConsole = () => {
     setQuotaUsage({ used: newUsage, limit: 200 });
   };
 
-// UPDATED: Now accepts both code and userId
+
+  // Replace your handleOAuthCallback function with this version:
+
 const handleOAuthCallback = async (code, userId) => {
   if (isAuthenticating) return;
 
@@ -717,9 +719,17 @@ const handleOAuthCallback = async (code, userId) => {
   console.log('========================================');
   
   try {
-    // Pass both code and userId to the API
+    // Step 1: Exchange code and wait for account to be saved
+    console.log('Step 1: Exchanging auth code...');
     const account = await SearchConsoleAPI.authenticateAccount(code, userId);
+    console.log('✅ Account saved to database:', account.email);
 
+    // Step 2: Small delay to ensure database write is committed
+    // This helps with potential database replication lag
+    console.log('Step 2: Waiting for database sync...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Step 3: Update accounts list
     const existingIndex = accounts.findIndex((acc) => acc.id === account.id);
     let updatedAccounts;
 
@@ -739,7 +749,14 @@ const handleOAuthCallback = async (code, userId) => {
     }
 
     setAccounts(updatedAccounts);
+    
+    // Step 4: Set selected account (this will trigger useEffect to load properties)
+    console.log('Step 3: Setting selected account...');
     setSelectedAccount(account);
+    
+    console.log('✅ OAuth flow complete');
+    console.log('========================================');
+    
   } catch (error) {
     console.error('========================================');
     console.error('❌ OAuth callback error:', error);
@@ -752,6 +769,55 @@ const handleOAuthCallback = async (code, userId) => {
     setIsAuthenticating(false);
   }
 };
+
+// UPDATED: Now accepts both code and userId
+// const handleOAuthCallback = async (code, userId) => {
+//   if (isAuthenticating) return;
+
+//   setIsAuthenticating(true);
+  
+//   console.log('========================================');
+//   console.log('🔐 HANDLING OAUTH CALLBACK');
+//   console.log('Code:', code ? 'Present' : 'Missing');
+//   console.log('User ID:', userId);
+//   console.log('========================================');
+  
+//   try {
+//     // Pass both code and userId to the API
+//     const account = await SearchConsoleAPI.authenticateAccount(code, userId);
+
+//     const existingIndex = accounts.findIndex((acc) => acc.id === account.id);
+//     let updatedAccounts;
+
+//     if (existingIndex >= 0) {
+//       updatedAccounts = [...accounts];
+//       updatedAccounts[existingIndex] = account;
+//       showNotification(
+//         "success",
+//         `Account ${account.email} re-authenticated`
+//       );
+//     } else {
+//       updatedAccounts = [...accounts, account];
+//       showNotification(
+//         "success",
+//         `Account ${account.email} connected successfully`
+//       );
+//     }
+
+//     setAccounts(updatedAccounts);
+//     setSelectedAccount(account);
+//   } catch (error) {
+//     console.error('========================================');
+//     console.error('❌ OAuth callback error:', error);
+//     console.error('========================================');
+//     showNotification(
+//       "error",
+//       error.message || "Failed to authenticate account"
+//     );
+//   } finally {
+//     setIsAuthenticating(false);
+//   }
+// };
 
   const handleSaveOAuthCredentials = async (clientId, clientSecret) => {
     try {
