@@ -299,12 +299,20 @@ class SearchConsoleAPI {
     );
   }
 
-  static async refreshToken(accountId, refreshToken) {
-    return this.fetchWithAuth(`${this.baseURL}/refresh-token`, {
-      method: "POST",
-      body: JSON.stringify({ accountId, refreshToken }),
-    });
-  }
+
+  static async refreshToken(accountId) {
+  return this.fetchWithAuth(`${this.baseURL}/refresh-token`, {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  });
+}
+
+  // static async refreshToken(accountId, refreshToken) {
+  //   return this.fetchWithAuth(`${this.baseURL}/refresh-token`, {
+  //     method: "POST",
+  //     body: JSON.stringify({ accountId, refreshToken }),
+  //   });
+  // }
 
   static async saveConfiguration(clientId, clientSecret) {
     await this.fetchWithAuth(`${this.baseURL}/configure`, {
@@ -599,47 +607,82 @@ const GoogleSearchConsole = () => {
   }, [accounts]);
 
   useEffect(() => {
+    // const refreshTokensIfNeeded = async () => {
+    //   for (const account of accounts) {
+    //     const timeUntilExpiry = account.tokenExpiry - Date.now();
+
+    //     if (account.refreshToken && timeUntilExpiry < 300000) {
+    //       try {
+    //         const result = await SearchConsoleAPI.refreshToken(
+    //           account.id,
+    //           account.refreshToken
+    //         );
+
+    //         const updatedAccounts = accounts.map((acc) =>
+    //           acc.id === account.id
+    //             ? {
+    //                 ...acc,
+    //                 accessToken: result.accessToken,
+    //                 tokenExpiry: result.tokenExpiry,
+    //               }
+    //             : acc
+    //         );
+
+    //         setAccounts(updatedAccounts);
+    //         console.log(`Token refreshed for ${account.email}`);
+    //       } catch (error) {
+    //         console.error(
+    //           `Failed to refresh token for ${account.email}:`,
+    //           error
+    //         );
+    //         showNotification(
+    //           "warning",
+    //           `Token refresh failed for ${account.email}. Please re-authenticate.`
+    //         );
+
+    //         const updatedAccounts = accounts.map((acc) =>
+    //           acc.id === account.id ? { ...acc, isActive: false } : acc
+    //         );
+    //         setAccounts(updatedAccounts);
+    //       }
+    //     }
+    //   }
+    // };
+
+
     const refreshTokensIfNeeded = async () => {
-      for (const account of accounts) {
-        const timeUntilExpiry = account.tokenExpiry - Date.now();
+  for (const account of accounts) {
+    const timeUntilExpiry = account.tokenExpiry - Date.now();
+    if (timeUntilExpiry < 300000) { // < 5 minutes
+      try {
+        const result = await SearchConsoleAPI.refreshToken(account.id);
 
-        if (account.refreshToken && timeUntilExpiry < 300000) {
-          try {
-            const result = await SearchConsoleAPI.refreshToken(
-              account.id,
-              account.refreshToken
-            );
-
-            const updatedAccounts = accounts.map((acc) =>
-              acc.id === account.id
-                ? {
-                    ...acc,
-                    accessToken: result.accessToken,
-                    tokenExpiry: result.tokenExpiry,
-                  }
-                : acc
-            );
-
-            setAccounts(updatedAccounts);
-            console.log(`Token refreshed for ${account.email}`);
-          } catch (error) {
-            console.error(
-              `Failed to refresh token for ${account.email}:`,
-              error
-            );
-            showNotification(
-              "warning",
-              `Token refresh failed for ${account.email}. Please re-authenticate.`
-            );
-
-            const updatedAccounts = accounts.map((acc) =>
-              acc.id === account.id ? { ...acc, isActive: false } : acc
-            );
-            setAccounts(updatedAccounts);
-          }
-        }
+        const updatedAccounts = accounts.map((acc) =>
+          acc.id === account.id
+            ? {
+                ...acc,
+                accessToken: result.accessToken,
+                tokenExpiry: result.tokenExpiry,
+                isActive: true,
+              }
+            : acc
+        );
+        setAccounts(updatedAccounts);
+        console.log(`Token refreshed for ${account.email}`);
+      } catch (error) {
+        console.error(`Failed to refresh token for ${account.email}:`, error);
+        showNotification(
+          "warning",
+          `Token refresh failed for ${account.email}. Please re-authenticate.`
+        );
+        const updatedAccounts = accounts.map((acc) =>
+          acc.id === account.id ? { ...acc, isActive: false } : acc
+        );
+        setAccounts(updatedAccounts);
       }
-    };
+    }
+  }
+};
 
     refreshTokensIfNeeded();
     const interval = setInterval(refreshTokensIfNeeded, 60000);

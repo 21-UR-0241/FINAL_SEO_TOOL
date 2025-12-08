@@ -1318,48 +1318,159 @@ router.get('/performance', requireAuth, validateAccountId, async (req: Authentic
   }
 });
 
-router.post('/refresh-token', requireAuth, validateAccountId, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const { accountId, refreshToken } = req.body;
+// router.post('/refresh-token', requireAuth, validateAccountId, async (req: AuthenticatedRequest, res: Response) => {
+//   try {
+//     const userId = req.user!.id;
+//     const { accountId, refreshToken } = req.body;
     
-    console.log(`🔄 Refreshing GSC token for account: ${accountId}`);
+//     console.log(`🔄 Refreshing GSC token for account: ${accountId}`);
     
-    if (!refreshToken || typeof refreshToken !== 'string') {
-      return res.status(400).json({ error: 'Refresh token is required' });
+//     if (!refreshToken || typeof refreshToken !== 'string') {
+//       return res.status(400).json({ error: 'Refresh token is required' });
+//     }
+    
+//     const config = await gscStorage.getGscConfiguration(userId);
+//     if (!config) {
+//       return res.status(400).json({ error: 'Configuration not found' });
+//     }
+    
+//     const oauth2Client = new google.auth.OAuth2(
+//       config.clientId,
+//       config.clientSecret,
+//       config.redirectUri || getRedirectUri()
+//     );
+    
+//     oauth2Client.setCredentials({
+//       refresh_token: refreshToken
+//     });
+    
+//     const { credentials } = await oauth2Client.refreshAccessToken();
+    
+//     await gscStorage.updateGscAccount(userId, accountId, {
+//       accessToken: credentials.access_token!,
+//       tokenExpiry: credentials.expiry_date!
+//     });
+    
+//     console.log(`✅ GSC token refreshed for account: ${accountId}`);
+//     res.json({ 
+//       accessToken: credentials.access_token,
+//       tokenExpiry: credentials.expiry_date
+//     });
+//   } catch (error) {
+//     console.error('Token refresh error:', error);
+//     res.status(500).json({ error: 'Failed to refresh token' });
+//   }
+// });
+
+router.post(
+  '/refresh-token',
+  requireAuth,
+  validateAccountId,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { accountId } = req.body; // validateAccountId has already sanitized this
+
+      console.log(`🔄 Refreshing GSC token for account: ${accountId}, user: ${userId}`);
+
+      // 1. Get account with stored credentials
+      const account = await gscStorage.getGscAccountWithCredentials(userId, accountId);
+
+      if (!account) {
+        console.error('❌ Account not found for refresh-token:', { userId, accountId });
+        return res.status(404).json({ 
+          error: 'Account not found',
+          needsReauth: true
+        });
+      }
+
+      if (!account.refreshToken) {
+        console.error('❌ No refresh token stored for account:', { userId, accountId });
+        return res.status(400).json({ 
+          error: 'No refresh token stored. Please re‑authenticate this GSC account.',
+          needsReauth: true
+        });
+      }
+
+      // 2. Get OAuth client config
+      const config = await gscStorage.getGscConfiguration(userId);
+      if (!config) {
+        console.error('❌ OAuth configuration not found for user:', userId);
+        return res.status(400).json({ 
+          error: 'Configuration not found. Please configure your Google OAuth credentials first.' 
+        });
+      }
+
+      const oauth2Client = new google.auth.OAuth2(
+        config.clientId,
+        config.clientSecret,
+        config.redirectUri || getRedirectUri()
+      );
+
+      oauth2Client.setCredentials({
+        refresh_token: account.refreshToken
+      });
+
+      console.log('🔄 Calling Google to refresh access token...');
+
+      try {
+        const { credentials } = await oauth2Client.refreshAccessToken();
+
+        if (!credentials.access_token) {
+          console.error('❌ No access token in refresh response');
+          return res.status(500).json({ error: 'Google did not return an access token' });
+        }
+
+        // 3. Persist new token
+        await gscStorage.updateGscAccount(userId, accountId, {
+          accessToken: credentials.access_token!,
+          tokenExpiry: credentials.expiry_date!,
+          isActive: true
+        });
+
+        console.log(`✅ GSC token refreshed for account: ${accountId}`);
+
+        return res.json({
+          accessToken: credentials.access_token,
+          tokenExpiry: credentials.expiry_date
+        });
+
+      } catch (googleErr: any) {
+        // Google-specific error handling
+        console.error('❌ Google refreshAccessToken error:', {
+          message: googleErr.message,
+          code: googleErr.code,
+          data: googleErr.response?.data
+        });
+
+        // Most common case: invalid / revoked refresh token
+        if (googleErr.message?.includes('invalid_grant')) {
+          await gscStorage.updateGscAccount(userId, accountId, { isActive: false });
+
+          return res.status(401).json({
+            error: 'Refresh token invalid or revoked. Please reconnect this GSC account.',
+            needsReauth: true
+          });
+        }
+
+        // Other Google errors
+        return res.status(502).json({
+          error: 'Failed to refresh token with Google',
+          details: process.env.NODE_ENV === 'development'
+            ? googleErr.response?.data || googleErr.message
+            : undefined
+        });
+      }
+
+    } catch (error: any) {
+      console.error('❌ Token refresh route error:', error);
+
+      return res.status(500).json({
+        error: 'Failed to refresh token',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
-    
-    const config = await gscStorage.getGscConfiguration(userId);
-    if (!config) {
-      return res.status(400).json({ error: 'Configuration not found' });
-    }
-    
-    const oauth2Client = new google.auth.OAuth2(
-      config.clientId,
-      config.clientSecret,
-      config.redirectUri || getRedirectUri()
-    );
-    
-    oauth2Client.setCredentials({
-      refresh_token: refreshToken
-    });
-    
-    const { credentials } = await oauth2Client.refreshAccessToken();
-    
-    await gscStorage.updateGscAccount(userId, accountId, {
-      accessToken: credentials.access_token!,
-      tokenExpiry: credentials.expiry_date!
-    });
-    
-    console.log(`✅ GSC token refreshed for account: ${accountId}`);
-    res.json({ 
-      accessToken: credentials.access_token,
-      tokenExpiry: credentials.expiry_date
-    });
-  } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(500).json({ error: 'Failed to refresh token' });
   }
-});
+);
 
 export default router;
