@@ -722,6 +722,101 @@ router.get('/user/profile', requireAuth, async (req: AuthenticatedRequest, res: 
   }
 });
 
+// router.post('/accounts/:accountId/verify', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+//   try {
+//     const userId = req.user!.id;
+//     const { accountId } = req.params;
+    
+//     const validation = InputSanitizer.sanitizeAccountId(accountId);
+//     if (!validation.isValid) {
+//       return res.status(400).json({ error: validation.error });
+//     }
+    
+//     console.log(`🔍 Verifying account: ${accountId}`);
+    
+//     const account = await gscStorage.getGscAccountWithCredentials(userId, validation.sanitized);
+    
+//     if (!account) {
+//       return res.status(404).json({ 
+//         error: 'Account not found', 
+//         isValid: false,
+//         needsReauth: true
+//       });
+//     }
+    
+//     const timeUntilExpiry = account.tokenExpiry - Date.now();
+//     const needsRefresh = timeUntilExpiry < 300000;
+    
+//     if (needsRefresh && account.refreshToken) {
+//       try {
+//         console.log(`🔄 Token expiring soon, refreshing...`);
+        
+//         const config = await gscStorage.getGscConfiguration(userId);
+//         if (!config) {
+//           return res.json({ 
+//             isValid: false, 
+//             needsReauth: true,
+//             message: 'OAuth configuration not found' 
+//           });
+//         }
+        
+//         const oauth2Client = new google.auth.OAuth2(
+//           config.clientId,
+//           config.clientSecret,
+//           config.redirectUri || getRedirectUri()
+//         );
+        
+//         oauth2Client.setCredentials({
+//           refresh_token: account.refreshToken
+//         });
+        
+//         const { credentials } = await oauth2Client.refreshAccessToken();
+        
+//         await gscStorage.updateGscAccount(userId, validation.sanitized, {
+//           accessToken: credentials.access_token!,
+//           tokenExpiry: credentials.expiry_date!,
+//           isActive: true
+//         });
+        
+//         console.log(`✅ Token refreshed for account: ${accountId}`);
+        
+//         return res.json({ 
+//           isValid: true, 
+//           refreshed: true,
+//           tokenExpiry: credentials.expiry_date,
+//           message: 'Token refreshed successfully'
+//         });
+        
+//       } catch (refreshError) {
+//         console.error('Token refresh failed:', refreshError);
+        
+//         await gscStorage.updateGscAccount(userId, validation.sanitized, {
+//           isActive: false
+//         });
+        
+//         return res.json({ 
+//           isValid: false, 
+//           needsReauth: true,
+//           message: 'Token expired and refresh failed. Please re-authenticate.'
+//         });
+//       }
+//     }
+    
+//     res.json({ 
+//       isValid: true, 
+//       refreshed: false,
+//       expiresIn: Math.floor(timeUntilExpiry / 1000),
+//       tokenExpiry: account.tokenExpiry,
+//       message: 'Account is valid'
+//     });
+    
+//   } catch (error) {
+//     console.error('Error verifying account:', error);
+//     res.status(500).json({ error: 'Failed to verify account' });
+//   }
+// });
+
+
 router.post('/accounts/:accountId/verify', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
@@ -732,20 +827,28 @@ router.post('/accounts/:accountId/verify', requireAuth, async (req: Authenticate
       return res.status(400).json({ error: validation.error });
     }
     
-    console.log(`🔍 Verifying account: ${accountId}`);
+    const sanitizedId = validation.sanitized;
+    console.log(`🔍 Verifying account: ${sanitizedId}`);
     
-    const account = await gscStorage.getGscAccountWithCredentials(userId, validation.sanitized);
+    // Load account with credentials
+    const account = await gscStorage.getGscAccountWithCredentials(userId, sanitizedId);
     
     if (!account) {
       return res.status(404).json({ 
         error: 'Account not found', 
         isValid: false,
+        isVerified: false,
         needsReauth: true
       });
     }
     
+    // -------------------------
+    // 1️⃣ TOKEN EXPIRY CHECK
+    // -------------------------
     const timeUntilExpiry = account.tokenExpiry - Date.now();
-    const needsRefresh = timeUntilExpiry < 300000;
+    const needsRefresh = timeUntilExpiry < 300000; // < 5min
+    
+    let accessToken = account.accessToken;
     
     if (needsRefresh && account.refreshToken) {
       try {
@@ -756,6 +859,7 @@ router.post('/accounts/:accountId/verify', requireAuth, async (req: Authenticate
           return res.json({ 
             isValid: false, 
             needsReauth: true,
+            isVerified: false,
             message: 'OAuth configuration not found' 
           });
         }
@@ -772,49 +876,123 @@ router.post('/accounts/:accountId/verify', requireAuth, async (req: Authenticate
         
         const { credentials } = await oauth2Client.refreshAccessToken();
         
-        await gscStorage.updateGscAccount(userId, validation.sanitized, {
+        accessToken = credentials.access_token!;
+        
+        await gscStorage.updateGscAccount(userId, sanitizedId, {
           accessToken: credentials.access_token!,
           tokenExpiry: credentials.expiry_date!,
           isActive: true
         });
         
-        console.log(`✅ Token refreshed for account: ${accountId}`);
-        
-        return res.json({ 
-          isValid: true, 
-          refreshed: true,
-          tokenExpiry: credentials.expiry_date,
-          message: 'Token refreshed successfully'
-        });
-        
+        console.log(`✅ Token refreshed for account: ${sanitizedId}`);
       } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
+        console.error('❌ Token refresh failed:', refreshError);
         
-        await gscStorage.updateGscAccount(userId, validation.sanitized, {
+        await gscStorage.updateGscAccount(userId, sanitizedId, {
           isActive: false
         });
         
         return res.json({ 
           isValid: false, 
+          isVerified: false,
           needsReauth: true,
           message: 'Token expired and refresh failed. Please re-authenticate.'
         });
       }
     }
     
-    res.json({ 
-      isValid: true, 
-      refreshed: false,
-      expiresIn: Math.floor(timeUntilExpiry / 1000),
-      tokenExpiry: account.tokenExpiry,
-      message: 'Account is valid'
+    // -------------------------
+    // 2️⃣ CREATE OAUTH CLIENT
+    // -------------------------
+    const config = await gscStorage.getGscConfiguration(userId);
+    if (!config) {
+      return res.json({
+        isValid: false,
+        needsReauth: true,
+        isVerified: false,
+        message: 'OAuth configuration missing'
+      });
+    }
+    
+    const oauth2Client = new google.auth.OAuth2(
+      config.clientId,
+      config.clientSecret,
+      config.redirectUri || getRedirectUri()
+    );
+    
+    oauth2Client.setCredentials({
+      access_token: accessToken,
+      refresh_token: account.refreshToken || undefined
     });
     
+    const searchconsole = google.searchconsole({ version: 'v1', auth: oauth2Client });
+    
+    // -------------------------
+    // 3️⃣ CHECK PROPERTY ACCESS
+    // -------------------------
+    let hasAccess = false;
+    try {
+      await searchconsole.sites.get({ siteUrl: sanitizedId });
+      hasAccess = true;
+    } catch (err: any) {
+      console.warn(`⚠️ Property check failed for ${sanitizedId}`, err?.response?.data || err);
+      hasAccess = false;
+    }
+    
+    // -------------------------
+    // 4️⃣ CHECK OWNERSHIP (REAL VERIFICATION)
+    // -------------------------
+    let isVerified = false;
+    let verifiedAt = account.verifiedAt || null;
+    
+    if (hasAccess) {
+      try {
+        const siteVerification = google.siteVerification({
+          version: 'v1',
+          auth: oauth2Client
+        });
+        
+        const { data } = await siteVerification.webResource.list({});
+        
+        const owned = data.items?.some(resource =>
+          resource.site?.identifier === sanitizedId
+        );
+        
+        if (owned) {
+          isVerified = true;
+          verifiedAt = verifiedAt || new Date().toISOString();
+          
+          await gscStorage.updateGscAccount(userId, sanitizedId, {
+            isVerified: true,
+            verifiedAt
+          });
+        }
+      } catch (verifyErr) {
+        console.warn(`⚠️ Ownership check failed for ${sanitizedId}`, verifyErr);
+      }
+    }
+    
+    // -------------------------
+    // 5️⃣ FINAL RESPONSE
+    // -------------------------
+    return res.json({
+      isValid: true,
+      refreshed: needsRefresh,
+      tokenExpiry: account.tokenExpiry,
+      expiresIn: Math.floor((account.tokenExpiry - Date.now()) / 1000),
+      needsReauth: false,
+      hasAccess,
+      isVerified,
+      verifiedAt,
+      message: 'Account verification completed'
+    });
+
   } catch (error) {
-    console.error('Error verifying account:', error);
+    console.error('❌ Error verifying account:', error);
     res.status(500).json({ error: 'Failed to verify account' });
   }
 });
+
 
 router.delete('/accounts/:accountId', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
