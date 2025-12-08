@@ -3438,7 +3438,7 @@ private async storeAnalysisResults(
             description: issue.description,
             affectedPages: issue.affectedPages,
             category: issue.category || 'technical',
-            status: 'open',
+            status: 'detected',
             autoFixable: true,
             detectedAt: new Date(),
           });
