@@ -106,50 +106,35 @@ app.set('trust proxy', 1);
 // 2. NUCLEAR OPTIONS HANDLER - HANDLES ALL PREFLIGHT REQUESTS
 // =============================================================================
 
-
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Allow OAuth popups to communicate
-  if (req.path === '/api/gsc/oauth-callback' || 
-      req.path === '/api/auth/google/callback' ||
-      req.path.startsWith('/api/gsc/auth')) {
-    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
-    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  } else {
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  // Handle OPTIONS IMMEDIATELY before anything else can interfere
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    
+    console.log(`⚡ OPTIONS ${req.path} from ${origin || 'unknown'}`);
+    
+    // Check if origin is allowed
+    if (origin && isAllowedOrigin(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      // For development or non-browser requests
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
+    res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.setHeader('Vary', 'Origin');
+    
+    // Send 200 immediately - don't let anything else process this
+    return res.status(200).end();
   }
+  
+  // Not an OPTIONS request, continue to next middleware
   next();
 });
-// app.use((req: Request, res: Response, next: NextFunction) => {
-//   // Handle OPTIONS IMMEDIATELY before anything else can interfere
-//   if (req.method === 'OPTIONS') {
-//     const origin = req.headers.origin;
-    
-//     console.log(`⚡ OPTIONS ${req.path} from ${origin || 'unknown'}`);
-    
-//     // Check if origin is allowed
-//     if (origin && isAllowedOrigin(origin)) {
-//       res.setHeader('Access-Control-Allow-Origin', origin);
-//       res.setHeader('Access-Control-Allow-Credentials', 'true');
-//     } else {
-//       // For development or non-browser requests
-//       res.setHeader('Access-Control-Allow-Origin', '*');
-//     }
-    
-//     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-//     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token');
-//     res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie, Content-Type');
-//     res.setHeader('Access-Control-Max-Age', '86400');
-//     res.setHeader('Vary', 'Origin');
-    
-//     // Send 200 immediately - don't let anything else process this
-//     return res.status(200).end();
-//   }
-  
-//   // Not an OPTIONS request, continue to next middleware
-//   next();
-// });
 
 // =============================================================================
 // 3. CORS FOR ALL OTHER REQUESTS

@@ -7769,7 +7769,7 @@ app.use("/api/user/high-intent", requireAuth, highIntentRoutes);
   // GOOGLE SEARCH CONSOLE ROUTES
   // ===========================================================================
   
-  app.use('/api/gsc',gscRouter);
+  app.use('/api/gsc', requireAuth, gscRouter);
 
   // ===========================================================================
   // DASHBOARD & ACTIVITY ROUTES
