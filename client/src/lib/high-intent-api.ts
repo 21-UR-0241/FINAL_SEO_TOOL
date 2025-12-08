@@ -420,6 +420,10 @@
 // Enhanced Frontend API client for High Intent Collection with Database Persistence
 
 // Types
+
+
+
+import { API_URL } from "@/config/api";
 export interface Product {
   id: string;
   name: string;
@@ -559,7 +563,8 @@ export const highIntentApi = {
     locations?: LocationTarget[],
     saveToDb: boolean = false
   ): Promise<ResearchResponse> {
-    const response = await fetchWithCredentials("/api/user/high-intent/research-product", {
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/research-product`, {
+      credentials: "include",
       method: "POST",
       body: JSON.stringify({ productName, niche, questionsCount, locations, saveToDb }),
     });
@@ -568,7 +573,7 @@ export const highIntentApi = {
       const error = await response.json().catch(() => ({ message: "Failed to research product" }));
       throw new Error(error.message || "Failed to research product");
     }
-
+`${API_URL}/api/user/high-intent/research-product`
     return response.json();
   },
 
@@ -583,7 +588,8 @@ export const highIntentApi = {
     locations?: LocationTarget[],
     saveToDb: boolean = false
   ): Promise<ResearchResponse> {
-    const response = await fetchWithCredentials("/api/user/high-intent/bulk-research", {
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/bulk-research`, {
+      credentials: "include",
       method: "POST",
       body: JSON.stringify({ productNames, niche, questionsPerProduct, locations, saveToDb }),
     });
@@ -600,8 +606,10 @@ export const highIntentApi = {
    * Get saved research sessions from database
    */
   async getSavedResearch(): Promise<SavedResearchSession[]> {
-    const response = await fetchWithCredentials("/api/user/high-intent/saved-research");
-
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/saved-research`,{
+      credentials:"include"
+    });
+`${API_URL}/api/user/high-intent/saved-research`
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: "Failed to fetch saved research" }));
       throw new Error(error.message || "Failed to fetch saved research");
@@ -621,11 +629,12 @@ export const highIntentApi = {
     products?: string[],
     locations?: LocationTarget[]
   ): Promise<{ success: boolean; id: string; session: SavedResearchSession }> {
-    const response = await fetchWithCredentials("/api/user/high-intent/save-research", {
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/save-research`, {
+      credentials: "include",
       method: "POST",
       body: JSON.stringify({ questions, name, niche, products, locations }),
     });
-
+`${API_URL}/api/user/high-intent/save-research`
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: "Failed to save research" }));
       throw new Error(error.message || "Failed to save research");
@@ -638,7 +647,8 @@ export const highIntentApi = {
    * Delete a saved research session
    */
   async deleteResearch(researchId: string): Promise<{ success: boolean }> {
-    const response = await fetchWithCredentials(`/api/user/high-intent/research/${researchId}`, {
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/research/${researchId}`, {
+      credentials:"include",
       method: "DELETE",
     });
 
@@ -654,7 +664,9 @@ export const highIntentApi = {
    * Get questions by research session ID
    */
   async getQuestionsBySession(sessionId: string): Promise<ResearchedQuestion[]> {
-    const response = await fetchWithCredentials(`/api/user/high-intent/research/${sessionId}/questions`);
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/research/${sessionId}/questions`,{
+      credentials : "include"
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: "Failed to fetch questions" }));
@@ -668,8 +680,11 @@ export const highIntentApi = {
   /**
    * Export questions to Excel file
    */
+
+  
   async exportToExcel(questions: ResearchedQuestion[]): Promise<Blob> {
-    const response = await fetchWithCredentials("/api/user/high-intent/export-excel", {
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/export-excel`, {
+      credentials : "include",
       method: "POST",
       body: JSON.stringify({ questions }),
     });
@@ -686,8 +701,11 @@ export const highIntentApi = {
    * Generate a blog from a question
    * @param saveToDb - If true (default), saves blog to the database
    */
+
+
   async generateBlog(request: BlogGenerationRequest): Promise<GeneratedBlog> {
-    const response = await fetchWithCredentials("/api/user/high-intent/generate-blog", {
+    const response = await fetchWithCredentials(  `${API_URL}/api/user/high-intent/generate-blog`, {
+      credentials : "include",
       method: "POST",
       body: JSON.stringify({ ...request, saveToDb: request.saveToDb !== false }),
     });
@@ -712,7 +730,8 @@ export const highIntentApi = {
     saveToDb: boolean = true,
     saveQuestionsFirst: boolean = true
   ): Promise<{ success: boolean; blogs: GeneratedBlog[]; failed: number; total: number; succeeded: number }> {
-    const response = await fetchWithCredentials("/api/user/high-intent/bulk-generate-blogs", {
+    const response = await fetchWithCredentials( `${API_URL}/api/user/high-intent/bulk-generate-blogs`, {
+      credentials : "include",
       method: "POST",
       body: JSON.stringify({ questions, settings, saveToDb, saveQuestionsFirst }),
     });
@@ -729,8 +748,10 @@ export const highIntentApi = {
    * Get all generated blogs for the user from database
    */
   async getGeneratedBlogs(): Promise<GeneratedBlog[]> {
-    const response = await fetchWithCredentials("/api/user/high-intent/blogs");
-
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/blogs`,{
+      credentials : "include"
+    });
+ 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: "Failed to fetch blogs" }));
       throw new Error(error.message || "Failed to fetch blogs");
@@ -743,8 +764,12 @@ export const highIntentApi = {
   /**
    * Get a specific blog by ID
    */
+
+  
   async getBlogById(blogId: string): Promise<GeneratedBlog> {
-    const response = await fetchWithCredentials(`/api/user/high-intent/blogs/${blogId}`);
+    const response = await fetchWithCredentials(`${API_URL}/api/user/high-intent/blogs/${blogId}`,{
+      credentials : "include"
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: "Blog not found" }));
@@ -774,8 +799,11 @@ export const highIntentApi = {
   /**
    * Delete a generated blog
    */
+
+
   async deleteBlog(blogId: string): Promise<{ success: boolean }> {
-    const response = await fetchWithCredentials(`/api/user/high-intent/blogs/${blogId}`, {
+    const response = await fetchWithCredentials(  `${API_URL}/api/user/high-intent/blogs/${blogId}`, {
+      credentials : "include",
       method: "DELETE",
     });
 
@@ -794,7 +822,10 @@ export const highIntentApi = {
     blogId: string,
     updates: Partial<Pick<GeneratedBlog, "title" | "content" | "metaDescription" | "faqs" | "status">>
   ): Promise<GeneratedBlog> {
-    const response = await fetchWithCredentials(`/api/user/high-intent/blogs/${blogId}`, {
+
+     
+    const response = await fetchWithCredentials( `${API_URL}/api/user/high-intent/blogs/${blogId}`, {
+      credentials : "include",
       method: "PUT",
       body: JSON.stringify(updates),
     });
@@ -811,8 +842,12 @@ export const highIntentApi = {
   /**
    * Get available locations (countries, states, provinces, cities)
    */
+
+
   async getAvailableLocations(): Promise<CountryData[]> {
-    const response = await fetchWithCredentials("/api/user/high-intent/locations");
+    const response = await fetchWithCredentials(   `${API_URL}/api/user/high-intent/locations`,{
+      credentials : "include"
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: "Failed to fetch locations" }));
