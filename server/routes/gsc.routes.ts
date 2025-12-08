@@ -449,10 +449,14 @@ router.post('/auth', authLimiter, async (req: Request, res: Response) => {
 });
 
 // ✅ CORRECT: oauth-callback with proper state decoding
+
+
 router.get('/oauth-callback', async (req: Request, res: Response) => {
   try {
+    // 🔥 CRITICAL: Set permissive headers FIRST
     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     
     const { code, state, error } = req.query;
     const clientUrl = getClientUrl();
@@ -462,6 +466,7 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
     console.log('Client URL:', clientUrl);
     console.log('Has code:', !!code);
     console.log('Has state:', !!state);
+    console.log('Has error:', !!error);
     console.log('========================================');
     
     if (error) {
@@ -471,23 +476,61 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
         <html>
         <head>
           <title>Authentication Error</title>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: system-ui; padding: 20px; text-align: center; background: #fee; }
-            .error { color: #dc2626; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              padding: 20px; 
+              text-align: center; 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin: 0;
+            }
+            .container {
+              background: white;
+              padding: 40px;
+              border-radius: 12px;
+              box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+              max-width: 450px;
+            }
+            .error { color: #dc2626; font-size: 48px; margin-bottom: 20px; }
+            h2 { margin: 0 0 10px 0; color: #1f2937; }
+            p { color: #6b7280; }
           </style>
         </head>
         <body>
-          <h2 class="error">Authentication Failed</h2>
-          <p>${safeError}</p>
-          <p>This window will close automatically...</p>
+          <div class="container">
+            <div class="error">✗</div>
+            <h2>Authentication Failed</h2>
+            <p>${safeError}</p>
+            <p><small>This window will close automatically...</small></p>
+          </div>
           <script>
-            if (window.opener && !window.opener.closed) {
-              window.opener.postMessage({ 
-                type: 'GSC_AUTH_ERROR', 
-                error: ${JSON.stringify(safeError)}
-              }, '${clientUrl}');
+            console.log('OAuth Error - sending to parent');
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ 
+                  type: 'GSC_AUTH_ERROR', 
+                  error: ${JSON.stringify(safeError)}
+                }, '${clientUrl}');
+                console.log('Error message sent to parent');
+              } else {
+                console.error('Parent window not available');
+              }
+            } catch (e) {
+              console.error('Failed to send error to parent:', e);
             }
-            setTimeout(() => window.close(), 3000);
+            setTimeout(() => {
+              try {
+                window.close();
+              } catch (e) {
+                console.log('Could not close window automatically');
+              }
+            }, 3000);
           </script>
         </body>
         </html>
@@ -500,70 +543,138 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
         <html>
         <head>
           <title>Authentication Error</title>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: system-ui; padding: 20px; text-align: center; background: #fee; }
-            .error { color: #dc2626; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              padding: 20px; 
+              text-align: center; 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin: 0;
+            }
+            .container {
+              background: white;
+              padding: 40px;
+              border-radius: 12px;
+              box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+              max-width: 450px;
+            }
+            .error { color: #dc2626; font-size: 48px; margin-bottom: 20px; }
+            h2 { margin: 0 0 10px 0; color: #1f2937; }
+            p { color: #6b7280; }
           </style>
         </head>
         <body>
-          <h2 class="error">Missing Required Parameters</h2>
-          <p>The authentication process didn't complete properly.</p>
+          <div class="container">
+            <div class="error">✗</div>
+            <h2>Missing Required Parameters</h2>
+            <p>The authentication process didn't complete properly.</p>
+          </div>
           <script>
-            if (window.opener && !window.opener.closed) {
-              window.opener.postMessage({ 
-                type: 'GSC_AUTH_ERROR', 
-                error: 'Missing authorization code or state'
-              }, '${clientUrl}');
+            console.log('Missing parameters - sending to parent');
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ 
+                  type: 'GSC_AUTH_ERROR', 
+                  error: 'Missing authorization code or state'
+                }, '${clientUrl}');
+                console.log('Error message sent to parent');
+              }
+            } catch (e) {
+              console.error('Failed to send error to parent:', e);
             }
-            setTimeout(() => window.close(), 3000);
+            setTimeout(() => {
+              try {
+                window.close();
+              } catch (e) {
+                console.log('Could not close window automatically');
+              }
+            }, 3000);
           </script>
         </body>
         </html>
       `);
     }
     
-    // ✅ Decode state to get userId with better error handling
+    // Decode state to get userId
     let userId;
     try {
       const stateJson = Buffer.from(state as string, 'base64').toString('utf-8');
-      console.log('Decoded state:', stateJson);
-      
       const stateData = JSON.parse(stateJson);
       userId = stateData.userId;
       
-      console.log('✅ Decoded userId from state:', userId);
-      
-      // Validate userId
       if (!userId || typeof userId !== 'string') {
         throw new Error('Invalid userId in state');
       }
       
+      console.log('✅ Decoded userId from state:', userId);
+      
     } catch (e) {
       console.error('❌ Failed to decode state:', e);
-      console.error('Raw state value:', state);
       
       return res.send(`
         <!DOCTYPE html>
         <html>
         <head>
           <title>Authentication Error</title>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: system-ui; padding: 20px; text-align: center; background: #fee; }
-            .error { color: #dc2626; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              padding: 20px; 
+              text-align: center; 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin: 0;
+            }
+            .container {
+              background: white;
+              padding: 40px;
+              border-radius: 12px;
+              box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+              max-width: 450px;
+            }
+            .error { color: #dc2626; font-size: 48px; margin-bottom: 20px; }
+            h2 { margin: 0 0 10px 0; color: #1f2937; }
+            p { color: #6b7280; }
           </style>
         </head>
         <body>
-          <h2 class="error">Invalid State Parameter</h2>
-          <p>The authentication state is invalid or corrupted.</p>
-          <p><small>Error: ${(e as Error).message}</small></p>
+          <div class="container">
+            <div class="error">✗</div>
+            <h2>Invalid State Parameter</h2>
+            <p>The authentication state is invalid or corrupted.</p>
+            <p><small>Error: ${(e as Error).message}</small></p>
+          </div>
           <script>
-            if (window.opener && !window.opener.closed) {
-              window.opener.postMessage({ 
-                type: 'GSC_AUTH_ERROR', 
-                error: 'Invalid state parameter: ${(e as Error).message}'
-              }, '${clientUrl}');
+            console.log('Invalid state - sending to parent');
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ 
+                  type: 'GSC_AUTH_ERROR', 
+                  error: 'Invalid state parameter: ${(e as Error).message}'
+                }, '${clientUrl}');
+                console.log('Error message sent to parent');
+              }
+            } catch (err) {
+              console.error('Failed to send error to parent:', err);
             }
-            setTimeout(() => window.close(), 3000);
+            setTimeout(() => {
+              try {
+                window.close();
+              } catch (err) {
+                console.log('Could not close window automatically');
+              }
+            }, 3000);
           </script>
         </body>
         </html>
@@ -581,9 +692,11 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
       <html>
       <head>
         <title>Authentication Successful</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           body { 
-            font-family: system-ui; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             margin: 0;
             padding: 20px; 
             text-align: center;
@@ -599,7 +712,7 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
             color: #333;
             padding: 40px;
             border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
             max-width: 450px;
           }
           .success { color: #059669; font-size: 48px; margin-bottom: 20px; }
@@ -612,18 +725,6 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
             border-radius: 8px;
             font-size: 14px;
           }
-          button {
-            margin-top: 20px;
-            padding: 12px 24px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-          }
-          button:hover { background: #5a67d8; }
           .loader {
             display: inline-block;
             width: 20px;
@@ -637,6 +738,19 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
           }
+          button {
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+          }
+          button:hover { background: #5a67d8; }
         </style>
       </head>
       <body>
@@ -648,7 +762,7 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
             <div class="loader"></div>
             <div style="margin-top: 10px;">Sending credentials...</div>
           </div>
-          <button onclick="closeWindow()" style="display: none;" id="closeBtn">Close Window</button>
+          <button onclick="closeWindow()" id="closeBtn">Close Window</button>
         </div>
         <script>
           const code = ${JSON.stringify(safeCode)};
@@ -656,66 +770,98 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
           const clientUrl = '${clientUrl}';
           
           console.log('========================================');
-          console.log('GSC OAuth Callback Page');
+          console.log('GSC OAuth Callback Page Loaded');
           console.log('Code:', code ? 'Present' : 'Missing');
           console.log('User ID:', userId);
-          console.log('Target:', clientUrl);
+          console.log('Target Origin:', clientUrl);
+          console.log('Has opener:', !!window.opener);
+          console.log('Opener closed:', window.opener ? window.opener.closed : 'N/A');
           console.log('========================================');
           
           function updateStatus(message, success = true) {
             const statusEl = document.getElementById('status');
-            statusEl.innerHTML = success
-              ? '<div style="color: #059669;">✓ ' + message + '</div>'
-              : '<div style="color: #dc2626;">✗ ' + message + '</div>';
+            if (statusEl) {
+              statusEl.innerHTML = success
+                ? '<div style="color: #059669;">✓ ' + message + '</div>'
+                : '<div style="color: #dc2626;">✗ ' + message + '</div>';
+            }
             
             if (!success) {
-              document.getElementById('closeBtn').style.display = 'block';
+              const btn = document.getElementById('closeBtn');
+              if (btn) btn.style.display = 'block';
             }
           }
           
           function closeWindow() {
-            window.close();
-            setTimeout(() => {
-              if (!window.closed) {
-                window.location.href = clientUrl;
-              }
-            }, 100);
+            try {
+              window.close();
+            } catch (e) {
+              console.log('Could not close window, redirecting...');
+              window.location.href = clientUrl;
+            }
           }
           
-          if (!window.opener || window.opener.closed) {
-            updateStatus('Parent window not found', false);
-            console.error('❌ Parent window not available');
-          } else {
-            try {
-              console.log('📤 Sending message to parent...');
+          // Check if we can access the opener
+          try {
+            if (!window.opener) {
+              updateStatus('Parent window not found', false);
+              console.error('❌ No window.opener');
+            } else if (window.opener.closed) {
+              updateStatus('Parent window was closed', false);
+              console.error('❌ window.opener.closed = true');
+            } else {
+              console.log('✅ Parent window is accessible');
               
-              window.opener.postMessage({ 
-                type: 'GSC_AUTH_SUCCESS', 
-                code: code,
-                userId: userId
-              }, clientUrl);
-              
-              updateStatus('Credentials sent successfully!');
-              console.log('✅ Message sent successfully');
-              
-              setTimeout(closeWindow, 2000);
-            } catch(e) {
-              updateStatus('Failed to send credentials: ' + e.message, false);
-              console.error('❌ Failed to send message:', e);
+              try {
+                console.log('📤 Sending postMessage to parent...');
+                
+                window.opener.postMessage({ 
+                  type: 'GSC_AUTH_SUCCESS', 
+                  code: code,
+                  userId: userId
+                }, clientUrl);
+                
+                updateStatus('Credentials sent successfully!');
+                console.log('✅ Message sent successfully');
+                
+                // Close after a short delay
+                setTimeout(closeWindow, 2000);
+                
+              } catch (postError) {
+                updateStatus('Failed to send credentials: ' + postError.message, false);
+                console.error('❌ postMessage failed:', postError);
+              }
             }
+          } catch (accessError) {
+            updateStatus('Could not access parent window: ' + accessError.message, false);
+            console.error('❌ Opener access error:', accessError);
           }
         </script>
       </body>
       </html>
     `);
+    
   } catch (error) {
     console.error('========================================');
     console.error('❌ OAuth callback error:', error);
     console.error('========================================');
+    
     res.status(500).send(`
       <!DOCTYPE html>
       <html>
-      <head><title>Error</title></head>
+      <head>
+        <title>Error</title>
+        <meta charset="UTF-8">
+        <style>
+          body { 
+            font-family: system-ui; 
+            text-align: center; 
+            padding: 40px;
+            background: #fee;
+          }
+          h2 { color: #dc2626; }
+        </style>
+      </head>
       <body>
         <h2>Authentication Failed</h2>
         <p>An unexpected error occurred.</p>
@@ -725,6 +871,283 @@ router.get('/oauth-callback', async (req: Request, res: Response) => {
     `);
   }
 });
+
+// router.get('/oauth-callback', async (req: Request, res: Response) => {
+//   try {
+//     res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+//     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    
+//     const { code, state, error } = req.query;
+//     const clientUrl = getClientUrl();
+    
+//     console.log('========================================');
+//     console.log('🔗 GSC OAUTH CALLBACK');
+//     console.log('Client URL:', clientUrl);
+//     console.log('Has code:', !!code);
+//     console.log('Has state:', !!state);
+//     console.log('========================================');
+    
+//     if (error) {
+//       const safeError = InputSanitizer.escapeHtml(error as string);
+//       return res.send(`
+//         <!DOCTYPE html>
+//         <html>
+//         <head>
+//           <title>Authentication Error</title>
+//           <style>
+//             body { font-family: system-ui; padding: 20px; text-align: center; background: #fee; }
+//             .error { color: #dc2626; }
+//           </style>
+//         </head>
+//         <body>
+//           <h2 class="error">Authentication Failed</h2>
+//           <p>${safeError}</p>
+//           <p>This window will close automatically...</p>
+//           <script>
+//             if (window.opener && !window.opener.closed) {
+//               window.opener.postMessage({ 
+//                 type: 'GSC_AUTH_ERROR', 
+//                 error: ${JSON.stringify(safeError)}
+//               }, '${clientUrl}');
+//             }
+//             setTimeout(() => window.close(), 3000);
+//           </script>
+//         </body>
+//         </html>
+//       `);
+//     }
+    
+//     if (!code || !state) {
+//       return res.send(`
+//         <!DOCTYPE html>
+//         <html>
+//         <head>
+//           <title>Authentication Error</title>
+//           <style>
+//             body { font-family: system-ui; padding: 20px; text-align: center; background: #fee; }
+//             .error { color: #dc2626; }
+//           </style>
+//         </head>
+//         <body>
+//           <h2 class="error">Missing Required Parameters</h2>
+//           <p>The authentication process didn't complete properly.</p>
+//           <script>
+//             if (window.opener && !window.opener.closed) {
+//               window.opener.postMessage({ 
+//                 type: 'GSC_AUTH_ERROR', 
+//                 error: 'Missing authorization code or state'
+//               }, '${clientUrl}');
+//             }
+//             setTimeout(() => window.close(), 3000);
+//           </script>
+//         </body>
+//         </html>
+//       `);
+//     }
+    
+//     // ✅ Decode state to get userId with better error handling
+//     let userId;
+//     try {
+//       const stateJson = Buffer.from(state as string, 'base64').toString('utf-8');
+//       console.log('Decoded state:', stateJson);
+      
+//       const stateData = JSON.parse(stateJson);
+//       userId = stateData.userId;
+      
+//       console.log('✅ Decoded userId from state:', userId);
+      
+//       // Validate userId
+//       if (!userId || typeof userId !== 'string') {
+//         throw new Error('Invalid userId in state');
+//       }
+      
+//     } catch (e) {
+//       console.error('❌ Failed to decode state:', e);
+//       console.error('Raw state value:', state);
+      
+//       return res.send(`
+//         <!DOCTYPE html>
+//         <html>
+//         <head>
+//           <title>Authentication Error</title>
+//           <style>
+//             body { font-family: system-ui; padding: 20px; text-align: center; background: #fee; }
+//             .error { color: #dc2626; }
+//           </style>
+//         </head>
+//         <body>
+//           <h2 class="error">Invalid State Parameter</h2>
+//           <p>The authentication state is invalid or corrupted.</p>
+//           <p><small>Error: ${(e as Error).message}</small></p>
+//           <script>
+//             if (window.opener && !window.opener.closed) {
+//               window.opener.postMessage({ 
+//                 type: 'GSC_AUTH_ERROR', 
+//                 error: 'Invalid state parameter: ${(e as Error).message}'
+//               }, '${clientUrl}');
+//             }
+//             setTimeout(() => window.close(), 3000);
+//           </script>
+//         </body>
+//         </html>
+//       `);
+//     }
+    
+//     const safeCode = InputSanitizer.escapeHtml(code as string);
+//     const safeUserId = InputSanitizer.escapeHtml(userId);
+    
+//     console.log('✅ Sending code and userId to parent window');
+//     console.log('========================================');
+    
+//     res.send(`
+//       <!DOCTYPE html>
+//       <html>
+//       <head>
+//         <title>Authentication Successful</title>
+//         <style>
+//           body { 
+//             font-family: system-ui; 
+//             margin: 0;
+//             padding: 20px; 
+//             text-align: center;
+//             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+//             color: white;
+//             display: flex;
+//             align-items: center;
+//             justify-content: center;
+//             min-height: 100vh;
+//           }
+//           .container {
+//             background: white;
+//             color: #333;
+//             padding: 40px;
+//             border-radius: 12px;
+//             box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+//             max-width: 450px;
+//           }
+//           .success { color: #059669; font-size: 48px; margin-bottom: 20px; }
+//           h2 { margin: 0 0 10px 0; }
+//           p { margin: 10px 0; color: #666; }
+//           #status { 
+//             margin-top: 20px; 
+//             padding: 15px; 
+//             background: #f3f4f6; 
+//             border-radius: 8px;
+//             font-size: 14px;
+//           }
+//           button {
+//             margin-top: 20px;
+//             padding: 12px 24px;
+//             background: #667eea;
+//             color: white;
+//             border: none;
+//             border-radius: 6px;
+//             cursor: pointer;
+//             font-size: 14px;
+//             font-weight: 500;
+//           }
+//           button:hover { background: #5a67d8; }
+//           .loader {
+//             display: inline-block;
+//             width: 20px;
+//             height: 20px;
+//             border: 3px solid #f3f3f3;
+//             border-top: 3px solid #667eea;
+//             border-radius: 50%;
+//             animation: spin 1s linear infinite;
+//           }
+//           @keyframes spin {
+//             0% { transform: rotate(0deg); }
+//             100% { transform: rotate(360deg); }
+//           }
+//         </style>
+//       </head>
+//       <body>
+//         <div class="container">
+//           <div class="success">✓</div>
+//           <h2>Authentication Successful!</h2>
+//           <p>Completing Google Search Console connection...</p>
+//           <div id="status">
+//             <div class="loader"></div>
+//             <div style="margin-top: 10px;">Sending credentials...</div>
+//           </div>
+//           <button onclick="closeWindow()" style="display: none;" id="closeBtn">Close Window</button>
+//         </div>
+//         <script>
+//           const code = ${JSON.stringify(safeCode)};
+//           const userId = ${JSON.stringify(safeUserId)};
+//           const clientUrl = '${clientUrl}';
+          
+//           console.log('========================================');
+//           console.log('GSC OAuth Callback Page');
+//           console.log('Code:', code ? 'Present' : 'Missing');
+//           console.log('User ID:', userId);
+//           console.log('Target:', clientUrl);
+//           console.log('========================================');
+          
+//           function updateStatus(message, success = true) {
+//             const statusEl = document.getElementById('status');
+//             statusEl.innerHTML = success
+//               ? '<div style="color: #059669;">✓ ' + message + '</div>'
+//               : '<div style="color: #dc2626;">✗ ' + message + '</div>';
+            
+//             if (!success) {
+//               document.getElementById('closeBtn').style.display = 'block';
+//             }
+//           }
+          
+//           function closeWindow() {
+//             window.close();
+//             setTimeout(() => {
+//               if (!window.closed) {
+//                 window.location.href = clientUrl;
+//               }
+//             }, 100);
+//           }
+          
+//           if (!window.opener || window.opener.closed) {
+//             updateStatus('Parent window not found', false);
+//             console.error('❌ Parent window not available');
+//           } else {
+//             try {
+//               console.log('📤 Sending message to parent...');
+              
+//               window.opener.postMessage({ 
+//                 type: 'GSC_AUTH_SUCCESS', 
+//                 code: code,
+//                 userId: userId
+//               }, clientUrl);
+              
+//               updateStatus('Credentials sent successfully!');
+//               console.log('✅ Message sent successfully');
+              
+//               setTimeout(closeWindow, 2000);
+//             } catch(e) {
+//               updateStatus('Failed to send credentials: ' + e.message, false);
+//               console.error('❌ Failed to send message:', e);
+//             }
+//           }
+//         </script>
+//       </body>
+//       </html>
+//     `);
+//   } catch (error) {
+//     console.error('========================================');
+//     console.error('❌ OAuth callback error:', error);
+//     console.error('========================================');
+//     res.status(500).send(`
+//       <!DOCTYPE html>
+//       <html>
+//       <head><title>Error</title></head>
+//       <body>
+//         <h2>Authentication Failed</h2>
+//         <p>An unexpected error occurred.</p>
+//         <button onclick="window.close()">Close</button>
+//       </body>
+//       </html>
+//     `);
+//   }
+// });
 
 // ============================================================================
 // USER & ACCOUNT MANAGEMENT ENDPOINTS
