@@ -502,7 +502,7 @@ if (fixableIssues.length === 0) {
 
   const trackedIssues = await storage.getTrackedSeoIssues(websiteId, userId, {
     autoFixableOnly: true,
-    status: ["detected", "reappeared", "open"],
+    status: ["detected", "reappeared"],
     excludeRecentlyFixed: true,
     fixedWithinDays: 7,
   });
