@@ -1,4 +1,5 @@
 
+
 //shared/schema.ts
 import { sql } from "drizzle-orm";
 import {
@@ -221,12 +222,10 @@ export const content = pgTable(
     
     // 🔥 ADD: Niche column for standalone content
     niche: varchar("niche", { length: 255 }), // e.g., "technology", "health", etc.
-    
+
       language: varchar("language", { length: 50 })
       .notNull()
       .default("english"), // e.g., "english", "spanish", "french", etc.
-
-
 
 
 
@@ -280,11 +279,15 @@ export const content = pgTable(
   (table) => [
     index("idx_content_user_id").on(table.userId),
     index("idx_content_website_user").on(table.websiteId, table.userId),
-    index("idx_content_niche").on(table.niche), // 🔥 ADD: Index for niche queries
+    index("idx_content_niche").on(table.niche),
+    index("idx_content_language").on(table.language), // 🔥 ADD: Index for niche queries
     // 🔥 ADD: Check constraint to ensure either websiteId OR niche is provided
     sql`CONSTRAINT content_website_or_niche_check CHECK (
       (website_id IS NOT NULL AND niche IS NULL) OR 
       (website_id IS NULL AND niche IS NOT NULL)
+    )`,
+        sql`CONSTRAINT valid_language CHECK (
+      language IN ('english', 'spanish', 'french', 'german', 'italian', 'portuguese', 'russian', 'japanese', 'chinese', 'korean', 'dutch', 'swedish', 'polish', 'turkish', 'thai', 'vietnamese')
     )`,
   ]
 );
@@ -1555,6 +1558,198 @@ export const googleAccounts = pgTable("google_accounts", {
   index("idx_google_accounts_email").on(table.email),
 ]);
 
+
+// ============================================================================
+// HIGH INTENT RESEARCH SESSIONS
+// ============================================================================
+
+export const highIntentResearchSessions = pgTable(
+  "high_intent_research_sessions",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    
+    name: text("name").notNull(),
+    niche: varchar("niche", { length: 100 }).notNull(),
+    
+    // Products researched in this session
+    products: jsonb("products").notNull().default([]),
+    // Array of product names: ["Product A", "Product B"]
+    
+    // Location targets used
+    locations: jsonb("locations").default([]),
+    // Array of LocationTarget objects
+    
+    // Session metadata
+    totalQuestions: integer("total_questions").notNull().default(0),
+    source: text("source").default("Serper API"),
+    
+    // Status
+    status: text("status").notNull().default("active"),
+    // active, archived, deleted
+    
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_high_intent_sessions_user_id").on(table.userId),
+    index("idx_high_intent_sessions_niche").on(table.niche),
+    index("idx_high_intent_sessions_status").on(table.status),
+    index("idx_high_intent_sessions_created_at").on(table.createdAt.desc()),
+  ]
+);
+
+// ============================================================================
+// HIGH INTENT QUESTIONS
+// ============================================================================
+
+export const highIntentQuestions = pgTable(
+  "high_intent_questions",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    
+    // Link to research session (optional - questions can exist independently)
+    sessionId: varchar("session_id")
+      .references(() => highIntentResearchSessions.id, { onDelete: "set null" }),
+    
+    // Product information
+    productId: varchar("product_id", { length: 255 }).notNull(),
+    productName: text("product_name").notNull(),
+    
+    // Question data
+    question: text("question").notNull(),
+    niche: varchar("niche", { length: 100 }),
+    
+    // Search metrics
+    searchVolume: integer("search_volume").notNull().default(0),
+    difficulty: integer("difficulty").notNull().default(50),
+    popularity: text("popularity").notNull().default("medium"),
+    // high, medium, low
+    
+    competition: text("competition").notNull().default("medium"),
+    // low, medium, high
+    
+    intent: text("intent").notNull().default("informational"),
+    // informational, commercial, transactional, navigational
+    
+    trend: text("trend").notNull().default("stable"),
+    // rising, stable, declining
+    
+    estimatedClicks: integer("estimated_clicks").notNull().default(0),
+    
+    // Region and location data
+    region: text("region").default("Global"),
+    locationData: jsonb("location_data").default({}),
+    // { country?: string, state?: string, province?: string, city?: string, localSearchVolume?: number }
+    
+    // Related questions from "People Also Ask"
+    relatedQuestions: jsonb("related_questions").default([]),
+    // Array of strings
+    
+    // Source and metadata
+    source: text("source").default("Serper API"),
+    lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+    
+    // Selection state (for UI purposes, can be used to track selected questions)
+    isSelected: boolean("is_selected").default(false),
+    
+    // Blog generation status
+    blogGenerated: boolean("blog_generated").default(false),
+    blogId: varchar("blog_id"),
+    
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_high_intent_questions_user_id").on(table.userId),
+    index("idx_high_intent_questions_session_id").on(table.sessionId),
+    index("idx_high_intent_questions_product_name").on(table.productName),
+    index("idx_high_intent_questions_niche").on(table.niche),
+    index("idx_high_intent_questions_competition").on(table.competition),
+    index("idx_high_intent_questions_intent").on(table.intent),
+    index("idx_high_intent_questions_search_volume").on(table.searchVolume.desc()),
+    index("idx_high_intent_questions_created_at").on(table.createdAt.desc()),
+  ]
+);
+
+// ============================================================================
+// HIGH INTENT BLOGS
+// ============================================================================
+
+export const highIntentBlogs = pgTable(
+  "high_intent_blogs",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    
+    // Link to the question this blog answers
+    questionId: varchar("question_id")
+      .references(() => highIntentQuestions.id, { onDelete: "set null" }),
+    
+    // Blog content
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    metaDescription: text("meta_description"),
+    
+    // Content metrics
+    wordCount: integer("word_count").notNull().default(0),
+    readingTime: integer("reading_time").notNull().default(0), // in minutes
+    
+    // FAQs stored as JSON array
+    faqs: jsonb("faqs").default([]),
+    // Array of { question: string, answer: string }
+    
+    // SEO and quality scores
+    seoScore: integer("seo_score").default(0),
+    
+    // Generation metadata
+    aiProvider: text("ai_provider").notNull().default("anthropic"),
+    // openai, anthropic, gemini
+    
+    tone: text("tone").default("professional"),
+    targetWordCount: integer("target_word_count").default(2000),
+    
+    // Status tracking
+    status: text("status").notNull().default("draft"),
+    // draft, reviewed, published, downloaded, archived
+    
+    // Publishing info (if published to WordPress)
+    wordpressPostId: integer("wordpress_post_id"),
+    wordpressUrl: text("wordpress_url"),
+    publishedAt: timestamp("published_at"),
+    
+    // Download tracking
+    downloadCount: integer("download_count").default(0),
+    lastDownloadedAt: timestamp("last_downloaded_at"),
+    lastDownloadFormat: text("last_download_format"),
+    // html, docx, md
+    
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_high_intent_blogs_user_id").on(table.userId),
+    index("idx_high_intent_blogs_question_id").on(table.questionId),
+    index("idx_high_intent_blogs_status").on(table.status),
+    index("idx_high_intent_blogs_ai_provider").on(table.aiProvider),
+    index("idx_high_intent_blogs_created_at").on(table.createdAt.desc()),
+    index("idx_high_intent_blogs_seo_score").on(table.seoScore.desc()),
+  ]
+);
+
+
 // ============================================================================
 // INSERT SCHEMAS
 // ============================================================================
@@ -1578,6 +1773,54 @@ export const insertGoogleAccountSchema = createInsertSchema(googleAccounts).pick
   isActive: true,
 });
 
+
+export const insertHighIntentResearchSessionSchema = createInsertSchema(highIntentResearchSessions).pick({
+  userId: true,
+  name: true,
+  niche: true,
+  products: true,
+  locations: true,
+  totalQuestions: true,
+  source: true,
+  status: true,
+});
+
+export const insertHighIntentQuestionSchema = createInsertSchema(highIntentQuestions).pick({
+  userId: true,
+  sessionId: true,
+  productId: true,
+  productName: true,
+  question: true,
+  niche: true,
+  searchVolume: true,
+  difficulty: true,
+  popularity: true,
+  competition: true,
+  intent: true,
+  trend: true,
+  estimatedClicks: true,
+  region: true,
+  locationData: true,
+  relatedQuestions: true,
+  source: true,
+});
+
+export const insertHighIntentBlogSchema = createInsertSchema(highIntentBlogs).pick({
+  userId: true,
+  questionId: true,
+  title: true,
+  content: true,
+  metaDescription: true,
+  wordCount: true,
+  readingTime: true,
+  faqs: true,
+  seoScore: true,
+  aiProvider: true,
+  tone: true,
+  targetWordCount: true,
+  status: true,
+});
+
 // ============================================================================
 // TYPE EXPORTS
 // ============================================================================
@@ -1589,6 +1832,14 @@ export type GoogleAccount = typeof googleAccounts.$inferSelect;
 export type InsertGoogleAccount = z.infer<typeof insertGoogleAccountSchema>;
 
 
+export type HighIntentResearchSession = typeof highIntentResearchSessions.$inferSelect;
+export type InsertHighIntentResearchSession = z.infer<typeof insertHighIntentResearchSessionSchema>;
+
+export type HighIntentQuestion = typeof highIntentQuestions.$inferSelect;
+export type InsertHighIntentQuestion = z.infer<typeof insertHighIntentQuestionSchema>;
+
+export type HighIntentBlog = typeof highIntentBlogs.$inferSelect;
+export type InsertHighIntentBlog = z.infer<typeof insertHighIntentBlogSchema>;
 
 
 // ============================================================================
@@ -1706,12 +1957,6 @@ export type InsertGscPerformanceData = z.infer<typeof insertGscPerformanceDataSc
 
 export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
 export type SelectPasswordResetToken = typeof passwordResetTokens.$inferSelect;
-
-
-
-
-
-
 
 
 
