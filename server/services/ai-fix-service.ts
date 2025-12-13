@@ -6899,63 +6899,335 @@ Make it clearer and easier to read while keeping all key information.`;
   );
 }
 
-  private async improveEAT(
-    creds: WordPressCredentials,
-    fixes: AIFix[],
-    userId?: string
-  ): Promise<{ applied: AIFix[]; errors: string[] }> {
-    return this.fixWordPressContent(
-      creds,
-      fixes,
-      async (content, fix) => {
-        const title = content.title?.rendered || content.title || "";
-        const contentHtml = content.content?.rendered || content.content || "";
-        
-        const provider = await this.selectAIProvider(userId);
-        if (!provider) {
-          return {
-            updated: false,
-            data: {},
-            description: "AI provider not available"
-          };
-        }
+private async improveEAT(
+  creds: WordPressCredentials,
+  fixes: AIFix[],
+  userId?: string
+): Promise<{ applied: AIFix[]; errors: string[] }> {
+  return this.fixWordPressContent(
+    creds,
+    fixes,
+    async (content, fix) => {
+      const title = content.title?.rendered || content.title || "";
+      const contentHtml = content.content?.rendered || content.content || "";
+      const originalWordCount = this.extractTextFromHTML(contentHtml)
+        .split(/\s+/)
+        .filter(w => w.length > 0).length;
+      
+      // ============ SAFETY CHECK #1: Minimum Content Length ============
+      if (originalWordCount < 300) {
+        return {
+          updated: false,
+          data: {},
+          description: `Content too short (${originalWordCount} words) - needs expansion before E-E-A-T enhancement`
+        };
+      }
 
-        const systemPrompt = `You are enhancing content with E-E-A-T signals (Experience, Expertise, Authoritativeness, Trustworthiness).
+      // ============ SAFETY CHECK #2: Maximum Content Length ============
+      // E-E-A-T enhancement on very long content is risky
+      if (originalWordCount > 3000) {
+        this.addLog(
+          `⚠️ Content very long (${originalWordCount} words) - E-E-A-T enhancement may be unreliable`,
+          "warning"
+        );
+        return {
+          updated: false,
+          data: {},
+          description: `Content too long (${originalWordCount} words) - E-E-A-T enhancement skipped for safety`
+        };
+      }
+      
+      const provider = await this.selectAIProvider(userId);
+      if (!provider) {
+        return {
+          updated: false,
+          data: {},
+          description: "AI provider not available for E-E-A-T enhancement"
+        };
+      }
 
-Add to the existing content:
-1. Expert insights and data points
-2. References to credible sources
-3. Author perspective or experience
-4. Clear, well-researched explanations
-5. Transparent and verifiable information
+      // ============ SAFETY CHECK #3: Image Preservation Setup ============
+      const originalImages = this.extractImages(contentHtml);
+      let contentForAI = contentHtml;
+      
+      if (originalImages.length > 0) {
+        this.addLog(
+          `🖼️ Protecting ${originalImages.length} images before E-E-A-T enhancement`,
+          "info"
+        );
+        contentForAI = this.replaceImagesWithPlaceholders(contentHtml, originalImages);
+      }
 
-CRITICAL: Return ONLY the enhanced HTML content. NO preambles or explanations.`;
-
-        const userPrompt = `Enhance this content with trustworthiness and expertise signals:
-
-Title: ${title}
-Content: ${contentHtml.substring(0, 2000)}
-
-Add credible elements while maintaining the original structure.`;
-
-        const enhanced = await this.callAIProvider(
+      // ============ ATTEMPT 1: Try with strict preservation prompt ============
+      try {
+        const result = await this.attemptEATEnhancement(
+          contentForAI,
+          title,
+          originalWordCount,
+          originalImages,
           provider,
-          systemPrompt,
-          userPrompt,
-          3000,
-          0.7,
-          userId
+          userId,
+          1 // Attempt number
         );
 
+        if (result.success) {
+          return result.data;
+        }
+
+        // ============ ATTEMPT 2: Retry with even stricter prompt ============
+        this.addLog(
+          `⚠️ First E-E-A-T attempt failed (${result.reason}), retrying with stricter prompt...`,
+          "warning"
+        );
+
+        const retryResult = await this.attemptEATEnhancement(
+          contentForAI,
+          title,
+          originalWordCount,
+          originalImages,
+          provider,
+          userId,
+          2 // Attempt number
+        );
+
+        if (retryResult.success) {
+          return retryResult.data;
+        }
+
+        // ============ FALLBACK: Both attempts failed ============
+        this.addLog(
+          `❌ E-E-A-T enhancement failed after 2 attempts: ${retryResult.reason}`,
+          "error"
+        );
+
+        // Mark as success but explain we couldn't enhance
         return {
-          updated: true,
-          data: { content: this.cleanAndValidateContent(enhanced) },
-          description: "Enhanced with expertise and trustworthiness signals"
+          updated: false,
+          data: {},
+          description: `E-E-A-T signals not added: ${retryResult.reason}. Content kept as-is for safety.`
         };
-      },
+
+      } catch (error: any) {
+        this.addLog(`E-E-A-T enhancement error: ${error.message}`, "error");
+        return {
+          updated: false,
+          data: {},
+          description: `E-E-A-T enhancement failed: ${error.message}`
+        };
+      }
+    },
+    userId
+  );
+}
+
+// ============ HELPER METHOD: Attempt E-E-A-T Enhancement ============
+private async attemptEATEnhancement(
+  contentForAI: string,
+  title: string,
+  originalWordCount: number,
+  originalImages: Array<{ src: string; element: string; placeholder?: string; attributes?: Record<string, string> }>,
+  provider: string,
+  userId: string | undefined,
+  attemptNumber: number
+): Promise<{
+  success: boolean;
+  reason?: string;
+  data?: {
+    updated: boolean;
+    data: any;
+    description: string;
+  };
+}> {
+  
+  const minAcceptableWords = Math.floor(originalWordCount * 0.95); // 95% threshold
+  const targetWords = Math.max(
+    originalWordCount + 200,
+    Math.floor(originalWordCount * 1.15)
+  );
+
+  // ============ PROGRESSIVE STRICTNESS ============
+  const strictnessLevel = attemptNumber === 1 ? "STRICT" : "EXTREMELY STRICT";
+  const maxTokens = attemptNumber === 1 ? 4000 : 5000;
+  const temperature = attemptNumber === 1 ? 0.7 : 0.5; // Lower temp for retry
+
+  const systemPrompt = `You are an expert at enhancing content with E-E-A-T signals (Experience, Expertise, Authoritativeness, Trustworthiness).
+
+🚨 ${strictnessLevel} CONTENT PRESERVATION RULES 🚨
+
+ABSOLUTE REQUIREMENTS - FAILURE TO COMPLY WILL RESULT IN REJECTION:
+1. ⛔ NEVER DELETE OR REMOVE ANY EXISTING CONTENT
+2. ⛔ NEVER SHORTEN OR PARAPHRASE EXISTING CONTENT
+3. ⛔ NEVER REWRITE EXISTING PARAGRAPHS
+4. ⛔ PRESERVE ALL ${originalWordCount} WORDS OF ORIGINAL CONTENT
+5. ⛔ PRESERVE ALL IMAGE PLACEHOLDERS EXACTLY: __IMAGE_PLACEHOLDER_X_XXXXX__
+6. ✅ ONLY ADD NEW CONTENT WITH E-E-A-T SIGNALS
+7. ✅ MINIMUM OUTPUT: ${minAcceptableWords} words
+8. ✅ TARGET OUTPUT: ${targetWords}+ words
+
+${attemptNumber > 1 ? `
+🔴 THIS IS RETRY ATTEMPT #${attemptNumber} - PREVIOUS ATTEMPT FAILED
+The previous attempt removed too much content. This time:
+- Keep EVERY SINGLE WORD from the original
+- Only ADD new E-E-A-T content, never replace
+- Think of it as "insertion" not "enhancement"
+` : ''}
+
+WHAT E-E-A-T SIGNALS TO ADD (as NEW paragraphs/sections):
+✅ Expert insights: "Industry research shows..." "Experts recommend..."
+✅ Authority references: "According to [credible source]..." "Studies indicate..."
+✅ Professional experience: "In professional practice..." "Best practices include..."
+✅ Data backing: "Statistics reveal..." "Research demonstrates..."
+✅ Credibility markers: "Certified professionals suggest..." "Industry standards require..."
+✅ Transparency: "It's important to note..." "Limitations include..."
+
+HOW TO INSERT E-E-A-T CONTENT:
+✅ Insert new <p> tags after relevant existing paragraphs
+✅ Add a new section like <h3>Expert Insights</h3> followed by new paragraphs
+✅ Place expert commentary between existing points
+✅ Add "Key Takeaways" or "Professional Perspective" sections
+❌ DO NOT replace existing text
+❌ DO NOT merge with existing paragraphs
+❌ DO NOT remove any existing HTML elements
+
+TECHNICAL REQUIREMENTS:
+- Output format: Valid HTML only
+- Preserve all HTML tags and attributes from original
+- No markdown, no code fences, no explanations
+- Return ONLY the enhanced HTML content
+
+VALIDATION BEFORE SENDING:
+☑ Original ${originalWordCount} words still present?
+☑ All image placeholders preserved?
+☑ Only NEW content added, nothing removed?
+☑ Final word count ≥ ${minAcceptableWords} words?`;
+
+  const userPrompt = `Add E-E-A-T signals to this content. Current: ${originalWordCount} words. Target: ${targetWords}+ words.
+
+Title: ${title}
+
+Original Content (DO NOT MODIFY - ONLY ADD TO):
+${contentForAI}
+
+YOUR TASK:
+1. Keep EVERY WORD of the above content (all ${originalWordCount} words)
+2. Add NEW paragraphs with E-E-A-T signals (expert insights, credible references, professional perspectives)
+3. Insert credibility markers and authority signals
+4. Final output must be ${targetWords}+ words
+
+${attemptNumber > 1 ? `
+⚠️ CRITICAL: This is retry attempt #${attemptNumber}. Previous attempt removed content.
+This time, treat the original content as COMPLETELY UNTOUCHABLE. Only INSERT new E-E-A-T content.
+` : ''}
+
+Return the enhanced HTML (original ${originalWordCount} words + new E-E-A-T content = ${targetWords}+ words).`;
+
+  try {
+    // ============ Call AI Provider ============
+    const enhanced = await this.callAIProvider(
+      provider,
+      systemPrompt,
+      userPrompt,
+      maxTokens,
+      temperature,
       userId
     );
+
+    // ============ VALIDATION #1: Clean and Basic Checks ============
+    let cleaned = this.cleanAndValidateContent(enhanced);
+    
+    // ============ VALIDATION #2: Restore Images ============
+    if (originalImages.length > 0) {
+      this.addLog(
+        `🖼️ Restoring ${originalImages.length} images after E-E-A-T enhancement (attempt ${attemptNumber})`,
+        "info"
+      );
+      cleaned = this.restoreImagesFromPlaceholders(cleaned, originalImages);
+      cleaned = this.ensureImagesPreserved(cleaned, originalImages);
+      
+      // Verify image restoration
+      const restoredImageCount = (cleaned.match(/<img/g) || []).length;
+      if (restoredImageCount < originalImages.length) {
+        return {
+          success: false,
+          reason: `Image restoration incomplete: ${restoredImageCount}/${originalImages.length} images restored`
+        };
+      }
+    }
+    
+    // ============ VALIDATION #3: Word Count Check ============
+    const newWordCount = this.extractTextFromHTML(cleaned)
+      .split(/\s+/)
+      .filter(w => w.length > 0).length;
+
+    const percentChange = ((newWordCount - originalWordCount) / originalWordCount) * 100;
+    const wordDifference = newWordCount - originalWordCount;
+
+    this.addLog(
+      `E-E-A-T attempt ${attemptNumber}: ${originalWordCount} → ${newWordCount} words (${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%, ${wordDifference > 0 ? '+' : ''}${wordDifference} words)`,
+      "info"
+    );
+
+    // ============ VALIDATION #4: Check for Content Reduction ============
+    if (newWordCount < minAcceptableWords) {
+      const reductionPercent = ((originalWordCount - newWordCount) / originalWordCount * 100).toFixed(1);
+      return {
+        success: false,
+        reason: `Content reduced by ${reductionPercent}% (${originalWordCount} → ${newWordCount} words). Minimum ${minAcceptableWords} words required.`
+      };
+    }
+
+    // ============ VALIDATION #5: Check for Minimal Enhancement ============
+    if (wordDifference < 50 && wordDifference >= 0) {
+      this.addLog(
+        `⚠️ E-E-A-T enhancement added only ${wordDifference} words - may not be meaningful`,
+        "warning"
+      );
+      // Accept but with note
+      return {
+        success: true,
+        data: {
+          updated: true,
+          data: { content: cleaned },
+          description: `Added minimal E-E-A-T signals (+${wordDifference} words: ${originalWordCount} → ${newWordCount}). Consider manual review.`
+        }
+      };
+    }
+
+    // ============ VALIDATION #6: Check for Excessive Growth ============
+    if (newWordCount > originalWordCount * 2) {
+      this.addLog(
+        `⚠️ E-E-A-T enhancement doubled content size (${originalWordCount} → ${newWordCount}) - may be excessive`,
+        "warning"
+      );
+      // Accept but with warning
+      return {
+        success: true,
+        data: {
+          updated: true,
+          data: { content: cleaned },
+          description: `Enhanced with E-E-A-T signals (+${wordDifference} words: ${originalWordCount} → ${newWordCount}). Large increase - verify quality.`
+        }
+      };
+    }
+
+    // ============ SUCCESS! ============
+    return {
+      success: true,
+      data: {
+        updated: true,
+        data: { content: cleaned },
+        description: `Enhanced with expertise and trustworthiness signals (+${wordDifference} words: ${originalWordCount} → ${newWordCount})${attemptNumber > 1 ? ` [Attempt ${attemptNumber}]` : ''}`
+      }
+    };
+
+  } catch (error: any) {
+    return {
+      success: false,
+      reason: `AI call failed: ${error.message}`
+    };
   }
+}
+
 
   // ==================== AI PROVIDER MANAGEMENT ====================
 
