@@ -31,6 +31,13 @@ const requireAuth = (req: Request, res: Response, next: Function) => {
   next();
 };
 
+
+// server/routes/billing.ts
+router.use((req, _res, next) => {
+  console.log('🔵 Billing router hit:', req.method, req.path);
+  next();
+});
+
 // ============================================================================
 // SUBSCRIPTION PLANS
 // ============================================================================
