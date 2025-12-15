@@ -13,7 +13,7 @@ import {
   promoCodes,
   promoCodeRedemptions,
 } from "../../shared/schema";
-import { stripeService } from "../services/stripe-service.ts";
+import { stripeService } from "../services/stripe-service";
 
 const router = Router();
 
