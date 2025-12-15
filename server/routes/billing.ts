@@ -458,7 +458,7 @@ router.post('/subscription', requireAuth, async (req: Request, res: Response) =>
 
 
 // server/routes/billing.ts
-app.post('/api/billing/create-portal-session', async (req, res) => {
+router.post('/api/billing/create-portal-session', async (req, res) => {
   const { userId, returnUrl } = req.body;
   
   try {
