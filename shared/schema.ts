@@ -1750,6 +1750,366 @@ export const highIntentBlogs = pgTable(
 );
 
 
+
+// ============================================================================
+// BILLING TABLES
+// ============================================================================
+
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  yearlyPrice: numeric("yearly_price", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  features: jsonb("features"),
+  maxWebsites: integer("max_websites"),
+  maxArticlesPerMonth: integer("max_articles_per_month"),
+  hasAdvancedSeo: boolean("has_advanced_seo").default(false),
+  hasPrioritySupport: boolean("has_priority_support").default(false),
+  hasCustomTemplates: boolean("has_custom_templates").default(false),
+  hasAnalytics: boolean("has_analytics").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const userSubscriptions = pgTable("user_subscriptions", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  planId: varchar("plan_id")
+    .notNull()
+    .references(() => subscriptionPlans.id),
+  status: text("status").notNull().default("active"),
+  billingInterval: text("billing_interval").notNull(),
+  currentPeriodStart: timestamp("current_period_start").notNull(),
+  currentPeriodEnd: timestamp("current_period_end").notNull(),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+  cancelledAt: timestamp("cancelled_at"),
+  trialStart: timestamp("trial_start"),
+  trialEnd: timestamp("trial_end"),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_user_subscriptions_user_id").on(table.userId),
+  index("idx_user_subscriptions_status").on(table.status),
+  index("idx_user_subscriptions_period_end").on(table.currentPeriodEnd),
+]);
+
+export const billingAddresses = pgTable("billing_addresses", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  streetAddress: varchar("street_address", { length: 255 }).notNull(),
+  addressLine2: varchar("address_line_2", { length: 255 }),
+  city: varchar("city", { length: 100 }).notNull(),
+  stateProvince: varchar("state_province", { length: 100 }),
+  postalCode: varchar("postal_code", { length: 20 }).notNull(),
+  country: varchar("country", { length: 2 }).notNull(),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_billing_addresses_user_id").on(table.userId),
+]);
+
+export const paymentMethods = pgTable("payment_methods", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  cardBrand: varchar("card_brand", { length: 20 }),
+  cardLast4: varchar("card_last4", { length: 4 }),
+  cardExpMonth: varchar("card_exp_month", { length: 2 }),
+  cardExpYear: varchar("card_exp_year", { length: 4 }),
+  cardholderName: varchar("cardholder_name", { length: 255 }),
+  stripePaymentMethodId: varchar("stripe_payment_method_id", { length: 255 }),
+  paypalEmail: varchar("paypal_email", { length: 255 }),
+  billingAddressId: varchar("billing_address_id").references(() => billingAddresses.id),
+  isDefault: boolean("is_default").default(false),
+  isExpired: boolean("is_expired").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_payment_methods_user_id").on(table.userId),
+  index("idx_payment_methods_stripe_id").on(table.stripePaymentMethodId),
+]);
+
+export const invoices = pgTable("invoices", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  subscriptionId: varchar("subscription_id").references(() => userSubscriptions.id),
+  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 4 }).notNull().default("0.08"),
+  taxAmount: numeric("tax_amount", { precision: 10, scale: 2 }).notNull(),
+  totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
+  amountPaid: numeric("amount_paid", { precision: 10, scale: 2 }).default("0.00"),
+  amountDue: numeric("amount_due", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  status: text("status").notNull().default("draft"),
+  invoiceDate: timestamp("invoice_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  paidAt: timestamp("paid_at"),
+  billingAddressId: varchar("billing_address_id").references(() => billingAddresses.id),
+  lineItems: jsonb("line_items"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_invoices_user_id").on(table.userId),
+  index("idx_invoices_subscription_id").on(table.subscriptionId),
+  index("idx_invoices_status").on(table.status),
+  index("idx_invoices_due_date").on(table.dueDate),
+]);
+
+export const transactions = pgTable("transactions", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  invoiceId: varchar("invoice_id").references(() => invoices.id),
+  subscriptionId: varchar("subscription_id").references(() => userSubscriptions.id),
+  paymentMethodId: varchar("payment_method_id").references(() => paymentMethods.id),
+  transactionType: text("transaction_type").notNull(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  status: text("status").notNull(),
+  stripeChargeId: varchar("stripe_charge_id", { length: 255 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  paypalTransactionId: varchar("paypal_transaction_id", { length: 255 }),
+  failureCode: varchar("failure_code", { length: 50 }),
+  failureMessage: text("failure_message"),
+  description: text("description"),
+  metadata: jsonb("metadata"),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_transactions_user_id").on(table.userId),
+  index("idx_transactions_invoice_id").on(table.invoiceId),
+  index("idx_transactions_subscription_id").on(table.subscriptionId),
+  index("idx_transactions_status").on(table.status),
+  index("idx_transactions_created_at").on(table.createdAt.desc()),
+]);
+
+export const subscriptionUsage = pgTable("subscription_usage", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  subscriptionId: varchar("subscription_id")
+    .notNull()
+    .references(() => userSubscriptions.id),
+  websitesCreated: integer("websites_created").default(0),
+  articlesGenerated: integer("articles_generated").default(0),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_subscription_usage_user_id").on(table.userId),
+  index("idx_subscription_usage_subscription_id").on(table.subscriptionId),
+  index("idx_subscription_usage_period").on(table.periodStart, table.periodEnd),
+]);
+
+export const promoCodes = pgTable("promo_codes", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  description: text("description"),
+  discountType: text("discount_type").notNull(),
+  discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  applicablePlans: text("applicable_plans").array(),
+  maxRedemptions: integer("max_redemptions"),
+  redemptionsCount: integer("redemptions_count").default(0),
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_promo_codes_code").on(table.code),
+  index("idx_promo_codes_active").on(table.isActive),
+]);
+
+export const promoCodeRedemptions = pgTable("promo_code_redemptions", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  promoCodeId: varchar("promo_code_id")
+    .notNull()
+    .references(() => promoCodes.id),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  subscriptionId: varchar("subscription_id").references(() => userSubscriptions.id),
+  discountAmount: numeric("discount_amount", { precision: 10, scale: 2 }).notNull(),
+  redeemedAt: timestamp("redeemed_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_promo_redemptions_user_id").on(table.userId),
+  index("idx_promo_redemptions_promo_code_id").on(table.promoCodeId),
+  uniqueIndex("ux_promo_redemption_user_code").on(table.promoCodeId, table.userId),
+]);
+
+// ============================================================================
+// INSERT SCHEMAS - BILLING
+// ============================================================================
+
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).pick({
+  id: true,
+  name: true,
+  description: true,
+  monthlyPrice: true,
+  yearlyPrice: true,
+  features: true,
+  maxWebsites: true,
+  maxArticlesPerMonth: true,
+  hasAdvancedSeo: true,
+  hasPrioritySupport: true,
+  hasCustomTemplates: true,
+  hasAnalytics: true,
+  isActive: true,
+});
+
+export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).pick({
+  planId: true,
+  status: true,
+  billingInterval: true,
+  currentPeriodStart: true,
+  currentPeriodEnd: true,
+  cancelAtPeriodEnd: true,
+  trialStart: true,
+  trialEnd: true,
+  stripeSubscriptionId: true,
+});
+
+export const insertBillingAddressSchema = createInsertSchema(billingAddresses).pick({
+  streetAddress: true,
+  addressLine2: true,
+  city: true,
+  stateProvince: true,
+  postalCode: true,
+  country: true,
+  isDefault: true,
+});
+
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).pick({
+  type: true,
+  cardBrand: true,
+  cardLast4: true,
+  cardExpMonth: true,
+  cardExpYear: true,
+  cardholderName: true,
+  stripePaymentMethodId: true,
+  paypalEmail: true,
+  billingAddressId: true,
+  isDefault: true,
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).pick({
+  invoiceNumber: true,
+  subscriptionId: true,
+  subtotal: true,
+  taxRate: true,
+  taxAmount: true,
+  totalAmount: true,
+  amountPaid: true,
+  amountDue: true,
+  currency: true,
+  status: true,
+  invoiceDate: true,
+  dueDate: true,
+  billingAddressId: true,
+  lineItems: true,
+  notes: true,
+});
+
+export const insertTransactionSchema = createInsertSchema(transactions).pick({
+  invoiceId: true,
+  subscriptionId: true,
+  paymentMethodId: true,
+  transactionType: true,
+  amount: true,
+  currency: true,
+  status: true,
+  stripeChargeId: true,
+  stripePaymentIntentId: true,
+  paypalTransactionId: true,
+  failureCode: true,
+  failureMessage: true,
+  description: true,
+  metadata: true,
+  processedAt: true,
+});
+
+export const insertPromoCodeSchema = createInsertSchema(promoCodes).pick({
+  code: true,
+  description: true,
+  discountType: true,
+  discountValue: true,
+  currency: true,
+  applicablePlans: true,
+  maxRedemptions: true,
+  validFrom: true,
+  validUntil: true,
+  isActive: true,
+});
+
+// ============================================================================
+// TYPE EXPORTS - BILLING
+// ============================================================================
+
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+
+export type UserSubscription = typeof userSubscriptions.$inferSelect;
+export type InsertUserSubscription = z.infer<typeof insertUserSubscriptionSchema>;
+
+export type BillingAddress = typeof billingAddresses.$inferSelect;
+export type InsertBillingAddress = z.infer<typeof insertBillingAddressSchema>;
+
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export type SubscriptionUsage = typeof subscriptionUsage.$inferSelect;
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
+
+export type PromoCodeRedemption = typeof promoCodeRedemptions.$inferSelect;
+
+
+
+
+
+
 // ============================================================================
 // INSERT SCHEMAS
 // ============================================================================
