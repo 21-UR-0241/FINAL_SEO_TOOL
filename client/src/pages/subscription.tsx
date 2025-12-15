@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "./authentication";
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 interface PricingPlan {
   id: string;
   name: string;
@@ -131,18 +133,30 @@ export function SubscriptionPage() {
     fetchCurrentSubscription();
   }, []);
 
-  const fetchCurrentSubscription = async () => {
+const fetchCurrentSubscription = async () => {
     try {
-      const response = await fetch("/api/subscription/current", {
+      const response = await fetch(`${API_URL}/api/subscription/current`, {
         credentials: "include",
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setCurrentPlan(data.plan || "free");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await response.json();
+          setCurrentPlan(data.plan || "free");
+        } else {
+          // API returned HTML instead of JSON, default to free plan
+          console.warn("API returned non-JSON response, defaulting to free plan");
+          setCurrentPlan("free");
+        }
+      } else {
+        // If response is not ok, default to free plan
+        setCurrentPlan("free");
       }
     } catch (error) {
       console.error("Failed to fetch subscription:", error);
+      // On any error, default to free plan
+      setCurrentPlan("free");
     }
   };
 
