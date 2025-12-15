@@ -661,7 +661,7 @@ import autoSchedulesRouter from "./api/user/auto-schedules";
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 // Import billing routes (single file)
-import billingRoutes from './routes/billing';
+import billingRoutes from '../server/routes/billing';
 // =============================================================================
 // TYPE DECLARATIONS
 // =============================================================================
