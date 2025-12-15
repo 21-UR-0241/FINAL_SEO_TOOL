@@ -456,6 +456,27 @@ router.post('/subscription', requireAuth, async (req: Request, res: Response) =>
   }
 });
 
+
+// server/routes/billing.ts
+app.post('/api/billing/create-portal-session', async (req, res) => {
+  const { userId, returnUrl } = req.body;
+  
+  try {
+    // Get user's stripeCustomerId
+    const customerId = await stripeService.getOrCreateCustomer(userId);
+    
+    // Create portal session
+    const session = await stripeService.createBillingPortalSession({
+      userId,
+      returnUrl,
+    });
+    
+    res.json({ url: session.url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * POST /api/billing/subscription/cancel
  * Cancel user's subscription

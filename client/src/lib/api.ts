@@ -2319,9 +2319,6 @@ export const api = {
   },
 };
 
-
-
-
 // SEO helpers
 export const seoHelpers = {
   getScoreCategory: (
