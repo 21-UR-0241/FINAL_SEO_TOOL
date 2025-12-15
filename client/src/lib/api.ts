@@ -3,7 +3,7 @@
 
 
 //client/src/lib/api.ts
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://seo-tool-9e5v.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 console.log('🔍 API_BASE_URL:', API_BASE_URL);
 
 // Helper function to ensure all fetches include credentials

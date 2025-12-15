@@ -47,6 +47,9 @@ interface BillingFormData {
   billingCountry: string;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+
 interface PlanDetails {
   id: string;
   name: string;
@@ -56,7 +59,7 @@ interface PlanDetails {
 
 // ✅ Add these API helper functions at the top
 const fetchWithCredentials = (url: string, options: RequestInit = {}) => {
-  return fetch(url, {
+  return fetch(`${API_URL}${url}`, {
     ...options,
     credentials: "include",
     headers: {
@@ -254,19 +257,25 @@ export function BillingPage() {
 
     // ✅ Use the mutation instead of direct fetch
     createSubscriptionMutation.mutate({
-      planId: planDetails.id,
-      interval: planDetails.interval,
-      paymentDetails: planDetails.id !== "free" ? {
-        cardLast4: formData.cardNumber.slice(-4).replace(/\s/g, ""),
-        cardName: formData.cardName,
+    planId: planDetails.id,
+    interval: planDetails.interval,
+    paymentDetails: {
+        // Only include card info for paid plans
+        cardLast4:
+        planDetails.id !== "free"
+            ? formData.cardNumber.replace(/\s/g, "").slice(-4)
+            : undefined,
+        cardName: planDetails.id !== "free" ? formData.cardName : undefined,
+        // Always send billing address (free and paid)
         billingAddress: {
-          address: formData.billingAddress,
-          city: formData.billingCity,
-          state: formData.billingState,
-          zip: formData.billingZip,
-          country: formData.billingCountry,
+        address: formData.billingAddress,
+        city: formData.billingCity,
+        state: formData.billingState,
+        zip: formData.billingZip,
+        country: formData.billingCountry,
         },
-      } : undefined,
+    },
+    // promoCode: promoCodeState || undefined, // if/when you add a promo field
     });
   };
 
