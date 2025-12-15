@@ -1121,7 +1121,7 @@ import {
   promoCodes,
   promoCodeRedemptions,
 } from "../../shared/schema";
-import { stripeService } from "../services/stripeService"; // ⬅️ adjust path if needed
+import { stripeService } from "../services/stripe-service";
 
 const router = Router();
 
