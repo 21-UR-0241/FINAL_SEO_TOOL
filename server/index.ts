@@ -764,7 +764,7 @@ const app = express();
 app.set("trust proxy", 1);
 
 // =============================================================================
-– 2. NUCLEAR OPTIONS HANDLER - HANDLES ALL PREFLIGHT REQUESTS
+// 2. NUCLEAR OPTIONS HANDLER - HANDLES ALL PREFLIGHT REQUESTS
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
