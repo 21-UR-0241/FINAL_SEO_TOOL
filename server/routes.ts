@@ -30,7 +30,7 @@ import { cloudinaryStorage } from "./services/cloudinary-storage";
 import {db} from './db'
 import { emailService } from './services/email-service';
 import highIntentRoutes  from "./routes/high-intent-routes";
-import billingRouter from './routes/billing';
+
 //added
 import { schedulerService } from './services/scheduler-service';
 import { users, websites, aiUsageTracking,  content, seoReports, activityLogs,googleAccounts, GoogleOAuthConfig } from "@shared/schema";
@@ -7761,17 +7761,8 @@ app.delete("/api/user/content/images/:imageId", requireAuth, async (req: Request
   }
 });
 
-  // ===========================================================================
-  // BILLING ROUTES
-  // ===========================================================================
-  
-app.use('/api/billing', billingRouter);
 
 
-  // ===========================================================================
-  // HIGH INTENT ROUTES
-  // ===========================================================================
-  
 
 app.use("/api/user/high-intent", requireAuth, highIntentRoutes);
   // ===========================================================================
