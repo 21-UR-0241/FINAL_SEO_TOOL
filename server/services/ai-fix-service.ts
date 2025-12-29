@@ -4518,6 +4518,38 @@ class AIFixService {
     console.log(logMessage);
   }
 
+
+  //added
+    // ⬇️ ADD IT HERE (with other WordPress helper methods)
+  private getCloudflareBypassHeaders(auth?: string): Record<string, string> {
+    const headers: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Connection': 'keep-alive',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'Sec-Fetch-Dest': 'empty',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'same-origin',
+      'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"'
+    };
+    
+    if (auth) {
+      headers['Authorization'] = `Basic ${auth}`;
+    }
+    
+    headers['Content-Type'] = 'application/json';
+    
+    return headers;
+  }
+
+
+
+
   // API Key Management Methods
   private async getAPIKey(
     userId: string | undefined,
@@ -4668,35 +4700,65 @@ class AIFixService {
     return allContent.slice(0, maxItems);
   }
 
+
+  //don't remove!
+  // private async getWordPressContentPaginated(
+  //   creds: WordPressCredentials,
+  //   type: "posts" | "pages",
+  //   page: number = 1,
+  //   perPage: number = 50
+  // ): Promise<any[]> {
+  //   const endpoint = `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/${type}`;
+  //   const auth = Buffer.from(
+  //     `${creds.username}:${creds.applicationPassword}`
+  //   ).toString("base64");
+
+  //   const response = await fetch(
+  //     `${endpoint}?per_page=${perPage}&page=${page}&status=publish`,
+  //     {
+  //       headers: {
+  //         Authorization: `Basic ${auth}`,
+  //         "Content-Type": "application/json",
+  //       },
+  //     }
+  //   );
+
+  //   if (!response.ok) {
+  //     if (response.status === 400 || response.status === 404) {
+  //       return [];
+  //     }
+  //     throw new Error(`Failed to fetch ${type}: ${response.status}`);
+  //   }
+  //   return response.json();
+  // }
+
   private async getWordPressContentPaginated(
-    creds: WordPressCredentials,
-    type: "posts" | "pages",
-    page: number = 1,
-    perPage: number = 50
-  ): Promise<any[]> {
-    const endpoint = `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/${type}`;
-    const auth = Buffer.from(
-      `${creds.username}:${creds.applicationPassword}`
-    ).toString("base64");
+  creds: WordPressCredentials,
+  type: "posts" | "pages",
+  page: number = 1,
+  perPage: number = 50
+): Promise<any[]> {
+  const endpoint = `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/${type}`;
+  const auth = Buffer.from(
+    `${creds.username}:${creds.applicationPassword}`
+  ).toString("base64");
 
-    const response = await fetch(
-      `${endpoint}?per_page=${perPage}&page=${page}&status=publish`,
-      {
-        headers: {
-          Authorization: `Basic ${auth}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+  const headers = this.getCloudflareBypassHeaders(auth);
 
-    if (!response.ok) {
-      if (response.status === 400 || response.status === 404) {
-        return [];
-      }
-      throw new Error(`Failed to fetch ${type}: ${response.status}`);
+  const response = await fetch(
+    `${endpoint}?per_page=${perPage}&page=${page}&status=publish`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    if (response.status === 400 || response.status === 404) {
+      return [];
     }
-    return response.json();
+    throw new Error(`Failed to fetch ${type}: ${response.status}`);
   }
+  
+  return response.json();
+}
 
   // Main entry point
   async analyzeAndFixWebsite(
@@ -4949,207 +5011,394 @@ class AIFixService {
   }));
 }
 
+
+//don't remove!
+// private async purgeWordPressCache(creds: WordPressCredentials): Promise<{
+//     success: boolean;
+//     purgedCaches: string[];
+//     recommendedWaitMinutes: number;
+//   }> {
+//     this.addLog("Attempting comprehensive cache purge...", "info");
+    
+//     const auth = Buffer.from(
+//       `${creds.username}:${creds.applicationPassword}`
+//     ).toString('base64');
+    
+//     const purgedCaches: string[] = [];
+//     let recommendedWaitMinutes = 5;
+    
+//     let hasCDN = false;
+//     try {
+//       const testResponse = await fetch(creds.url, { 
+//         method: 'HEAD',
+//         headers: { 'User-Agent': 'Mozilla/5.0' }
+//       });
+      
+//       const cfRay = testResponse.headers.get('cf-ray');
+//       const xCache = testResponse.headers.get('x-cache');
+//       const xCDN = testResponse.headers.get('x-cdn');
+      
+//       if (cfRay) {
+//         hasCDN = true;
+//         this.addLog("Cloudflare CDN detected - cache propagation may take 10-15 minutes", "warning");
+//         recommendedWaitMinutes = 15;
+//       } else if (xCache || xCDN) {
+//         hasCDN = true;
+//         this.addLog("CDN detected - cache propagation may take 10 minutes", "warning");
+//         recommendedWaitMinutes = 10;
+//       }
+//     } catch (error: any) {
+//       this.addLog(`CDN detection failed: ${error.message}`, "info");
+//     }
+    
+//     const purgeMethods = [
+//       {
+//         name: 'LiteSpeed Cache',
+//         execute: async () => {
+//           const response = await fetch(`${creds.url}/wp-json/litespeed/v1/purge_all`, {
+//             method: 'POST',
+//             headers: {
+//               'Authorization': `Basic ${auth}`,
+//               'Content-Type': 'application/json'
+//             }
+//           });
+//           return response.ok;
+//         }
+//       },
+//       {
+//         name: 'WP Rocket',
+//         execute: async () => {
+//           const response = await fetch(`${creds.url}/wp-json/wp-rocket/v1/purge-cache`, {
+//             method: 'POST',
+//             headers: {
+//               'Authorization': `Basic ${auth}`,
+//               'Content-Type': 'application/json'
+//             }
+//           });
+//           return response.ok;
+//         }
+//       },
+//       {
+//         name: 'W3 Total Cache',
+//         execute: async () => {
+//           const response = await fetch(`${creds.url}/wp-json/w3tc/v1/flush`, {
+//             method: 'POST',
+//             headers: {
+//               'Authorization': `Basic ${auth}`,
+//               'Content-Type': 'application/json'
+//             }
+//           });
+//           return response.ok;
+//         }
+//       },
+//       {
+//         name: 'WP Super Cache',
+//         execute: async () => {
+//           const response = await fetch(`${creds.url}/wp-json/wp-super-cache/v1/cache`, {
+//             method: 'DELETE',
+//             headers: {
+//               'Authorization': `Basic ${auth}`,
+//               'Content-Type': 'application/json'
+//             }
+//           });
+//           return response.ok;
+//         }
+//       },
+//       {
+//         name: 'WP Fastest Cache',
+//         execute: async () => {
+//           const response = await fetch(`${creds.url}/wp-json/wpfc/v1/cache/delete`, {
+//             method: 'POST',
+//             headers: {
+//               'Authorization': `Basic ${auth}`,
+//               'Content-Type': 'application/json'
+//             }
+//           });
+//           return response.ok;
+//         }
+//       },
+//       {
+//         name: 'Autoptimize',
+//         execute: async () => {
+//           const response = await fetch(`${creds.url}/wp-json/autoptimize/v1/cache/purge`, {
+//             method: 'POST',
+//             headers: {
+//               'Authorization': `Basic ${auth}`,
+//               'Content-Type': 'application/json'
+//             }
+//           });
+//           return response.ok;
+//         }
+//       },
+//       {
+//         name: 'Redis Object Cache',
+//         execute: async () => {
+//           const response = await fetch(`${creds.url}/wp-json/redis-cache/v1/flush`, {
+//             method: 'POST',
+//             headers: {
+//               'Authorization': `Basic ${auth}`,
+//               'Content-Type': 'application/json'
+//             }
+//           });
+//           return response.ok;
+//         }
+//       },
+//       {
+//         name: 'Transient Cache',
+//         execute: async () => {
+//           const response = await fetch(`${creds.url}/wp-json/wp/v2/settings`, {
+//             method: 'POST',
+//             headers: { 
+//               'Authorization': `Basic ${auth}`, 
+//               'Content-Type': 'application/json'
+//             },
+//             body: JSON.stringify({ 
+//               _wpnonce: Date.now().toString()
+//             })
+//           });
+//           return response.status === 200 || response.status === 403;
+//         }
+//       }
+//     ];
+
+//     for (const method of purgeMethods) {
+//       try {
+//         const success = await method.execute();
+//         if (success) {
+//           purgedCaches.push(method.name);
+//           this.addLog(`Cache purged via ${method.name}`, "success");
+//         }
+//       } catch (error: any) {
+//         if (error.message && !error.message.includes('404')) {
+//           this.addLog(`${method.name} purge attempt: ${error.message}`, "info");
+//         }
+//       }
+//     }
+    
+//     try {
+//       await fetch(`${creds.url}?nocache=${Date.now()}`, {
+//         headers: {
+//           'Cache-Control': 'no-cache, no-store, must-revalidate',
+//           'Pragma': 'no-cache'
+//         }
+//       });
+//     } catch (error) {
+//       // Ignore errors
+//     }
+    
+//     const success = purgedCaches.length > 0;
+    
+//     if (success) {
+//       this.addLog(
+//         `Successfully purged: ${purgedCaches.join(', ')} (${purgedCaches.length} cache system${purgedCaches.length > 1 ? 's' : ''})`, 
+//         "success"
+//       );
+      
+//       if (hasCDN) {
+//         this.addLog(
+//           `CDN detected - recommend waiting ${recommendedWaitMinutes} minutes for full propagation`, 
+//           "warning"
+//         );
+//       }
+//     } else {
+//       this.addLog(
+//         "Could not purge cache via API - changes may take 10-30 minutes to propagate (cache TTL)", 
+//         "warning"
+//       );
+//       recommendedWaitMinutes = 30;
+//     }
+    
+//     return {
+//       success,
+//       purgedCaches,
+//       recommendedWaitMinutes
+//     };
+//   }
+
+
 private async purgeWordPressCache(creds: WordPressCredentials): Promise<{
-    success: boolean;
-    purgedCaches: string[];
-    recommendedWaitMinutes: number;
-  }> {
-    this.addLog("Attempting comprehensive cache purge...", "info");
+  success: boolean;
+  purgedCaches: string[];
+  recommendedWaitMinutes: number;
+}> {
+  this.addLog("Attempting comprehensive cache purge...", "info");
+  
+  const auth = Buffer.from(
+    `${creds.username}:${creds.applicationPassword}`
+  ).toString('base64');
+  
+  // Get headers with Cloudflare bypass
+  const headers = this.getCloudflareBypassHeaders(auth);
+  
+  const purgedCaches: string[] = [];
+  let recommendedWaitMinutes = 5;
+  
+  let hasCDN = false;
+  try {
+    const testResponse = await fetch(creds.url, { 
+      method: 'HEAD',
+      headers: this.getCloudflareBypassHeaders() // Use bypass headers for CDN detection too
+    });
     
-    const auth = Buffer.from(
-      `${creds.username}:${creds.applicationPassword}`
-    ).toString('base64');
+    const cfRay = testResponse.headers.get('cf-ray');
+    const xCache = testResponse.headers.get('x-cache');
+    const xCDN = testResponse.headers.get('x-cdn');
     
-    const purgedCaches: string[] = [];
-    let recommendedWaitMinutes = 5;
-    
-    let hasCDN = false;
+    if (cfRay) {
+      hasCDN = true;
+      this.addLog("Cloudflare CDN detected - cache propagation may take 10-15 minutes", "warning");
+      recommendedWaitMinutes = 15;
+    } else if (xCache || xCDN) {
+      hasCDN = true;
+      this.addLog("CDN detected - cache propagation may take 10 minutes", "warning");
+      recommendedWaitMinutes = 10;
+    }
+  } catch (error: any) {
+    this.addLog(`CDN detection failed: ${error.message}`, "info");
+  }
+  
+  const purgeMethods = [
+    {
+      name: 'LiteSpeed Cache',
+      execute: async () => {
+        const response = await fetch(`${creds.url}/wp-json/litespeed/v1/purge_all`, {
+          method: 'POST',
+          headers
+        });
+        return response.ok;
+      }
+    },
+    {
+      name: 'WP Rocket',
+      execute: async () => {
+        const response = await fetch(`${creds.url}/wp-json/wp-rocket/v1/purge-cache`, {
+          method: 'POST',
+          headers
+        });
+        return response.ok;
+      }
+    },
+    {
+      name: 'W3 Total Cache',
+      execute: async () => {
+        const response = await fetch(`${creds.url}/wp-json/w3tc/v1/flush`, {
+          method: 'POST',
+          headers
+        });
+        return response.ok;
+      }
+    },
+    {
+      name: 'WP Super Cache',
+      execute: async () => {
+        const response = await fetch(`${creds.url}/wp-json/wp-super-cache/v1/cache`, {
+          method: 'DELETE',
+          headers
+        });
+        return response.ok;
+      }
+    },
+    {
+      name: 'WP Fastest Cache',
+      execute: async () => {
+        const response = await fetch(`${creds.url}/wp-json/wpfc/v1/cache/delete`, {
+          method: 'POST',
+          headers
+        });
+        return response.ok;
+      }
+    },
+    {
+      name: 'Autoptimize',
+      execute: async () => {
+        const response = await fetch(`${creds.url}/wp-json/autoptimize/v1/cache/purge`, {
+          method: 'POST',
+          headers
+        });
+        return response.ok;
+      }
+    },
+    {
+      name: 'Redis Object Cache',
+      execute: async () => {
+        const response = await fetch(`${creds.url}/wp-json/redis-cache/v1/flush`, {
+          method: 'POST',
+          headers
+        });
+        return response.ok;
+      }
+    },
+    {
+      name: 'Transient Cache',
+      execute: async () => {
+        const response = await fetch(`${creds.url}/wp-json/wp/v2/settings`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ 
+            _wpnonce: Date.now().toString()
+          })
+        });
+        return response.status === 200 || response.status === 403;
+      }
+    }
+  ];
+
+  for (const method of purgeMethods) {
     try {
-      const testResponse = await fetch(creds.url, { 
-        method: 'HEAD',
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-      
-      const cfRay = testResponse.headers.get('cf-ray');
-      const xCache = testResponse.headers.get('x-cache');
-      const xCDN = testResponse.headers.get('x-cdn');
-      
-      if (cfRay) {
-        hasCDN = true;
-        this.addLog("Cloudflare CDN detected - cache propagation may take 10-15 minutes", "warning");
-        recommendedWaitMinutes = 15;
-      } else if (xCache || xCDN) {
-        hasCDN = true;
-        this.addLog("CDN detected - cache propagation may take 10 minutes", "warning");
-        recommendedWaitMinutes = 10;
+      const success = await method.execute();
+      if (success) {
+        purgedCaches.push(method.name);
+        this.addLog(`Cache purged via ${method.name}`, "success");
       }
     } catch (error: any) {
-      this.addLog(`CDN detection failed: ${error.message}`, "info");
-    }
-    
-    const purgeMethods = [
-      {
-        name: 'LiteSpeed Cache',
-        execute: async () => {
-          const response = await fetch(`${creds.url}/wp-json/litespeed/v1/purge_all`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${auth}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          return response.ok;
-        }
-      },
-      {
-        name: 'WP Rocket',
-        execute: async () => {
-          const response = await fetch(`${creds.url}/wp-json/wp-rocket/v1/purge-cache`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${auth}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          return response.ok;
-        }
-      },
-      {
-        name: 'W3 Total Cache',
-        execute: async () => {
-          const response = await fetch(`${creds.url}/wp-json/w3tc/v1/flush`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${auth}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          return response.ok;
-        }
-      },
-      {
-        name: 'WP Super Cache',
-        execute: async () => {
-          const response = await fetch(`${creds.url}/wp-json/wp-super-cache/v1/cache`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Basic ${auth}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          return response.ok;
-        }
-      },
-      {
-        name: 'WP Fastest Cache',
-        execute: async () => {
-          const response = await fetch(`${creds.url}/wp-json/wpfc/v1/cache/delete`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${auth}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          return response.ok;
-        }
-      },
-      {
-        name: 'Autoptimize',
-        execute: async () => {
-          const response = await fetch(`${creds.url}/wp-json/autoptimize/v1/cache/purge`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${auth}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          return response.ok;
-        }
-      },
-      {
-        name: 'Redis Object Cache',
-        execute: async () => {
-          const response = await fetch(`${creds.url}/wp-json/redis-cache/v1/flush`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${auth}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          return response.ok;
-        }
-      },
-      {
-        name: 'Transient Cache',
-        execute: async () => {
-          const response = await fetch(`${creds.url}/wp-json/wp/v2/settings`, {
-            method: 'POST',
-            headers: { 
-              'Authorization': `Basic ${auth}`, 
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ 
-              _wpnonce: Date.now().toString()
-            })
-          });
-          return response.status === 200 || response.status === 403;
-        }
-      }
-    ];
-
-    for (const method of purgeMethods) {
-      try {
-        const success = await method.execute();
-        if (success) {
-          purgedCaches.push(method.name);
-          this.addLog(`Cache purged via ${method.name}`, "success");
-        }
-      } catch (error: any) {
-        if (error.message && !error.message.includes('404')) {
-          this.addLog(`${method.name} purge attempt: ${error.message}`, "info");
-        }
+      if (error.message && !error.message.includes('404')) {
+        this.addLog(`${method.name} purge attempt: ${error.message}`, "info");
       }
     }
+  }
+  
+  try {
+    // Use bypass headers for cache-busting request too
+    const cacheBustHeaders = this.getCloudflareBypassHeaders();
+    cacheBustHeaders['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    cacheBustHeaders['Pragma'] = 'no-cache';
     
-    try {
-      await fetch(`${creds.url}?nocache=${Date.now()}`, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      });
-    } catch (error) {
-      // Ignore errors
-    }
+    await fetch(`${creds.url}?nocache=${Date.now()}`, {
+      headers: cacheBustHeaders
+    });
+  } catch (error) {
+    // Ignore errors
+  }
+  
+  const success = purgedCaches.length > 0;
+  
+  if (success) {
+    this.addLog(
+      `Successfully purged: ${purgedCaches.join(', ')} (${purgedCaches.length} cache system${purgedCaches.length > 1 ? 's' : ''})`, 
+      "success"
+    );
     
-    const success = purgedCaches.length > 0;
-    
-    if (success) {
+    if (hasCDN) {
       this.addLog(
-        `Successfully purged: ${purgedCaches.join(', ')} (${purgedCaches.length} cache system${purgedCaches.length > 1 ? 's' : ''})`, 
-        "success"
-      );
-      
-      if (hasCDN) {
-        this.addLog(
-          `CDN detected - recommend waiting ${recommendedWaitMinutes} minutes for full propagation`, 
-          "warning"
-        );
-      }
-    } else {
-      this.addLog(
-        "Could not purge cache via API - changes may take 10-30 minutes to propagate (cache TTL)", 
+        `CDN detected - recommend waiting ${recommendedWaitMinutes} minutes for full propagation`, 
         "warning"
       );
-      recommendedWaitMinutes = 30;
     }
-    
-    return {
-      success,
-      purgedCaches,
-      recommendedWaitMinutes
-    };
+  } else {
+    this.addLog(
+      "Could not purge cache via API - changes may take 10-30 minutes to propagate (cache TTL)", 
+      "warning"
+    );
+    recommendedWaitMinutes = 30;
   }
+  
+  return {
+    success,
+    purgedCaches,
+    recommendedWaitMinutes
+  };
+}
+
 
   private async applyFixesAndAnalyze(
     website: any,
@@ -7010,48 +7259,128 @@ Create a better title that will rank well and get clicks.`;
     }));
   }
 
+
+  //don't remove!
+  // private async updateWordPressContent(
+  //   creds: WordPressCredentials,
+  //   id: number,
+  //   data: any,
+  //   contentType: "post" | "page" = "post"
+  // ) {
+  //   const endpoint =
+  //     contentType === "page"
+  //       ? `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/pages/${id}`
+  //       : `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/posts/${id}`;
+
+  //   const auth = Buffer.from(
+  //     `${creds.username}:${creds.applicationPassword}`
+  //   ).toString("base64");
+
+  //   const response = await fetch(endpoint, {
+  //     method: "POST",
+  //     headers: {
+  //       Authorization: `Basic ${auth}`,
+  //       "Content-Type": "application/json",
+  //     },
+  //     body: JSON.stringify(data),
+  //   });
+
+  //   if (!response.ok) {
+  //     const errorBody = await response.text();
+  //     throw new Error(`Failed to update ${contentType} ${id}: ${errorBody}`);
+  //   }
+
+  //   return response.json();
+  // }
+
   private async updateWordPressContent(
-    creds: WordPressCredentials,
-    id: number,
-    data: any,
-    contentType: "post" | "page" = "post"
-  ) {
-    const endpoint =
-      contentType === "page"
-        ? `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/pages/${id}`
-        : `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/posts/${id}`;
+  creds: WordPressCredentials,
+  id: number,
+  data: any,
+  contentType: "post" | "page" = "post"
+) {
+  const endpoint =
+    contentType === "page"
+      ? `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/pages/${id}`
+      : `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/posts/${id}`;
 
-    const auth = Buffer.from(
-      `${creds.username}:${creds.applicationPassword}`
-    ).toString("base64");
+  const auth = Buffer.from(
+    `${creds.username}:${creds.applicationPassword}`
+  ).toString("base64");
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
+  const headers = this.getCloudflareBypassHeaders(auth);
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Failed to update ${contentType} ${id}: ${errorBody}`);
-    }
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(data),
+  });
 
-    return response.json();
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Failed to update ${contentType} ${id}: ${errorBody}`);
   }
 
-  private async testWordPressConnection(
-    creds: WordPressCredentials
-  ): Promise<void> {
-    const connectionTest = await wordpressService.testConnection(creds);
-    if (!connectionTest.success) {
-      throw new Error(connectionTest.message || "WordPress connection failed");
+  return response.json();
+}
+
+  //don't remove!
+  // private async testWordPressConnection(
+  //   creds: WordPressCredentials
+  // ): Promise<void> {
+  //   const connectionTest = await wordpressService.testConnection(creds);
+  //   if (!connectionTest.success) {
+  //     throw new Error(connectionTest.message || "WordPress connection failed");
+  //   }
+  //   this.addLog("WordPress connection verified", "success");
+  // }
+private async testWordPressConnection(
+  creds: WordPressCredentials
+): Promise<void> {
+  const auth = Buffer.from(
+    `${creds.username}:${creds.applicationPassword}`
+  ).toString("base64");
+
+  const headers = this.getCloudflareBypassHeaders(auth);
+
+  this.addLog(`Testing WordPress connection: ${creds.url}/wp-json/wp/v2/users/me`, "info");
+
+  const response = await fetch(`${creds.url}/wp-json/wp/v2/users/me`, {
+    method: 'GET',
+    headers,
+    redirect: 'manual' // Don't follow redirects to challenge pages
+  });
+
+  // Check for Cloudflare block
+  if (response.status === 403) {
+    const cfMitigated = response.headers.get('cf-mitigated');
+    const server = response.headers.get('server');
+    
+    if (cfMitigated || server === 'cloudflare') {
+      const body = await response.text();
+      if (body.includes('Just a moment') || body.includes('challenge-platform')) {
+        throw new Error(
+          'Cloudflare bot protection is blocking API access. ' +
+          'Please ask the website owner to whitelist /wp-json/ paths in Cloudflare firewall rules.'
+        );
+      }
     }
-    this.addLog("WordPress connection verified", "success");
   }
 
+  if (!response.ok) {
+    throw new Error(
+      `WordPress connection failed: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  
+  if (!data || !data.id) {
+    throw new Error('Invalid WordPress API response');
+  }
+
+  this.addLog("WordPress connection verified", "success");
+}
   // ==================== UTILITY METHODS ====================
 
   private getCheerioConfig() {
