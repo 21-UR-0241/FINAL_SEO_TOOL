@@ -3955,45 +3955,87 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
         promptType: promptType as 'system' | 'custom',
         customPrompt: customPrompt,
       });
-
       // 🍌 NEW: Generate Nano Banana images separately if selected
-      if (includeImages && imageProvider === 'imagen') {
-        console.log(`🍌 Generating ${imageCount} Nano Banana images...`);
-        
-        try {
-          const nanoBananaResult = await nanoBananaImagenService.generateImages({
-            topic: topic,
-            count: imageCount,
-            contentContext: result.content, // Pass content for better context
-          }, userId, websiteId);
+if (includeImages && imageProvider === 'imagen') {
+  console.log(`🍌 Generating ${imageCount} Nano Banana images...`);
+  
+  try {
+    const nanoBananaResult = await nanoBananaImagenService.generateImages({
+      topic: topic,
+      count: imageCount,
+      contentContext: result.content, // Pass content for better context
+    }, userId, websiteId);
 
-          // Convert base64 to data URLs and format for storage
-          result.images = nanoBananaResult.images.map((img: any, idx: number) => ({
-            url: `data:${img.mimeType};base64,${img.base64}`,
-            base64: img.base64,
-            mimeType: img.mimeType,
-            altText: img.altText || `${topic} - Image ${idx + 1}`,
-            prompt: img.prompt,
-            cost: 0.02, // Imagen cost
-            filename: `nano-banana-${Date.now()}-${idx}.png`,
-            cloudinaryUrl: null,
-            cloudinaryPublicId: null,
-          }));
+    // Convert base64 to data URLs and format for storage
+    result.images = nanoBananaResult.images.map((img: any, idx: number) => ({
+      url: `data:${img.mimeType};base64,${img.base64}`,
+      base64: img.base64,
+      mimeType: img.mimeType,
+      altText: img.altText || `${topic} - Image ${idx + 1}`,
+      prompt: img.prompt,
+      cost: 0.02, // Imagen cost
+      filename: `nano-banana-${Date.now()}-${idx}.png`,
+      cloudinaryUrl: null,
+      cloudinaryPublicId: null,
+    }));
+    
+    result.totalImageCost = nanoBananaResult.totalCost;
+    
+    console.log(`✅ Generated ${nanoBananaResult.images.length} Nano Banana images for $${nanoBananaResult.totalCost.toFixed(4)}`);
+    
+    // 🔥 FIX: Insert images into content body using service method
+    result.content = nanoBananaImagenService.insertImagesIntoContent(
+      result.content, 
+      result.images,
+      'distributed' // Distributes images evenly throughout the content
+    );
+    console.log(`✅ Inserted ${result.images.length} images into content HTML`);
+    
+  } catch (imageError: any) {
+    console.error('🍌 Nano Banana generation failed:', imageError);
+    result.images = [];
+    result.totalImageCost = 0;
+  }
+}
+
+      // // 🍌 NEW: Generate Nano Banana images separately if selected
+      // if (includeImages && imageProvider === 'imagen') {
+      //   console.log(`🍌 Generating ${imageCount} Nano Banana images...`);
+        
+      //   try {
+      //     const nanoBananaResult = await nanoBananaImagenService.generateImages({
+      //       topic: topic,
+      //       count: imageCount,
+      //       contentContext: result.content, // Pass content for better context
+      //     }, userId, websiteId);
+
+      //     // Convert base64 to data URLs and format for storage
+      //     result.images = nanoBananaResult.images.map((img: any, idx: number) => ({
+      //       url: `data:${img.mimeType};base64,${img.base64}`,
+      //       base64: img.base64,
+      //       mimeType: img.mimeType,
+      //       altText: img.altText || `${topic} - Image ${idx + 1}`,
+      //       prompt: img.prompt,
+      //       cost: 0.02, // Imagen cost
+      //       filename: `nano-banana-${Date.now()}-${idx}.png`,
+      //       cloudinaryUrl: null,
+      //       cloudinaryPublicId: null,
+      //     }));
           
-          result.totalImageCost = nanoBananaResult.totalCost;
+      //     result.totalImageCost = nanoBananaResult.totalCost;
           
-          console.log(`✅ Generated ${nanoBananaResult.images.length} Nano Banana images for $${nanoBananaResult.totalCost.toFixed(4)}`);
+      //     console.log(`✅ Generated ${nanoBananaResult.images.length} Nano Banana images for $${nanoBananaResult.totalCost.toFixed(4)}`);
           
-          // 🔥 FIX: Insert images into content body
-          result.content = insertImagesIntoContent(result.content, result.images);
-          console.log(`✅ Inserted ${result.images.length} images into content HTML`);
+      //     // 🔥 FIX: Insert images into content body
+      //     result.content = insertImagesIntoContent(result.content, result.images);
+      //     console.log(`✅ Inserted ${result.images.length} images into content HTML`);
           
-        } catch (imageError: any) {
-          console.error('🍌 Nano Banana generation failed:', imageError);
-          result.images = [];
-          result.totalImageCost = 0;
-        }
-      }
+      //   } catch (imageError: any) {
+      //     console.error('🍌 Nano Banana generation failed:', imageError);
+      //     result.images = [];
+      //     result.totalImageCost = 0;
+      //   }
+      // }
     } catch (error: any) {
       // Clear cache if API key error
       if (error.message?.includes('Invalid API key') || error.message?.includes('authentication')) {
