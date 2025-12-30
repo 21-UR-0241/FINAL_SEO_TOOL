@@ -951,11 +951,11 @@ private async getApiKey(provider: AIProvider, userId: string): Promise<{ key: st
       // Use Cloudinary URL if available, otherwise fallback to original URL
       const imageUrl = image.cloudinaryUrl || image.url;
       const imageHtml = `
-<figure class="wp-block-image size-large">
-  <img src="${imageUrl}" alt="${image.altText}" class="wp-image" style="max-width: 100%; height: auto;" />
-  <figcaption>${image.altText}</figcaption>
-</figure>
-`;
+        <figure class="wp-block-image size-large">
+          <img src="${imageUrl}" alt="${image.altText}" class="wp-image" style="max-width: 100%; height: auto;" />
+          <figcaption>${image.altText}</figcaption>
+        </figure>
+        `;
 
       if (index === 0) {
         const firstParagraphEnd = modifiedContent.indexOf("</p>");
@@ -1094,41 +1094,41 @@ private async getApiKey(provider: AIProvider, userId: string): Promise<{ key: st
           {
             role: "system",
             content: `You are a technical SEO analyst. Analyze content for SEO effectiveness and return a numeric score.
-ANALYSIS CRITERIA FOR SEO SCORE (1-100):
-KEYWORD OPTIMIZATION (25 points):
-- Primary keyword in title (5 points)
-- Keywords in first paragraph (5 points)  
-- Keywords in headings/subheadings (5 points)
-- Natural keyword density 1-3% (5 points)
-- Use of semantic/related keywords (5 points)
-CONTENT STRUCTURE (25 points):
-- Proper heading hierarchy (H1, H2, H3) (8 points)
-- Logical content flow and organization (8 points)
-- Use of lists, bullets for scannability (5 points)
-- Appropriate content length for topic depth (4 points)
-SEARCH INTENT ALIGNMENT (25 points):
-- Content directly addresses search query (10 points)
-- Provides comprehensive answer to user questions (8 points)
-- Includes actionable information/next steps (7 points)
-TECHNICAL SEO ELEMENTS (25 points):
-- Optimized title tag under 60 characters (8 points)
-- Meta description 150-160 characters with CTA (8 points)
-- Internal linking opportunities mentioned (5 points)
-- Content uniqueness and originality (4 points)
-CRITICAL: Return ONLY a JSON object with numeric values: {"contentSeoScore": number, "analysis": "explanation"}`,
-          },
-          {
-            role: "user",
-            content: `Analyze this content for SEO:
-TITLE: ${request.title}
-CONTENT: ${request.content.substring(0, 3000)}${
-              request.content.length > 3000 ? "... [TRUNCATED]" : ""
-            }
-TARGET KEYWORDS: ${request.keywords.join(", ")}
-TARGET AUDIENCE: ${request.targetAudience || "General audience"}
-${request.niche ? `NICHE: ${getNicheContext(request.niche).label} - ${getNicheContext(request.niche).contentStyle}` : ""}
-Evaluate each criterion and provide a realistic score.`,
-          },
+                ANALYSIS CRITERIA FOR SEO SCORE (1-100):
+                KEYWORD OPTIMIZATION (25 points):
+                - Primary keyword in title (5 points)
+                - Keywords in first paragraph (5 points)  
+                - Keywords in headings/subheadings (5 points)
+                - Natural keyword density 1-3% (5 points)
+                - Use of semantic/related keywords (5 points)
+                CONTENT STRUCTURE (25 points):
+                - Proper heading hierarchy (H1, H2, H3) (8 points)
+                - Logical content flow and organization (8 points)
+                - Use of lists, bullets for scannability (5 points)
+                - Appropriate content length for topic depth (4 points)
+                SEARCH INTENT ALIGNMENT (25 points):
+                - Content directly addresses search query (10 points)
+                - Provides comprehensive answer to user questions (8 points)
+                - Includes actionable information/next steps (7 points)
+                TECHNICAL SEO ELEMENTS (25 points):
+                - Optimized title tag under 60 characters (8 points)
+                - Meta description 150-160 characters with CTA (8 points)
+                - Internal linking opportunities mentioned (5 points)
+                - Content uniqueness and originality (4 points)
+                CRITICAL: Return ONLY a JSON object with numeric values: {"contentSeoScore": number, "analysis": "explanation"}`,
+                          },
+                          {
+                            role: "user",
+                            content: `Analyze this content for SEO:
+                TITLE: ${request.title}
+                CONTENT: ${request.content.substring(0, 3000)}${
+                              request.content.length > 3000 ? "... [TRUNCATED]" : ""
+                            }
+                TARGET KEYWORDS: ${request.keywords.join(", ")}
+                TARGET AUDIENCE: ${request.targetAudience || "General audience"}
+                ${request.niche ? `NICHE: ${getNicheContext(request.niche).label} - ${getNicheContext(request.niche).contentStyle}` : ""}
+                Evaluate each criterion and provide a realistic score.`,
+                          },
         ],
         request.aiProvider === "openai" ? { type: "json_object" } : undefined,
         0.1,
@@ -1172,36 +1172,36 @@ Evaluate each criterion and provide a realistic score.`,
           {
             role: "system",
             content: `You are a content readability expert. Analyze text complexity and return a numeric score 1-100.
-READABILITY SCORING CRITERIA:
-SENTENCE STRUCTURE (30 points):
-- Average sentence length under 20 words (10 points)
-- Variety in sentence length (8 points)
-- Simple sentence structure (7 points)
-- Minimal complex clauses (5 points)
-VOCABULARY COMPLEXITY (25 points):
-- Use of common, everyday words (10 points)
-- Minimal jargon or well-explained terms (8 points)
-- Active voice usage (7 points)
-CONTENT ORGANIZATION (25 points):
-- Clear paragraph structure (8 points)
-- Effective transitions (8 points)
-- Logical information flow (5 points)
-- Proper formatting (4 points)
-COMPREHENSION EASE (20 points):
-- Understandable by target audience (8 points)
-- Clear key points (6 points)
-- Supporting examples (6 points)
-CRITICAL: Return ONLY JSON: {"readabilityScore": number, "analysis": "explanation"}`,
-          },
-          {
-            role: "user",
-            content: `Analyze readability of this content:
-${request.content.substring(0, 2000)}${request.content.length > 2000 ? "..." : ""}
-Consider:
-- Sentence complexity
-- Word choice
-- Paragraph structure
-- Overall flow`,
+                READABILITY SCORING CRITERIA:
+                SENTENCE STRUCTURE (30 points):
+                - Average sentence length under 20 words (10 points)
+                - Variety in sentence length (8 points)
+                - Simple sentence structure (7 points)
+                - Minimal complex clauses (5 points)
+                VOCABULARY COMPLEXITY (25 points):
+                - Use of common, everyday words (10 points)
+                - Minimal jargon or well-explained terms (8 points)
+                - Active voice usage (7 points)
+                CONTENT ORGANIZATION (25 points):
+                - Clear paragraph structure (8 points)
+                - Effective transitions (8 points)
+                - Logical information flow (5 points)
+                - Proper formatting (4 points)
+                COMPREHENSION EASE (20 points):
+                - Understandable by target audience (8 points)
+                - Clear key points (6 points)
+                - Supporting examples (6 points)
+                CRITICAL: Return ONLY JSON: {"readabilityScore": number, "analysis": "explanation"}`,
+                          },
+                          {
+                            role: "user",
+                            content: `Analyze readability of this content:
+                ${request.content.substring(0, 2000)}${request.content.length > 2000 ? "..." : ""}
+                Consider:
+                - Sentence complexity
+                - Word choice
+                - Paragraph structure
+                - Overall flow`,
           },
         ],
         request.aiProvider === "openai" ? { type: "json_object" } : undefined,
@@ -1245,37 +1245,37 @@ Consider:
           {
             role: "system",
             content: `You are a brand voice analyst. Return a numeric score 1-100 for brand alignment.
-BRAND VOICE SCORING CRITERIA:
-TONE CONSISTENCY (30 points):
-- Maintains specified tone throughout (15 points)
-- Tone appropriate for target audience (8 points)
-- Consistent voice personality (7 points)
-VOCABULARY ALIGNMENT (25 points):
-- Word choice matches brand voice (10 points)
-- Consistent formality level (8 points)
-- Industry-appropriate terminology (7 points)
-BRAND PERSONALITY EXPRESSION (25 points):
-- Reflects brand values (10 points)
-- Writing style matches brand character (8 points)
-- Appropriate authority level (7 points)
-AUDIENCE APPROPRIATENESS (20 points):
-- Language suitable for demographic (8 points)
-- Content complexity matches audience (7 points)
-- Cultural sensitivity (5 points)
-CRITICAL: Return ONLY JSON: {"brandVoiceScore": number, "analysis": "evaluation"}`,
-          },
-          {
-            role: "user",
-            content: `Analyze brand voice alignment:
-CONTENT: ${request.content.substring(0, 1500)}${
-              request.content.length > 1500 ? "..." : ""
-            }
-BRAND REQUIREMENTS:
-- Specified Tone: ${request.tone}
-- Brand Voice: ${request.brandVoice || "Not specified - use tone as guidance"}
-- Target Audience: ${request.targetAudience || "General audience"}
-- Industry Context: Based on content topic
-Evaluate how well the content aligns with these brand requirements.`,
+              BRAND VOICE SCORING CRITERIA:
+              TONE CONSISTENCY (30 points):
+              - Maintains specified tone throughout (15 points)
+              - Tone appropriate for target audience (8 points)
+              - Consistent voice personality (7 points)
+              VOCABULARY ALIGNMENT (25 points):
+              - Word choice matches brand voice (10 points)
+              - Consistent formality level (8 points)
+              - Industry-appropriate terminology (7 points)
+              BRAND PERSONALITY EXPRESSION (25 points):
+              - Reflects brand values (10 points)
+              - Writing style matches brand character (8 points)
+              - Appropriate authority level (7 points)
+              AUDIENCE APPROPRIATENESS (20 points):
+              - Language suitable for demographic (8 points)
+              - Content complexity matches audience (7 points)
+              - Cultural sensitivity (5 points)
+              CRITICAL: Return ONLY JSON: {"brandVoiceScore": number, "analysis": "evaluation"}`,
+                        },
+                        {
+                          role: "user",
+                          content: `Analyze brand voice alignment:
+              CONTENT: ${request.content.substring(0, 1500)}${
+                            request.content.length > 1500 ? "..." : ""
+                          }
+              BRAND REQUIREMENTS:
+              - Specified Tone: ${request.tone}
+              - Brand Voice: ${request.brandVoice || "Not specified - use tone as guidance"}
+              - Target Audience: ${request.targetAudience || "General audience"}
+              - Industry Context: Based on content topic
+              Evaluate how well the content aligns with these brand requirements.`,
           },
         ],
         request.aiProvider === "openai" ? { type: "json_object" } : undefined,
@@ -2223,144 +2223,6 @@ TOTAL: ${minimumWords}+ words MINIMUM
 START WRITING COMPREHENSIVE CONTENT IN ${languageCode} - ${minimumWords} WORDS MINIMUM:`;
 }
 
-//   private buildSystemPrompt(
-//     request: ContentGenerationRequest,
-//     language: string,
-//     languagePrompt: string
-//   ): string {
-
-//     const languageCode = language.toUpperCase();
-//     const languageName = this.getLanguageName(language);
-
-//     // Language enforcement map
-//     const languageEnforcementMap: Record<string, string> = {
-//       french: `COMMANDEMENT LINGUISTIQUE ABSOLU:
-// Vous DEVEZ écrire en français et UNIQUEMENT en français.
-// Chaque mot, chaque phrase, chaque paragraphe DOIT être en français.
-// Il est INTERDIT d'utiliser l'anglais ou toute autre langue.
-// Si vous ne connaissez pas un mot en français, décrivez-le en français.
-// Votre réponse COMPLÈTE sera en français.`,
-//       spanish: `MANDATO LINGÜÍSTICO ABSOLUTO:
-// Debes escribir en español y SOLO en español.
-// Cada palabra, cada oración, cada párrafo DEBE estar en español.
-// Está PROHIBIDO usar inglés u otros idiomas.
-// Si no conoces una palabra en español, descríbela en español.
-// Tu respuesta COMPLETA será en español.`,
-//       german: `ABSOLUTES SPRACHGEBOT:
-// Sie MÜSSEN auf Deutsch schreiben und NUR auf Deutsch.
-// Jedes Wort, jeder Satz, jeder Absatz MUSS auf Deutsch sein.
-// Es ist VERBOTEN, Englisch oder andere Sprachen zu verwenden.
-// Wenn Sie ein Wort nicht auf Deutsch kennen, beschreiben Sie es auf Deutsch.
-// Ihre GESAMTE Antwort wird auf Deutsch sein.`,
-//       italian: `MANDATO LINGUISTICO ASSOLUTO:
-// Devi scrivere in italiano e SOLO in italiano.
-// Ogni parola, ogni frase, ogni paragrafo DEVE essere in italiano.
-// È VIETATO usare l'inglese o altre lingue.
-// Se non conosci una parola in italiano, descrivila in italiano.
-// La tua risposta COMPLETA sarà in italiano.`,
-//       portuguese: `MANDATO LINGUÍSTICO ABSOLUTO:
-// Você DEVE escrever em português e SOMENTE em português.
-// Cada palavra, cada frase, cada parágrafo DEVE estar em português.
-// É PROIBIDO usar inglês ou outros idiomas.
-// Se não conhecer uma palavra em português, descreva-a em português.
-// Sua resposta COMPLETA será em português.`,
-//       russian: `АБСОЛЮТНОЕ ЯЗЫКОВОЕ ТРЕБОВАНИЕ:
-// Вы ДОЛЖНЫ писать на русском и ТОЛЬКО на русском.
-// Каждое слово, каждое предложение, каждый абзац ДОЛЖНЫ быть на русском.
-// ЗАПРЕЩЕНО использовать английский или другие языки.
-// Если вы не знаете слово по-русски, опишите его по-русски.
-// Ваш ПОЛНЫЙ ответ будет на русском.`,
-//       japanese: `絶対的な言語要件:
-// あなたは日本語で書く必要があります。日本語のみです。
-// すべての単語、すべての文、すべての段落は日本語である必要があります。
-// 英語または他の言語を使用することは禁止されています。
-// 日本語で知らない単語がある場合は、日本語で説明してください。
-// あなたの完全な応答は日本語になります。`,
-//       chinese: `绝对语言要求:
-// 你必须用中文写作,仅用中文。
-// 每个单词、每个句子、每个段落都必须是中文。
-// 禁止使用英文或其他语言。
-// 如果你不知道一个中文词汇,用中文描述它。
-// 你的完整答复将是中文。`,
-//       korean: `절대적 언어 요구사항:
-// 한국어로 작성해야 합니다. 한국어만 사용합니다.
-// 모든 단어, 모든 문장, 모든 단락은 한국어여야 합니다.
-// 영어 또는 다른 언어 사용은 금지됩니다.
-// 한국어로 모르는 단어가 있으면 한국어로 설명하세요.
-// 완전한 답변은 한국어입니다.`,
-//       dutch: `ABSOLUUT TAALCOMMANDEMENT:
-// Je MOET in het Nederlands schrijven en ALLEEN in het Nederlands.
-// Elk woord, elke zin, elke alinea MOET in het Nederlands zijn.
-// Het is VERBODEN Engels of andere talen te gebruiken.
-// Als je een woord niet in het Nederlands kent, beschrijf het dan in het Nederlands.
-// Je COMPLETE antwoord wordt in het Nederlands.`,
-//       swedish: `ABSOLUT SPRÅKKRAV:
-// Du MÅSTE skriva på svenska och ENDAST på svenska.
-// Varje ord, varje mening, varje stycke MÅSTE vara på svenska.
-// Det är FÖRBJUDET att använda engelska eller andra språk.
-// Om du inte kan ett ord på svenska, beskriv det på svenska.
-// Ditt KOMPLETTA svar kommer att vara på svenska.`,
-//       polish: `ABSOLUTNE WYMAGANIE JĘZYKA:
-// Musisz pisać po polsku i TYLKO po polsku.
-// Każde słowo, każde zdanie, każdy akapit MUSI być po polsku.
-// ZABRANIA się używania angielskiego lub innych języków.
-// Jeśli nie znasz słowa po polsku, opisz je po polsku.
-// Twoja CAŁA odpowiedź będzie po polsku.`,
-//       turkish: `MUTLAK DİL GEREKSİNİMİ:
-// Türkçe yazmalısın ve SADECE Türkçe.
-// Her kelime, her cümle, her paragraf Türkçe OLMALIDIR.
-// İngilizce veya diğer diller YASAKLANMIŞTIR.
-// Türkçe bilmediğin bir kelime varsa, onu Türkçe olarak tanımla.
-// Tüm cevabın Türkçe olması gerekir.`,
-//       thai: `ข้อกำหนดภาษาที่ขาดไม่ได้:
-// คุณต้องเขียนเป็นภาษาไทยและภาษาไทยเท่านั้น
-// ทุกคำ ทุกประโยค ทุกย่อหน้าต้องเป็นภาษาไทย
-// ห้ามใช้ภาษาอังกฤษหรือภาษาอื่น
-// หากคุณไม่รู้คำว่าไทย ให้อธิบายเป็นภาษาไทย
-// คำตอบทั้งหมดของคุณต้องเป็นภาษาไทย`,
-//       vietnamese: `YÊU CẦU NGÔN NGỮ TUYỆT ĐỐI:
-// Bạn PHẢI viết bằng tiếng Việt và CHỈ tiếng Việt.
-// Mỗi từ, mỗi câu, mỗi đoạn phải bằng tiếng Việt.
-// KHÔNG ĐƯỢC phép dùng tiếng Anh hoặc ngôn ngữ khác.
-// Nếu không biết một từ tiếng Việt, hãy mô tả nó bằng tiếng Việt.
-// Toàn bộ câu trả lời của bạn sẽ bằng tiếng Việt.`,
-//       english: "",
-//     };
-
-//     const languageEnforcement = languageEnforcementMap[language] || "";
-//     const conversationalPrompt = this.CONVERSATIONAL_SYSTEM_PROMPT.replace('{TOPIC}', request.topic);
-
-//     return `${languageEnforcement}
-// ⚠️ ABSOLUTE LANGUAGE REQUIREMENT ⚠️
-// OUTPUT LANGUAGE: ${languageCode} (${languageName})
-// ${languagePrompt}
-// ${conversationalPrompt}
-// CRITICAL INSTRUCTIONS:
-// 1. WRITE EVERYTHING IN ${languageCode} ONLY
-// 2. EVERY SINGLE WORD MUST BE IN ${languageCode}
-// 3. NO ENGLISH WORDS ANYWHERE
-// 4. NO LANGUAGE MIXING
-// 5. NO SECTION HEADERS IN ENGLISH
-// If a term doesn't exist in ${language}, describe it fully in ${language}.
-// === RESPONSE FORMAT - MUST BE VALID JSON ===
-// {
-//   "title": "Article title in ${languageCode}",
-//   "content": "Full HTML article in ${languageCode} with conversational voice",
-//   "excerpt": "Summary in ${languageCode}",
-//   "metaDescription": "Meta description in ${languageCode}",
-//   "metaTitle": "SEO title in ${languageCode}",
-//   "keywords": ["keyword_in_${languageCode}", "keyword_in_${languageCode}"]
-// }
-// CRITICAL REMINDERS:
-// 1. WRITE EVERYTHING IN ${languageCode} ONLY
-// 2. EVERY SINGLE WORD MUST BE IN ${languageCode}
-// 3. NO ENGLISH WORDS ANYWHERE
-// 4. NO LANGUAGE MIXING
-// 5. NO SECTION HEADERS IN ENGLISH
-// 6. Use the conversational voice style defined above in ${languageCode}
-// 7. If a term doesn't exist in ${language}, describe it fully in ${language}
-// START WRITING IN ${languageCode}:`;
-//   }
 
   private getLanguageName(language: string): string {
     const languageNames: Record<string, string> = {
@@ -3151,964 +3013,6 @@ Begin generation now.`;
   }
 }
 
-  
-//   async generateContent(
-//   request: ContentGenerationRequest
-// ): Promise<ContentGenerationResultWithPublishing> {
-//   try {
-//     console.log(
-//       `Generating content for user ${request.userId} with ${request.aiProvider.toUpperCase()} in ${
-//         request.language || "english"
-//       }`
-//     );
-
-//     // VALIDATION BLOCK
-//     if (!request.websiteId && !request.niche) {
-//       throw new Error(
-//         "Either websiteId or niche must be provided for content generation"
-//       );
-//     }
-
-//     const language = request.language || "english";
-//     if (!VALID_LANGUAGES.includes(language)) {
-//       throw new Error(
-//         `Invalid language: ${language}. Must be one of: ${VALID_LANGUAGES.join(", ")}`
-//       );
-//     }
-
-//     this.lastLanguage = language;
-//     this.lastRequestTopic = request.topic;
-
-//     // Log content type
-//     if (request.websiteId) {
-//       console.log(`📄 Generating website-specific content for website: ${request.websiteId}`);
-//     } else if (request.niche) {
-//       console.log(`📄 Generating standalone content for niche: ${request.niche}`);
-//     }
-
-//     // Log prompt type
-//     if (request.promptType === "custom" && request.customPrompt) {
-//       console.log(`🎯 Using CUSTOM PROMPT mode`);
-//     } else {
-//       console.log(`🤖 Using SYSTEM PROMPT mode (conversational)`);
-//     }
-
-//     // STEP 1: Check image generation
-//     if (request.includeImages && request.imageCount && request.imageCount > 0) {
-//       const openAiKey = await this.getApiKey('openai', request.userId);
-//       if (!openAiKey) {
-//         console.warn("⚠️ Image generation requested but no OpenAI API key available");
-//         request.includeImages = false;
-//         request.imageCount = 0;
-//       } else {
-//         console.log(
-//           `🎨 Will generate ${request.imageCount} images with DALL-E 3 (regardless of content AI provider: ${request.aiProvider})`
-//         );
-//       }
-//     }
-
-//     if (request.isAutoGenerated) {
-//       console.log(`Auto-generation detected:`, {
-//         autoScheduleId: request.autoScheduleId,
-//         autoPublish: request.autoPublish,
-//         publishDelay: request.publishDelay,
-//       });
-//     }
-
-//     // STEP 2: Generate content
-//     const languagePrompt = this.getLanguagePrompt(language);
-//     const systemPrompt = this.buildSystemPrompt(request, language, languagePrompt);
-
-//     // ✅ CUSTOM PROMPT HANDLING: Use different user prompts based on mode
-//     let userPrompt: string;
-//     if (request.promptType === "custom" && request.customPrompt && request.customPrompt.trim()) {
-//       // For custom prompts, use a minimal user message
-//       // All instructions are already in the system prompt
-//       userPrompt = `Generate the content based on the custom instructions and context provided in the system prompt above. 
-
-// Important reminders:
-// - Write in ${language.toUpperCase()} only
-// - Output valid JSON in the exact format specified
-// - Follow all the custom instructions provided
-// - Include all required fields: title, content, excerpt, metaDescription, metaTitle, keywords
-
-// Begin generation now.`;
-      
-//       console.log(`📝 Using CUSTOM PROMPT with simplified user message`);
-//     } else {
-//       // For system prompts, use the detailed content prompt
-//       userPrompt = this.buildContentPrompt(request);
-//       console.log(`📝 Using SYSTEM PROMPT with detailed content instructions`);
-//     }
-
-//     console.log(`📝 System Prompt Language Enforcement: ${language.toUpperCase()}`);
-//     console.log(`📝 User Prompt Language Code: ${language.toUpperCase()}`);
-//     console.log(`📝 ${request.promptType === "custom" ? "Custom prompt" : "Conversational voice"} enabled for topic: ${request.topic}`);
-
-//     const contentResponse = await this.callAI(
-//       request.aiProvider,
-//       [
-//         { role: "system", content: systemPrompt },
-//         { role: "user", content: userPrompt },
-//       ],
-//       request.aiProvider === "openai" ? { type: "json_object" } : undefined,
-//       0.7,
-//       request.userId
-//     );
-
-//     const keyTypeUsed = contentResponse.keyType || 'system';
-//     let contentResult;
-
-//     // Parse JSON response
-//     try {
-//       let cleanedContent = contentResponse.content.trim();
-//       cleanedContent = cleanedContent.replace(/^\uFEFF/, "");
-//       contentResult = JSON.parse(cleanedContent);
-//       console.log("✅ Successfully parsed JSON response from", request.aiProvider.toUpperCase());
-//     } catch (parseError: any) {
-//       console.error("❌ Initial JSON parse failed, attempting extraction...", parseError.message);
-//       let cleanedContent = contentResponse.content.trim();
-//       const firstBrace = cleanedContent.indexOf("{");
-//       const lastBrace = cleanedContent.lastIndexOf("}");
-
-//       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-//         const extractedJson = cleanedContent.substring(firstBrace, lastBrace + 1);
-//         try {
-//           contentResult = JSON.parse(extractedJson);
-//           console.log("✅ Successfully parsed extracted JSON from", request.aiProvider.toUpperCase());
-//         } catch (secondParseError: any) {
-//           throw new AIProviderError(
-//             request.aiProvider,
-//             `Failed to parse JSON response after multiple attempts. Original error: ${parseError.message}`
-//           );
-//         }
-//       } else {
-//         throw new AIProviderError(
-//           request.aiProvider,
-//           `No valid JSON structure found in response. Response was: ${contentResponse.content.substring(0, 300)}...`
-//         );
-//       }
-//     }
-
-//     // Validate required fields
-//     if (!contentResult.title || !contentResult.content) {
-//       throw new AIProviderError(
-//         request.aiProvider,
-//         "AI response missing required fields (title, content)"
-//       );
-//     }
-
-//     // Convert markdown to HTML
-//     console.log("🔄 Converting markdown headers to HTML...");
-//     if (contentResult.content && contentResult.content.includes("#")) {
-//       console.log("🔍 Markdown headers detected, converting to HTML...");
-//       contentResult.content = ContentFormatter.convertMarkdownToHtml(contentResult.content);
-//     }
-
-//     contentResult.content = ContentFormatter.formatForWordPress(contentResult.content);
-//     console.log("✅ Content formatted for WordPress");
-
-//     // Sanitize metadata
-//     contentResult.content = this.sanitizeContentMetadata(contentResult.content);
-
-//     // Pre-generate contentId
-//     let contentId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-//     // STEP 3: Generate images if requested
-//     let images: Array<{
-//       url: string;
-//       filename: string;
-//       altText: string;
-//       prompt: string;
-//       cost: number;
-//       cloudinaryUrl?: string;
-//       cloudinaryPublicId?: string;
-//     }> = [];
-//     let totalImageCost = 0;
-//     let imageKeyType: 'user' | 'system' = 'system';
-
-//     if (request.includeImages && request.imageCount && request.imageCount > 0) {
-//       try {
-//         console.log(`🎨 Generating ${request.imageCount} images with DALL-E 3...`);
-
-//         const imageGenerationRequest = {
-//           topic: request.topic,
-//           count: request.imageCount,
-//           style: request.imageStyle || "natural",
-//           contentContext: contentResult.content.substring(0, 500),
-//           keywords: request.keywords,
-//         };
-
-//         const validation = imageService.validateImageRequest(imageGenerationRequest);
-//         if (!validation.valid) {
-//           throw new Error(
-//             `Image generation validation failed: ${validation.errors.join(", ")}`
-//           );
-//         }
-
-//         const imageResult = await imageService.generateImages(
-//           imageGenerationRequest,
-//           request.userId,
-//           request.websiteId
-//         );
-//         imageKeyType = imageResult.keyType || 'system';
-
-//         // Upload to Cloudinary
-//         console.log(`☁️ Uploading images to Cloudinary...`);
-
-//         for (const img of imageResult.images) {
-//           try {
-//             const cloudinaryImage = await cloudinaryStorage.uploadFromUrl(
-//               img.url,
-//               request.websiteId || `niche-${request.niche}`,
-//               contentId,
-//               img.filename
-//             );
-
-//             images.push({
-//               ...img,
-//               url: cloudinaryImage.secureUrl,
-//               cloudinaryUrl: cloudinaryImage.secureUrl,
-//               cloudinaryPublicId: cloudinaryImage.publicId,
-//             });
-//             console.log(`✅ Image stored: ${img.filename}`);
-//           } catch (uploadError: any) {
-//             console.error(`❌ Failed to upload to Cloudinary: ${img.filename}`, uploadError.message);
-//             images.push(img);
-//           }
-//         }
-
-//         totalImageCost = imageResult.totalCost;
-//         console.log(`✅ Generated ${images.length} images`);
-
-//         if (images.length > 0) {
-//           console.log("🖼️ Embedding images into content...");
-//           contentResult.content = this.embedImagesInContentPrivate(
-//             contentResult.content,
-//             images
-//           );
-//           console.log(`✅ Embedded ${images.length} images`);
-//         }
-//       } catch (imageError: any) {
-//         console.error("❌ Image generation failed:", imageError.message);
-//         if (imageError.message.includes("Rate limit")) {
-//           console.warn("⚠️ Rate limit reached, continuing without images");
-//         } else if (imageError.message.includes("credits") || imageError.message.includes("quota")) {
-//           console.warn("⚠️ Insufficient credits, continuing without images");
-//         } else if (imageError.message.includes("API key")) {
-//           console.warn("⚠️ API key issue, continuing without images");
-//         } else {
-//           console.warn(`⚠️ Image error: ${imageError.message}`);
-//         }
-//         images = [];
-//         totalImageCost = 0;
-//       }
-//     }
-
-//     // STEP 4: Analyze content
-//     const analysisResult = await this.performContentAnalysis({
-//       title: contentResult.title,
-//       content: contentResult.content,
-//       keywords: request.keywords,
-//       tone: request.tone,
-//       brandVoice: request.brandVoice,
-//       targetAudience: request.targetAudience,
-//       eatCompliance: request.eatCompliance,
-//       websiteId: request.websiteId || 'standalone',
-//       aiProvider: request.aiProvider,
-//       userId: request.userId,
-//       language: language,
-//       niche: request.niche,
-//     });
-
-//     // STEP 5: Calculate costs
-//     const contentTokens = Math.max(1, contentResponse.tokens + analysisResult.tokensUsed);
-//     const contentPricing = AI_MODELS[request.aiProvider].pricing;
-//     const avgTokenCost = (contentPricing.input + contentPricing.output) / 2;
-//     const textCostUsd = (contentTokens * avgTokenCost) / 1000;
-//     const totalCostUsd = textCostUsd + totalImageCost;
-
-//     console.log(`💰 Cost breakdown:`);
-//     console.log(`   Content: $${textCostUsd.toFixed(6)}`);
-//     console.log(`   Images: $${totalImageCost.toFixed(6)}`);
-//     console.log(`   Total: $${totalCostUsd.toFixed(6)}`);
-
-//     // STEP 6: Track AI usage
-//     try {
-//       await storage.trackAiUsage({
-//         websiteId: request.websiteId || null,
-//         userId: request.userId,
-//         model: AI_MODELS[request.aiProvider].model,
-//         tokensUsed: contentTokens,
-//         costUsd: Math.max(1, Math.round(textCostUsd * 1000)),
-//         operation: "content_generation",
-//         keyType: keyTypeUsed,
-//       });
-
-//       if (images.length > 0) {
-//         await storage.trackAiUsage({
-//           websiteId: request.websiteId || null,
-//           userId: request.userId,
-//           model: "dall-e-3",
-//           tokensUsed: 0,
-//           costUsd: Math.round(totalImageCost * 100),
-//           operation: "image_generation",
-//           keyType: imageKeyType,
-//         });
-//       }
-//     } catch (trackingError: any) {
-//       console.warn("Tracking failed:", trackingError.message);
-//     }
-
-//     // STEP 7: Generate quality checks
-//     const qualityChecks = this.generateQualityChecks(contentResult.content, request);
-
-//     // STEP 8: Save to database
-//     let savedContentId: string | undefined;
-//     let published = false;
-//     let scheduledForPublishing = false;
-//     let publishedAt: Date | undefined;
-//     let scheduledDate: Date | undefined;
-
-//     try {
-//       const contentToSave = {
-//         websiteId: request.websiteId || null,
-//         niche: request.niche || null,
-//         userId: request.userId,
-//         title: contentResult.title,
-//         body: contentResult.content,
-//         excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
-//         metaDescription:
-//           contentResult.metaDescription ||
-//           this.generateMetaDescription(contentResult.title, contentResult.content),
-//         metaTitle: contentResult.metaTitle || contentResult.title,
-//         aiModel: AI_MODELS[request.aiProvider].model,
-//         seoKeywords: contentResult.keywords || request.keywords,
-//         seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
-//         readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
-//         brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
-//         eatCompliance: request.eatCompliance || false,
-//         tokensUsed: contentTokens,
-//         costUsd: Math.round(totalCostUsd * 100),
-//         status: 'draft',
-//         hasImages: images.length > 0,
-//         imageCount: images.length,
-//         imageCostCents: Math.round(totalImageCost * 100),
-//         language: language,
-//         conversationalVoice: request.promptType !== "custom", // ✅ Track if custom or system prompt was used
-//       };
-
-//       console.log(`💾 Saving content...`);
-//       const savedContent = await storage.createContent(contentToSave);
-//       savedContentId = savedContent.id;
-//       contentId = savedContentId;
-
-//       console.log(`✅ Content saved: ${savedContentId}`);
-
-//       if (!savedContentId || savedContentId.startsWith('temp-')) {
-//         throw new Error(`Invalid content ID: ${savedContentId}`);
-//       }
-
-//       // Handle auto-publishing
-//       if (request.isAutoGenerated && request.autoScheduleId && request.autoPublish) {
-//         console.log(`🚀 Processing auto-publishing...`);
-
-//         if (request.publishDelay === 0) {
-//           scheduledDate = new Date();
-//           try {
-//             await storage.createContentSchedule({
-//               contentId: savedContentId,
-//               userId: request.userId,
-//               websiteId: request.websiteId!,
-//               scheduled_date: scheduledDate,
-//               status: "publishing",
-//               title: contentResult.title,
-//               topic: request.topic,
-//               metadata: {
-//                 autoGenerated: true,
-//                 autoScheduleId: request.autoScheduleId,
-//                 publishedImmediately: true,
-//                 generatedAt: new Date(),
-//               },
-//             });
-
-//             const publishResult = await this.publishToWordPress(
-//               savedContentId,
-//               request.websiteId!,
-//               request.userId
-//             );
-
-//             if (publishResult.success) {
-//               published = true;
-//               publishedAt = new Date();
-
-//               await storage.updateContent(savedContentId, {
-//                 status: "published",
-//                 publishDate: publishedAt,
-//                 wordpressPostId: publishResult.postId,
-//               });
-
-//               await storage.updateContentScheduleByContentId(savedContentId, {
-//                 status: "published",
-//                 published_at: publishedAt,
-//               });
-
-//               console.log(`✅ Published to WordPress`);
-//             } else {
-//               console.error(`❌ Publishing failed: ${publishResult.error}`);
-//             }
-//           } catch (publishError: any) {
-//             console.error(`❌ Publishing error: ${publishError.message}`);
-//           }
-//         } else if (request.publishDelay && request.publishDelay > 0) {
-//           scheduledDate = new Date();
-//           scheduledDate.setHours(scheduledDate.getHours() + request.publishDelay);
-//           scheduledForPublishing = true;
-
-//           try {
-//             await storage.createContentSchedule({
-//               contentId: savedContentId,
-//               userId: request.userId,
-//               websiteId: request.websiteId!,
-//               scheduled_date: scheduledDate,
-//               status: "scheduled",
-//               title: contentResult.title,
-//               topic: request.topic,
-//               metadata: {
-//                 autoGenerated: true,
-//                 autoScheduleId: request.autoScheduleId,
-//                 publishDelay: request.publishDelay,
-//                 generatedAt: new Date(),
-//               },
-//             });
-
-//             console.log(`⏰ Scheduled for ${scheduledDate.toISOString()}`);
-//           } catch (scheduleError: any) {
-//             console.error(`❌ Schedule error: ${scheduleError.message}`);
-//           }
-//         }
-//       }
-//     } catch (saveError: any) {
-//       console.error(`❌ Save failed: ${saveError.message}`);
-//       throw new Error(`Content generation failed: Unable to save - ${saveError.message}`);
-//     }
-
-//     // STEP 9: Return result
-//     const result: ContentGenerationResultWithPublishing = {
-//       title: contentResult.title,
-//       content: contentResult.content,
-//       excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
-//       metaDescription:
-//         contentResult.metaDescription ||
-//         this.generateMetaDescription(contentResult.title, contentResult.content),
-//       metaTitle: contentResult.metaTitle || contentResult.title,
-//       keywords: contentResult.keywords || request.keywords,
-//       seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
-//       readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
-//       brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
-//       eatCompliance: request.eatCompliance || false,
-//       tokensUsed: contentTokens,
-//       costUsd: Number(textCostUsd.toFixed(6)),
-//       aiProvider: request.aiProvider,
-//       qualityChecks,
-//       contentId: savedContentId,
-//       published: published,
-//       scheduledForPublishing: scheduledForPublishing,
-//       publishedAt: publishedAt,
-//       scheduledDate: scheduledDate,
-//       totalCost: totalCostUsd.toFixed(6),
-//       language: language,
-//       conversationalVoice: request.promptType !== "custom", // ✅ Track prompt type
-//     };
-
-//     if (images.length > 0) {
-//       result.images = images.map((img) => ({
-//         url: img.cloudinaryUrl || img.url,
-//         filename: img.filename,
-//         altText: img.altText,
-//         prompt: img.prompt,
-//         cost: img.cost,
-//         cloudinaryUrl: img.cloudinaryUrl,
-//         cloudinaryPublicId: img.cloudinaryPublicId,
-//       }));
-//       result.totalImageCost = totalImageCost;
-//     }
-
-//     console.log(`✅ Generation complete - ${language.toUpperCase()} - ${request.promptType === "custom" ? "Custom Prompt" : "System Prompt"}`);
-
-//     return result;
-//   } catch (error: any) {
-//     if (error instanceof AIProviderError || error instanceof AnalysisError) {
-//       throw error;
-//     }
-//     throw new Error(`Content generation failed: ${error.message}`);
-//   }
-// }
-
-  // async generateContent(
-  //   request: ContentGenerationRequest
-  // ): Promise<ContentGenerationResultWithPublishing> {
-  //   try {
-  //     console.log(
-  //       `Generating content for user ${request.userId} with ${request.aiProvider.toUpperCase()} in ${
-  //         request.language || "english"
-  //       }`
-  //     );
-
-  //     // VALIDATION BLOCK
-  //     if (!request.websiteId && !request.niche) {
-  //       throw new Error(
-  //         "Either websiteId or niche must be provided for content generation"
-  //       );
-  //     }
-
-  //     const language = request.language || "english";
-  //     if (!VALID_LANGUAGES.includes(language)) {
-  //       throw new Error(
-  //         `Invalid language: ${language}. Must be one of: ${VALID_LANGUAGES.join(", ")}`
-  //       );
-  //     }
-
-  //     this.lastLanguage = language;
-  //     this.lastRequestTopic = request.topic;
-
-  //     // Log content type
-  //     if (request.websiteId) {
-  //       console.log(`📄 Generating website-specific content for website: ${request.websiteId}`);
-  //     } else if (request.niche) {
-  //       console.log(`📄 Generating standalone content for niche: ${request.niche}`);
-  //     }
-
-  //     // STEP 1: Check image generation
-  //     if (request.includeImages && request.imageCount && request.imageCount > 0) {
-  //       const openAiKey = await this.getApiKey('openai', request.userId);
-  //       if (!openAiKey) {
-  //         console.warn("⚠️ Image generation requested but no OpenAI API key available");
-  //         request.includeImages = false;
-  //         request.imageCount = 0;
-  //       } else {
-  //         console.log(
-  //           `🎨 Will generate ${request.imageCount} images with DALL-E 3 (regardless of content AI provider: ${request.aiProvider})`
-  //         );
-  //       }
-  //     }
-
-  //     if (request.isAutoGenerated) {
-  //       console.log(`Auto-generation detected:`, {
-  //         autoScheduleId: request.autoScheduleId,
-  //         autoPublish: request.autoPublish,
-  //         publishDelay: request.publishDelay,
-  //       });
-  //     }
-
-  //     // STEP 2: Generate content
-  //     const contentPrompt = this.buildContentPrompt(request);
-  //     const languagePrompt = this.getLanguagePrompt(language);
-  //     const systemPrompt = this.buildSystemPrompt(request, language, languagePrompt);
-
-  //     console.log(`📝 System Prompt Language Enforcement: ${language.toUpperCase()}`);
-  //     console.log(`📝 User Prompt Language Code: ${language.toUpperCase()}`);
-  //     console.log(`📝 Conversational voice enabled for topic: ${request.topic}`);
-
-  //     const contentResponse = await this.callAI(
-  //       request.aiProvider,
-  //       [
-  //         { role: "system", content: systemPrompt },
-  //         { role: "user", content: contentPrompt },
-  //       ],
-  //       request.aiProvider === "openai" ? { type: "json_object" } : undefined,
-  //       0.7,
-  //       request.userId
-  //     );
-
-  //     const keyTypeUsed = contentResponse.keyType || 'system';
-  //     let contentResult;
-
-  //     // Parse JSON response
-  //     try {
-  //       let cleanedContent = contentResponse.content.trim();
-  //       cleanedContent = cleanedContent.replace(/^\uFEFF/, "");
-  //       contentResult = JSON.parse(cleanedContent);
-  //       console.log("✅ Successfully parsed JSON response from", request.aiProvider.toUpperCase());
-  //     } catch (parseError: any) {
-  //       console.error("❌ Initial JSON parse failed, attempting extraction...", parseError.message);
-  //       let cleanedContent = contentResponse.content.trim();
-  //       const firstBrace = cleanedContent.indexOf("{");
-  //       const lastBrace = cleanedContent.lastIndexOf("}");
-
-  //       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-  //         const extractedJson = cleanedContent.substring(firstBrace, lastBrace + 1);
-  //         try {
-  //           contentResult = JSON.parse(extractedJson);
-  //           console.log("✅ Successfully parsed extracted JSON from", request.aiProvider.toUpperCase());
-  //         } catch (secondParseError: any) {
-  //           throw new AIProviderError(
-  //             request.aiProvider,
-  //             `Failed to parse JSON response after multiple attempts. Original error: ${parseError.message}`
-  //           );
-  //         }
-  //       } else {
-  //         throw new AIProviderError(
-  //           request.aiProvider,
-  //           `No valid JSON structure found in response. Response was: ${contentResponse.content.substring(0, 300)}...`
-  //         );
-  //       }
-  //     }
-
-  //     // Validate required fields
-  //     if (!contentResult.title || !contentResult.content) {
-  //       throw new AIProviderError(
-  //         request.aiProvider,
-  //         "AI response missing required fields (title, content)"
-  //       );
-  //     }
-
-  //     // Convert markdown to HTML
-  //     console.log("🔄 Converting markdown headers to HTML...");
-  //     if (contentResult.content && contentResult.content.includes("#")) {
-  //       console.log("🔍 Markdown headers detected, converting to HTML...");
-  //       contentResult.content = ContentFormatter.convertMarkdownToHtml(contentResult.content);
-  //     }
-
-  //     contentResult.content = ContentFormatter.formatForWordPress(contentResult.content);
-  //     console.log("✅ Content formatted for WordPress");
-
-  //     // Sanitize metadata
-  //     contentResult.content = this.sanitizeContentMetadata(contentResult.content);
-
-  //     // Pre-generate contentId
-  //     let contentId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-  //     // STEP 3: Generate images if requested
-  //     let images: Array<{
-  //       url: string;
-  //       filename: string;
-  //       altText: string;
-  //       prompt: string;
-  //       cost: number;
-  //       cloudinaryUrl?: string;
-  //       cloudinaryPublicId?: string;
-  //     }> = [];
-  //     let totalImageCost = 0;
-  //     let imageKeyType: 'user' | 'system' = 'system';
-
-  //     if (request.includeImages && request.imageCount && request.imageCount > 0) {
-  //       try {
-  //         console.log(`🎨 Generating ${request.imageCount} images with DALL-E 3...`);
-
-  //         const imageGenerationRequest = {
-  //           topic: request.topic,
-  //           count: request.imageCount,
-  //           style: request.imageStyle || "natural",
-  //           contentContext: contentResult.content.substring(0, 500),
-  //           keywords: request.keywords,
-  //         };
-
-  //         const validation = imageService.validateImageRequest(imageGenerationRequest);
-  //         if (!validation.valid) {
-  //           throw new Error(
-  //             `Image generation validation failed: ${validation.errors.join(", ")}`
-  //           );
-  //         }
-
-  //         const imageResult = await imageService.generateImages(
-  //           imageGenerationRequest,
-  //           request.userId,
-  //           request.websiteId
-  //         );
-  //         imageKeyType = imageResult.keyType || 'system';
-
-  //         // Upload to Cloudinary
-  //         console.log(`☁️ Uploading images to Cloudinary...`);
-
-  //         for (const img of imageResult.images) {
-  //           try {
-  //             const cloudinaryImage = await cloudinaryStorage.uploadFromUrl(
-  //               img.url,
-  //               request.websiteId || `niche-${request.niche}`,
-  //               contentId,
-  //               img.filename
-  //             );
-
-  //             images.push({
-  //               ...img,
-  //               url: cloudinaryImage.secureUrl,
-  //               cloudinaryUrl: cloudinaryImage.secureUrl,
-  //               cloudinaryPublicId: cloudinaryImage.publicId,
-  //             });
-  //             console.log(`✅ Image stored: ${img.filename}`);
-  //           } catch (uploadError: any) {
-  //             console.error(`❌ Failed to upload to Cloudinary: ${img.filename}`, uploadError.message);
-  //             images.push(img);
-  //           }
-  //         }
-
-  //         totalImageCost = imageResult.totalCost;
-  //         console.log(`✅ Generated ${images.length} images`);
-
-  //         if (images.length > 0) {
-  //           console.log("🖼️ Embedding images into content...");
-  //           contentResult.content = this.embedImagesInContentPrivate(
-  //             contentResult.content,
-  //             images
-  //           );
-  //           console.log(`✅ Embedded ${images.length} images`);
-  //         }
-  //       } catch (imageError: any) {
-  //         console.error("❌ Image generation failed:", imageError.message);
-  //         if (imageError.message.includes("Rate limit")) {
-  //           console.warn("⚠️ Rate limit reached, continuing without images");
-  //         } else if (imageError.message.includes("credits") || imageError.message.includes("quota")) {
-  //           console.warn("⚠️ Insufficient credits, continuing without images");
-  //         } else if (imageError.message.includes("API key")) {
-  //           console.warn("⚠️ API key issue, continuing without images");
-  //         } else {
-  //           console.warn(`⚠️ Image error: ${imageError.message}`);
-  //         }
-  //         images = [];
-  //         totalImageCost = 0;
-  //       }
-  //     }
-
-  //     // STEP 4: Analyze content
-  //     const analysisResult = await this.performContentAnalysis({
-  //       title: contentResult.title,
-  //       content: contentResult.content,
-  //       keywords: request.keywords,
-  //       tone: request.tone,
-  //       brandVoice: request.brandVoice,
-  //       targetAudience: request.targetAudience,
-  //       eatCompliance: request.eatCompliance,
-  //       websiteId: request.websiteId || 'standalone',
-  //       aiProvider: request.aiProvider,
-  //       userId: request.userId,
-  //       language: language,
-  //       niche: request.niche,
-  //     });
-
-  //     // STEP 5: Calculate costs
-  //     const contentTokens = Math.max(1, contentResponse.tokens + analysisResult.tokensUsed);
-  //     const contentPricing = AI_MODELS[request.aiProvider].pricing;
-  //     const avgTokenCost = (contentPricing.input + contentPricing.output) / 2;
-  //     const textCostUsd = (contentTokens * avgTokenCost) / 1000;
-  //     const totalCostUsd = textCostUsd + totalImageCost;
-
-  //     console.log(`💰 Cost breakdown:`);
-  //     console.log(`   Content: $${textCostUsd.toFixed(6)}`);
-  //     console.log(`   Images: $${totalImageCost.toFixed(6)}`);
-  //     console.log(`   Total: $${totalCostUsd.toFixed(6)}`);
-
-  //     // STEP 6: Track AI usage
-  //     try {
-  //       await storage.trackAiUsage({
-  //         websiteId: request.websiteId || null,
-  //         userId: request.userId,
-  //         model: AI_MODELS[request.aiProvider].model,
-  //         tokensUsed: contentTokens,
-  //         costUsd: Math.max(1, Math.round(textCostUsd * 1000)),
-  //         operation: "content_generation",
-  //         keyType: keyTypeUsed,
-  //       });
-
-  //       if (images.length > 0) {
-  //         await storage.trackAiUsage({
-  //           websiteId: request.websiteId || null,
-  //           userId: request.userId,
-  //           model: "dall-e-3",
-  //           tokensUsed: 0,
-  //           costUsd: Math.round(totalImageCost * 100),
-  //           operation: "image_generation",
-  //           keyType: imageKeyType,
-  //         });
-  //       }
-  //     } catch (trackingError: any) {
-  //       console.warn("Tracking failed:", trackingError.message);
-  //     }
-
-  //     // STEP 7: Generate quality checks
-  //     const qualityChecks = this.generateQualityChecks(contentResult.content, request);
-
-  //     // STEP 8: Save to database
-  //     let savedContentId: string | undefined;
-  //     let published = false;
-  //     let scheduledForPublishing = false;
-  //     let publishedAt: Date | undefined;
-  //     let scheduledDate: Date | undefined;
-
-  //     try {
-  //       const contentToSave = {
-  //         websiteId: request.websiteId || null,
-  //         niche: request.niche || null,
-  //         userId: request.userId,
-  //         title: contentResult.title,
-  //         body: contentResult.content,
-  //         excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
-  //         metaDescription:
-  //           contentResult.metaDescription ||
-  //           this.generateMetaDescription(contentResult.title, contentResult.content),
-  //         metaTitle: contentResult.metaTitle || contentResult.title,
-  //         aiModel: AI_MODELS[request.aiProvider].model,
-  //         seoKeywords: contentResult.keywords || request.keywords,
-  //         seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
-  //         readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
-  //         brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
-  //         eatCompliance: request.eatCompliance || false,
-  //         tokensUsed: contentTokens,
-  //         costUsd: Math.round(totalCostUsd * 100),
-  //         status: 'draft',
-  //         hasImages: images.length > 0,
-  //         imageCount: images.length,
-  //         imageCostCents: Math.round(totalImageCost * 100),
-  //         language: language,
-  //         conversationalVoice: true,
-  //       };
-
-  //       console.log(`💾 Saving content...`);
-  //       const savedContent = await storage.createContent(contentToSave);
-  //       savedContentId = savedContent.id;
-  //       contentId = savedContentId;
-
-  //       console.log(`✅ Content saved: ${savedContentId}`);
-
-  //       if (!savedContentId || savedContentId.startsWith('temp-')) {
-  //         throw new Error(`Invalid content ID: ${savedContentId}`);
-  //       }
-
-  //       // Handle auto-publishing
-  //       if (request.isAutoGenerated && request.autoScheduleId && request.autoPublish) {
-  //         console.log(`🚀 Processing auto-publishing...`);
-
-  //         if (request.publishDelay === 0) {
-  //           scheduledDate = new Date();
-  //           try {
-  //             await storage.createContentSchedule({
-  //               contentId: savedContentId,
-  //               userId: request.userId,
-  //               websiteId: request.websiteId!,
-  //               scheduled_date: scheduledDate,
-  //               status: "publishing",
-  //               title: contentResult.title,
-  //               topic: request.topic,
-  //               metadata: {
-  //                 autoGenerated: true,
-  //                 autoScheduleId: request.autoScheduleId,
-  //                 publishedImmediately: true,
-  //                 generatedAt: new Date(),
-  //               },
-  //             });
-
-  //             const publishResult = await this.publishToWordPress(
-  //               savedContentId,
-  //               request.websiteId!,
-  //               request.userId
-  //             );
-
-  //             if (publishResult.success) {
-  //               published = true;
-  //               publishedAt = new Date();
-
-  //               await storage.updateContent(savedContentId, {
-  //                 status: "published",
-  //                 publishDate: publishedAt,
-  //                 wordpressPostId: publishResult.postId,
-  //               });
-
-  //               await storage.updateContentScheduleByContentId(savedContentId, {
-  //                 status: "published",
-  //                 published_at: publishedAt,
-  //               });
-
-  //               console.log(`✅ Published to WordPress`);
-  //             } else {
-  //               console.error(`❌ Publishing failed: ${publishResult.error}`);
-  //             }
-  //           } catch (publishError: any) {
-  //             console.error(`❌ Publishing error: ${publishError.message}`);
-  //           }
-  //         } else if (request.publishDelay && request.publishDelay > 0) {
-  //           scheduledDate = new Date();
-  //           scheduledDate.setHours(scheduledDate.getHours() + request.publishDelay);
-  //           scheduledForPublishing = true;
-
-  //           try {
-  //             await storage.createContentSchedule({
-  //               contentId: savedContentId,
-  //               userId: request.userId,
-  //               websiteId: request.websiteId!,
-  //               scheduled_date: scheduledDate,
-  //               status: "scheduled",
-  //               title: contentResult.title,
-  //               topic: request.topic,
-  //               metadata: {
-  //                 autoGenerated: true,
-  //                 autoScheduleId: request.autoScheduleId,
-  //                 publishDelay: request.publishDelay,
-  //                 generatedAt: new Date(),
-  //               },
-  //             });
-
-  //             console.log(`⏰ Scheduled for ${scheduledDate.toISOString()}`);
-  //           } catch (scheduleError: any) {
-  //             console.error(`❌ Schedule error: ${scheduleError.message}`);
-  //           }
-  //         }
-  //       }
-  //     } catch (saveError: any) {
-  //       console.error(`❌ Save failed: ${saveError.message}`);
-  //       throw new Error(`Content generation failed: Unable to save - ${saveError.message}`);
-  //     }
-
-  //     // STEP 9: Return result
-  //     const result: ContentGenerationResultWithPublishing = {
-  //       title: contentResult.title,
-  //       content: contentResult.content,
-  //       excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
-  //       metaDescription:
-  //         contentResult.metaDescription ||
-  //         this.generateMetaDescription(contentResult.title, contentResult.content),
-  //       metaTitle: contentResult.metaTitle || contentResult.title,
-  //       keywords: contentResult.keywords || request.keywords,
-  //       seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
-  //       readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
-  //       brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
-  //       eatCompliance: request.eatCompliance || false,
-  //       tokensUsed: contentTokens,
-  //       costUsd: Number(textCostUsd.toFixed(6)),
-  //       aiProvider: request.aiProvider,
-  //       qualityChecks,
-  //       contentId: savedContentId,
-  //       published: published,
-  //       scheduledForPublishing: scheduledForPublishing,
-  //       publishedAt: publishedAt,
-  //       scheduledDate: scheduledDate,
-  //       totalCost: totalCostUsd.toFixed(6),
-  //       language: language,
-  //       conversationalVoice: true,
-  //     };
-
-  //     if (images.length > 0) {
-  //       result.images = images.map((img) => ({
-  //         url: img.cloudinaryUrl || img.url,
-  //         filename: img.filename,
-  //         altText: img.altText,
-  //         prompt: img.prompt,
-  //         cost: img.cost,
-  //         cloudinaryUrl: img.cloudinaryUrl,
-  //         cloudinaryPublicId: img.cloudinaryPublicId,
-  //       }));
-  //       result.totalImageCost = totalImageCost;
-  //     }
-
-  //     console.log(`✅ Generation complete - ${language.toUpperCase()}`);
-
-  //     return result;
-  //   } catch (error: any) {
-  //     if (error instanceof AIProviderError || error instanceof AnalysisError) {
-  //       throw error;
-  //     }
-  //     throw new Error(`Content generation failed: ${error.message}`);
-  //   }
-  // }
 
   async optimizeContent(
     content: string,
