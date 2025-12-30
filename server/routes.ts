@@ -3973,7 +3973,7 @@ if (includeImages && imageProvider === 'imagen') {
       mimeType: img.mimeType,
       altText: img.altText || `${topic} - Image ${idx + 1}`,
       prompt: img.prompt,
-      cost: 0.02, // Imagen cost
+      cost: 0.04, // Imagen cost
       filename: `nano-banana-${Date.now()}-${idx}.png`,
       cloudinaryUrl: null,
       cloudinaryPublicId: null,

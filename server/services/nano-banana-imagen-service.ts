@@ -686,7 +686,7 @@ interface UserApiKey {
 }
 
 export class NanoBananaImagenService {
-  private readonly IMAGEN_COST = 0.02; // $0.02 per image
+  private readonly IMAGEN_COST = 0.04; // $0.02 per image
   private apiKeyCache: Map<string, { key: string; type: 'user' | 'system'; timestamp: number }> = new Map();
   private readonly CACHE_DURATION = 5 * 60 * 1000;
 

@@ -2103,7 +2103,7 @@ ${request.niche ? `Niche: ${getNicheContext(request.niche).label}` : ""}
 You MUST respond with a valid JSON object in this exact format:
 {
   "title": "Article title in ${languageCode} (under 60 characters)",
-  "content": "Full HTML article in ${languageCode} (minimum ${Math.ceil(request.wordCount * 0.8)} words)",
+  "content": "Full HTML article in ${languageCode} (MINIMUM ${Math.max(800, Math.ceil(request.wordCount * 0.9))} words - this is a strict minimum, write more if needed)",
   "excerpt": "Summary in ${languageCode} (150-160 characters)",
   "metaDescription": "Meta description in ${languageCode} (150-160 characters)",
   "metaTitle": "SEO title in ${languageCode} (under 60 characters)",
@@ -2144,7 +2144,7 @@ If a term doesn't exist in ${language}, describe it fully in ${language}.
 === RESPONSE FORMAT - MUST BE VALID JSON ===
 {
   "title": "Article title in ${languageCode}",
-  "content": "Full HTML article in ${languageCode} with conversational voice",
+  "content": "Full HTML article in ${languageCode} (STRICT MINIMUM ${Math.max(800, Math.ceil(request.wordCount * 0.9))} words - write comprehensive content)",
   "excerpt": "Summary in ${languageCode}",
   "metaDescription": "Meta description in ${languageCode}",
   "metaTitle": "SEO title in ${languageCode}",
@@ -2421,10 +2421,20 @@ NO section headers in English.
 ${languageWarnings[language] || ""}`
         : "";
 
-    let prompt = `${languageWarning}
+let prompt = `${languageWarning}
 LANGUAGE: ${languageCode}
 Article Topic: "${request.topic}"
-Target Word Count: ${request.wordCount} words (+/- 20%)
+WORD COUNT REQUIREMENT: MINIMUM 800 words (target: ${Math.max(1000, request.wordCount)} words)
+⚠️ This is a STRICT MINIMUM - write comprehensive, in-depth content
+CONTENT DEPTH REQUIREMENTS:
+- Write thorough, comprehensive coverage of the topic
+- Include multiple examples and use cases  
+- Explain concepts fully - don't rush through sections
+- Add practical advice and actionable steps
+- Include relevant details and context
+- NEVER pad with fluff - every word should add value
+- If you finish a section and are under 800 words, add another valuable section
+
 Tone: ${request.tone}
 Keywords: ${request.keywords.join(", ")}
 ${contextSection}${brandVoiceSection}${audienceSection}${industryContext}
@@ -2479,7 +2489,7 @@ The content should be clean article HTML without any metadata or administrative 
 JSON OUTPUT STRUCTURE:
 {
   "title": "Clear title under 60 chars with main keyword",
-  "content": "Full HTML article starting directly with the content (minimum ${Math.ceil(request.wordCount * 0.8)} words) - NO metadata, NO 'Created:', NO 'Niche:', NO 'Keywords:' labels",
+  "content": "Full HTML article starting directly with the content (STRICT MINIMUM ${Math.max(800, Math.ceil(request.wordCount * 0.9))} words - aim for ${Math.max(1000, request.wordCount)} words for comprehensive coverage) - NO metadata, NO 'Created:', NO 'Niche:', NO 'Keywords:' labels",
   "excerpt": "150-160 character summary for the excerpt field (not in content)",
   "metaDescription": "150-160 char meta description for SEO",
   "metaTitle": "SEO title under 60 characters",
