@@ -30,10 +30,13 @@ import { cloudinaryStorage } from "./services/cloudinary-storage";
 import {db} from './db'
 import { emailService } from './services/email-service';
 import highIntentRoutes  from "./routes/high-intent-routes";
-import billingRouter from './routes/billing';
+// import billingRouter from './routes/billing';
+
 //added
 import { schedulerService } from './services/scheduler-service';
 import { users, websites, aiUsageTracking,  content, seoReports, activityLogs,googleAccounts, GoogleOAuthConfig } from "@shared/schema";
+import { nanoBananaImagenService } from './services/nano-banana-imagen-service';
+import nanoBananaImagenRoutes from "./routes/nano-banana-imagen-routes";
 
 
 
@@ -3780,15 +3783,21 @@ app.get("/api/user/api-keys/usage-summary", requireAuth, async (req: Request, re
   });
 
 
-app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user!.id;
-    const { websiteId, niche, language = "english", ...contentData } = req.body; // ✅ ADD language with default
+    const { websiteId, niche, language = "english", ...contentData } = req.body;
+    
+    console.log('🔍 [Route Handler] Received prompt fields:', {
+      promptType: contentData.promptType,
+      hasCustomPrompt: !!contentData.customPrompt,
+      customPromptLength: contentData.customPrompt?.length || 0
+    });
     
     console.log('🔍 DEBUG: Raw request body:', {
       websiteId: websiteId || 'none',
       niche: niche || 'none',
-      language: language || 'english', // ✅ ADD
+      language: language || 'english',
       contentType: websiteId ? 'website' : 'standalone',
       contentData: {
         includeImages: contentData.includeImages,
@@ -3813,7 +3822,6 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
       return;
     }
 
-    // ✅ ADD: Validate language
     const VALID_LANGUAGES = [
       "english", "spanish", "french", "german", "italian", "portuguese",
       "russian", "japanese", "chinese", "korean", "dutch", "swedish",
@@ -3827,7 +3835,6 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
       return;
     }
 
-    // Only check website ownership IF websiteId is provided
     let website = null;
     if (websiteId) {
       website = await storage.getUserWebsite(websiteId, userId);
@@ -3852,8 +3859,8 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
       includeImages = false,
       imageCount = 0,
       imageStyle = 'natural',
-      promptType = 'system',        // ✅ ADD THIS with default
-      customPrompt                   // ✅ ADD THIS
+      promptType = 'system',
+      customPrompt
     } = contentData;
     
     if (!topic) {
@@ -3861,24 +3868,48 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
       return;
     }
 
-    // Check for user's OpenAI key OR environment key for images
+    // 🍌 NEW: Determine image provider
+    const imageProvider = imageStyle === 'nano_banana' ? 'imagen' : 'dalle';
+    
+    // Check for appropriate API key based on image provider
     if (includeImages) {
       const userApiKeys = await storage.getUserApiKeys(userId);
-      const hasUserOpenAIKey = userApiKeys.some(
-        key => key.provider === 'openai' && 
-               key.isActive && 
-               key.validationStatus === 'valid'
-      );
-      const hasSystemOpenAIKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
       
-      if (!hasUserOpenAIKey && !hasSystemOpenAIKey) {
-        res.status(400).json({ 
-          message: "Image generation requires an OpenAI API key. Please add your OpenAI API key in settings or contact support." 
-        });
-        return;
+      if (imageProvider === 'imagen') {
+        // Check for Google key (Nano Banana)
+        const hasUserGoogleKey = userApiKeys.some(
+          key => key.provider === 'google_gemini' && 
+                 key.isActive && 
+                 key.validationStatus === 'valid'
+        );
+        const hasSystemGoogleKey = !!process.env.GOOGLE_GEMINI_API_KEY;
+        
+        if (!hasUserGoogleKey && !hasSystemGoogleKey) {
+          res.status(400).json({ 
+            message: "Nano Banana requires a Google Gemini API key. Please add your Google API key in settings." 
+          });
+          return;
+        }
+        
+        console.log(`🍌 Nano Banana available via ${hasUserGoogleKey ? 'user' : 'system'} Google key`);
+      } else {
+        // Check for OpenAI key (DALL-E)
+        const hasUserOpenAIKey = userApiKeys.some(
+          key => key.provider === 'openai' && 
+                 key.isActive && 
+                 key.validationStatus === 'valid'
+        );
+        const hasSystemOpenAIKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
+        
+        if (!hasUserOpenAIKey && !hasSystemOpenAIKey) {
+          res.status(400).json({ 
+            message: "Image generation requires an OpenAI API key. Please add your OpenAI API key in settings." 
+          });
+          return;
+        }
+        
+        console.log(`🎨 DALL-E available via ${hasUserOpenAIKey ? 'user' : 'system'} OpenAI key`);
       }
-      
-      console.log(`🎨 Image generation available via ${hasUserOpenAIKey ? 'user' : 'system'} OpenAI key`);
     }
 
     if (includeImages && (imageCount < 1 || imageCount > 3)) {
@@ -3898,11 +3929,12 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
     console.log(`🤖 Generating ${websiteId ? 'website' : 'standalone'} content with ${aiProvider.toUpperCase()} in ${language.toUpperCase()} using ${promptType === 'custom' ? 'CUSTOM' : 'SYSTEM'} prompt for topic: ${topic}`);
     
     if (includeImages) {
-      console.log(`🎨 Will also generate ${imageCount} images with DALL-E 3`);
+      console.log(`🎨 Will generate ${imageCount} images with ${imageProvider === 'imagen' ? '🍌 Nano Banana (Google Imagen)' : 'DALL-E 3'}`);
     }
 
     let result;
     try {
+      // Generate content first (let aiService handle DALL-E, but not Imagen)
       result = await aiService.generateContent({
         websiteId: websiteId || undefined,
         niche: niche || undefined,
@@ -3916,20 +3948,63 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
         eatCompliance: eatCompliance || false,
         aiProvider: aiProvider as 'openai' | 'anthropic' | 'gemini',
         userId: userId,
-        includeImages,
-        imageCount,
-        imageStyle,
+        includeImages: includeImages && imageProvider === 'dalle', // Only DALL-E
+        imageCount: imageProvider === 'dalle' ? imageCount : 0,
+        imageStyle: imageProvider === 'dalle' ? imageStyle : 'natural',
         language: language,
-        promptType: promptType as 'system' | 'custom',  // ✅ ADD THIS
-        customPrompt: customPrompt,                      // ✅ ADD THIS // ✅ ADD: Pass language to aiService
+        promptType: promptType as 'system' | 'custom',
+        customPrompt: customPrompt,
       });
+
+      // 🍌 NEW: Generate Nano Banana images separately if selected
+      if (includeImages && imageProvider === 'imagen') {
+        console.log(`🍌 Generating ${imageCount} Nano Banana images...`);
+        
+        try {
+          const nanoBananaResult = await nanoBananaImagenService.generateImages({
+            topic: topic,
+            count: imageCount,
+            contentContext: result.content, // Pass content for better context
+          }, userId, websiteId);
+
+          // Convert base64 to data URLs and format for storage
+          result.images = nanoBananaResult.images.map((img: any, idx: number) => ({
+            url: `data:${img.mimeType};base64,${img.base64}`,
+            base64: img.base64,
+            mimeType: img.mimeType,
+            altText: img.altText || `${topic} - Image ${idx + 1}`,
+            prompt: img.prompt,
+            cost: 0.02, // Imagen cost
+            filename: `nano-banana-${Date.now()}-${idx}.png`,
+            cloudinaryUrl: null,
+            cloudinaryPublicId: null,
+          }));
+          
+          result.totalImageCost = nanoBananaResult.totalCost;
+          
+          console.log(`✅ Generated ${nanoBananaResult.images.length} Nano Banana images for $${nanoBananaResult.totalCost.toFixed(4)}`);
+          
+          // 🔥 FIX: Insert images into content body
+          result.content = insertImagesIntoContent(result.content, result.images);
+          console.log(`✅ Inserted ${result.images.length} images into content HTML`);
+          
+        } catch (imageError: any) {
+          console.error('🍌 Nano Banana generation failed:', imageError);
+          result.images = [];
+          result.totalImageCost = 0;
+        }
+      }
     } catch (error: any) {
       // Clear cache if API key error
       if (error.message?.includes('Invalid API key') || error.message?.includes('authentication')) {
         console.log('🔄 Clearing API key cache due to authentication error');
         aiService.clearApiKeyCache(userId, aiProvider as any);
         if (includeImages) {
-          imageService.clearApiKeyCache(userId);
+          if (imageProvider === 'imagen') {
+            nanoBananaImagenService.clearApiKeyCache(userId);
+          } else {
+            imageService.clearApiKeyCache(userId);
+          }
         }
       }
       throw error;
@@ -3943,6 +4018,18 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
       
       if (!content) {
         throw new Error(`Content with ID ${result.contentId} not found after save`);
+      }
+      
+      // 🔥 FIX: If we added images after content was saved, update the content body
+      if (result.images && result.images.length > 0) {
+        console.log(`🔄 Updating saved content with ${result.images.length} images...`);
+        content = await storage.updateContent(content.id, {
+          body: result.content,
+          hasImages: true,
+          imageCount: result.images.length,
+          imageCostCents: Math.round((result.totalImageCost || 0) * 100),
+        });
+        console.log(`✅ Content updated with images`);
       }
     } else {
       console.log(`💾 Saving content (fallback path)...`);
@@ -3966,7 +4053,7 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
         hasImages: includeImages && result.images?.length > 0,
         imageCount: result.images?.length || 0,
         imageCostCents: Math.round((result.totalImageCost || 0) * 100),
-        language: language, // ✅ ADD: Save language to database
+        language: language,
       });
       
       console.log(`✅ Content saved with scores - SEO: ${content.seoScore}, Readability: ${content.readabilityScore}, Brand: ${content.brandVoiceScore}`);
@@ -3995,19 +4082,23 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
 
     // Create activity log (only if not already created)
     if (!result.contentId) {
+      const imageProviderName = result.images?.length 
+        ? (imageProvider === 'imagen' ? 'Google Imagen (Nano Banana)' : 'DALL-E 3')
+        : null;
+        
       await storage.createActivityLog({
         userId,
         websiteId: websiteId || null,
         type: "content_generated",
-        description: `AI ${websiteId ? 'website' : 'standalone'} content generated in ${language.toUpperCase()}: "${result.title}" (${result.aiProvider.toUpperCase()}${result.images?.length ? ` + ${result.images.length} DALL-E images` : ''})`,
+        description: `AI ${websiteId ? 'website' : 'standalone'} content generated in ${language.toUpperCase()} using ${promptType === 'custom' ? 'custom' : 'system'} prompt: "${result.title}" (${result.aiProvider.toUpperCase()}${imageProviderName ? ` + ${result.images.length} ${imageProviderName} images` : ''})`,
         metadata: { 
           contentId: content.id,
           contentType: websiteId ? 'website' : 'standalone',
           niche: niche || null,
-          language: language, // ✅ ADD: Log language
-          promptType: promptType,  // ✅ ADD: Track prompt type
+          language: language,
+          promptType: promptType,
           contentAiProvider: result.aiProvider,
-          imageAiProvider: result.images?.length ? 'dall-e-3' : null,
+          imageAiProvider: result.images?.length ? (imageProvider === 'imagen' ? 'google-imagen' : 'dall-e-3') : null,
           tokensUsed: content.tokensUsed,
           textCostCents: content.costUsd,
           hasImages: !!result.images?.length,
@@ -4049,6 +4140,277 @@ app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Re
     });
   }
 });
+
+
+// app.post("/api/user/content/generate", requireAuth, async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const userId = req.user!.id;
+//     const { websiteId, niche, language = "english", ...contentData } = req.body; // ✅ ADD language with default
+    
+//     console.log('🔍 DEBUG: Raw request body:', {
+//       websiteId: websiteId || 'none',
+//       niche: niche || 'none',
+//       language: language || 'english', // ✅ ADD
+//       contentType: websiteId ? 'website' : 'standalone',
+//       contentData: {
+//         includeImages: contentData.includeImages,
+//         imageCount: contentData.imageCount,
+//         imageStyle: contentData.imageStyle,
+//         aiProvider: contentData.aiProvider,
+//         topic: contentData.topic
+//       }
+//     });
+
+//     // Validate EITHER websiteId OR niche (not both, not neither)
+//     if (!websiteId && !niche) {
+//       res.status(400).json({ 
+//         message: "Either websiteId or niche must be provided for content generation" 
+//       });
+//       return;
+//     }
+//     if (websiteId && niche) {
+//       res.status(400).json({ 
+//         message: "Cannot specify both websiteId and niche - choose one" 
+//       });
+//       return;
+//     }
+
+//     // ✅ ADD: Validate language
+//     const VALID_LANGUAGES = [
+//       "english", "spanish", "french", "german", "italian", "portuguese",
+//       "russian", "japanese", "chinese", "korean", "dutch", "swedish",
+//       "polish", "turkish", "thai", "vietnamese"
+//     ];
+    
+//     if (!VALID_LANGUAGES.includes(language)) {
+//       res.status(400).json({ 
+//         message: `Invalid language: ${language}. Must be one of: ${VALID_LANGUAGES.join(", ")}` 
+//       });
+//       return;
+//     }
+
+//     // Only check website ownership IF websiteId is provided
+//     let website = null;
+//     if (websiteId) {
+//       website = await storage.getUserWebsite(websiteId, userId);
+//       if (!website) {
+//         res.status(403).json({ message: "Website not found or access denied" });
+//         return;
+//       }
+//       console.log(`✅ Generating content for website: ${website.name}`);
+//     } else {
+//       console.log(`✅ Generating standalone content for niche: ${niche}`);
+//     }
+    
+//     const { 
+//       topic, 
+//       keywords, 
+//       tone, 
+//       wordCount, 
+//       brandVoice, 
+//       targetAudience, 
+//       eatCompliance,
+//       aiProvider = 'openai',
+//       includeImages = false,
+//       imageCount = 0,
+//       imageStyle = 'natural',
+//       promptType = 'system',        // ✅ ADD THIS with default
+//       customPrompt                   // ✅ ADD THIS
+//     } = contentData;
+    
+//     if (!topic) {
+//       res.status(400).json({ message: "Topic is required" });
+//       return;
+//     }
+
+//     // Check for user's OpenAI key OR environment key for images
+//     if (includeImages) {
+//       const userApiKeys = await storage.getUserApiKeys(userId);
+//       const hasUserOpenAIKey = userApiKeys.some(
+//         key => key.provider === 'openai' && 
+//                key.isActive && 
+//                key.validationStatus === 'valid'
+//       );
+//       const hasSystemOpenAIKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
+      
+//       if (!hasUserOpenAIKey && !hasSystemOpenAIKey) {
+//         res.status(400).json({ 
+//           message: "Image generation requires an OpenAI API key. Please add your OpenAI API key in settings or contact support." 
+//         });
+//         return;
+//       }
+      
+//       console.log(`🎨 Image generation available via ${hasUserOpenAIKey ? 'user' : 'system'} OpenAI key`);
+//     }
+
+//     if (includeImages && (imageCount < 1 || imageCount > 3)) {
+//       res.status(400).json({ 
+//         message: "Image count must be between 1 and 3" 
+//       });
+//       return;
+//     }
+
+//     if (aiProvider && !['openai', 'anthropic', 'gemini'].includes(aiProvider)) {
+//       res.status(400).json({ 
+//         message: "AI provider must be 'openai', 'anthropic', or 'gemini'" 
+//       });
+//       return;
+//     }
+
+//     console.log(`🤖 Generating ${websiteId ? 'website' : 'standalone'} content with ${aiProvider.toUpperCase()} in ${language.toUpperCase()} using ${promptType === 'custom' ? 'CUSTOM' : 'SYSTEM'} prompt for topic: ${topic}`);
+    
+//     if (includeImages) {
+//       console.log(`🎨 Will also generate ${imageCount} images with DALL-E 3`);
+//     }
+
+//     let result;
+//     try {
+//       result = await aiService.generateContent({
+//         websiteId: websiteId || undefined,
+//         niche: niche || undefined,
+//         topic,
+//         keywords: keywords || [],
+//         tone: tone || "professional", 
+//         wordCount: wordCount || 800,
+//         seoOptimized: true,
+//         brandVoice: brandVoice || "professional",
+//         targetAudience,
+//         eatCompliance: eatCompliance || false,
+//         aiProvider: aiProvider as 'openai' | 'anthropic' | 'gemini',
+//         userId: userId,
+//         includeImages,
+//         imageCount,
+//         imageStyle,
+//         language: language,
+//         promptType: promptType as 'system' | 'custom',  // ✅ ADD THIS
+//         customPrompt: customPrompt,                      // ✅ ADD THIS // ✅ ADD: Pass language to aiService
+//       });
+//     } catch (error: any) {
+//       // Clear cache if API key error
+//       if (error.message?.includes('Invalid API key') || error.message?.includes('authentication')) {
+//         console.log('🔄 Clearing API key cache due to authentication error');
+//         aiService.clearApiKeyCache(userId, aiProvider as any);
+//         if (includeImages) {
+//           imageService.clearApiKeyCache(userId);
+//         }
+//       }
+//       throw error;
+//     }
+
+//     // CHECK IF CONTENT WAS ALREADY SAVED
+//     let content;
+//     if (result.contentId) {
+//       console.log(`✅ Using already saved content with ID: ${result.contentId}`);
+//       content = await storage.getContent(result.contentId);
+      
+//       if (!content) {
+//         throw new Error(`Content with ID ${result.contentId} not found after save`);
+//       }
+//     } else {
+//       console.log(`💾 Saving content (fallback path)...`);
+//       content = await storage.createContent({
+//         userId,
+//         websiteId: websiteId || null,
+//         niche: niche || null,
+//         title: result.title,
+//         body: result.content,
+//         excerpt: result.excerpt,
+//         metaDescription: result.metaDescription,
+//         metaTitle: result.metaTitle,
+//         seoScore: Math.max(1, Math.min(100, Math.round(result.seoScore))),
+//         readabilityScore: Math.max(1, Math.min(100, Math.round(result.readabilityScore))), 
+//         brandVoiceScore: Math.max(1, Math.min(100, Math.round(result.brandVoiceScore))),
+//         tokensUsed: Math.max(1, result.tokensUsed),
+//         costUsd: Math.max(1, Math.round((result.costUsd || 0.001) * 100)),
+//         eatCompliance: result.eatCompliance,
+//         seoKeywords: result.keywords,
+//         aiModel: aiProvider === 'openai' ? 'gpt-4o' : aiProvider === 'anthropic' ? 'claude-3-5-sonnet-20250106' : 'gemini-1.5-pro',
+//         hasImages: includeImages && result.images?.length > 0,
+//         imageCount: result.images?.length || 0,
+//         imageCostCents: Math.round((result.totalImageCost || 0) * 100),
+//         language: language, // ✅ ADD: Save language to database
+//       });
+      
+//       console.log(`✅ Content saved with scores - SEO: ${content.seoScore}, Readability: ${content.readabilityScore}, Brand: ${content.brandVoiceScore}`);
+//     }
+
+//     // Save images to database if they exist (only if not already saved)
+//     if (result.images && result.images.length > 0 && !result.contentId) {
+//       for (const image of result.images) {
+//         await storage.createContentImage({
+//           contentId: content.id,
+//           userId,
+//           websiteId: websiteId || null,
+//           originalUrl: image.cloudinaryUrl || image.url,
+//           cloudinaryUrl: image.cloudinaryUrl,
+//           cloudinaryPublicId: image.cloudinaryPublicId,
+//           filename: image.filename,
+//           altText: image.altText,
+//           generationPrompt: image.prompt,
+//           costCents: Math.round(image.cost * 100),
+//           imageStyle,
+//           size: '1024x1024',
+//           status: 'generated'
+//         });
+//       }
+//     }
+
+//     // Create activity log (only if not already created)
+//     if (!result.contentId) {
+//       await storage.createActivityLog({
+//         userId,
+//         websiteId: websiteId || null,
+//         type: "content_generated",
+//         description: `AI ${websiteId ? 'website' : 'standalone'} content generated in ${language.toUpperCase()}: "${result.title}" (${result.aiProvider.toUpperCase()}${result.images?.length ? ` + ${result.images.length} DALL-E images` : ''})`,
+//         metadata: { 
+//           contentId: content.id,
+//           contentType: websiteId ? 'website' : 'standalone',
+//           niche: niche || null,
+//           language: language, // ✅ ADD: Log language
+//           promptType: promptType,  // ✅ ADD: Track prompt type
+//           contentAiProvider: result.aiProvider,
+//           imageAiProvider: result.images?.length ? 'dall-e-3' : null,
+//           tokensUsed: content.tokensUsed,
+//           textCostCents: content.costUsd,
+//           hasImages: !!result.images?.length,
+//           imageCount: result.images?.length || 0,
+//           imageCostCents: Math.round((result.totalImageCost || 0) * 100),
+//           apiKeySource: {
+//             content: 'user',
+//             images: includeImages ? 'user' : null
+//           }
+//         }
+//       });
+//     }
+
+//     res.json({ content, aiResult: result });
+//   } catch (error) {
+//     console.error("Content generation error:", error);
+    
+//     let statusCode = 500;
+//     let errorMessage = error instanceof Error ? error.message : "Failed to generate content";
+    
+//     if (error instanceof Error) {
+//       if (error.name === 'AIProviderError') {
+//         statusCode = 400;
+//         if (error.message.includes('No API key available')) {
+//           errorMessage = error.message;
+//         }
+//       } else if (error.name === 'AnalysisError') {
+//         statusCode = 422;
+//         errorMessage = `Content generated successfully, but analysis failed: ${error.message}`;
+//       } else if (error.message.includes('Image generation failed')) {
+//         statusCode = 422;
+//         errorMessage = `Content generated successfully, but image generation failed: ${error.message}`;
+//       }
+//     }
+    
+//     res.status(statusCode).json({ 
+//       message: errorMessage,
+//       error: error instanceof Error ? error.name : 'UnknownError'
+//     });
+//   }
+// });
 
 
   // ADD: New endpoint to check image generation availability
@@ -7765,9 +8127,16 @@ app.delete("/api/user/content/images/:imageId", requireAuth, async (req: Request
   // BILLING ROUTES
   // ===========================================================================
   
-app.use('/api/billing', billingRouter);
+// app.use('/api/billing', billingRouter);
 
 
+  // ===========================================================================
+  // NANO BANANA SERVICE ROUTES
+  // ===========================================================================
+  
+app.use('/api/nano-banana-imagen', nanoBananaImagenRoutes);
+
+app.use("/api/user/high-intent", requireAuth, highIntentRoutes);
   // ===========================================================================
   // HIGH INTENT ROUTES
   // ===========================================================================

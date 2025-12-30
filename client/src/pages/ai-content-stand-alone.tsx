@@ -647,11 +647,21 @@ export default function StandaloneContent() {
       if (!formData.imageCount || formData.imageCount < 1 || formData.imageCount > 3) {
         errors.imageCount = "Image count must be between 1 and 3";
       }
-      const validStyles = ["natural", "digital_art", "photographic", "cinematic"];
+      const validStyles = ["natural", "digital_art", "photographic", "cinematic", "nano_banana"]; // ← ADD nano_banana
       if (!formData.imageStyle || !validStyles.includes(formData.imageStyle)) {
         errors.imageStyle = "Invalid image style selected";
       }
     }
+
+    // if (formData.includeImages) {
+    //   if (!formData.imageCount || formData.imageCount < 1 || formData.imageCount > 3) {
+    //     errors.imageCount = "Image count must be between 1 and 3";
+    //   }
+    //   const validStyles = ["natural", "digital_art", "photographic", "cinematic"];
+    //   if (!formData.imageStyle || !validStyles.includes(formData.imageStyle)) {
+    //     errors.imageStyle = "Invalid image style selected";
+    //   }
+    // }
 
     if (formData.brandVoice && formData.brandVoice.length > 500) {
       errors.brandVoice = "Brand voice description must be under 500 characters";
@@ -1795,6 +1805,7 @@ export default function StandaloneContent() {
                       </button>
                       {showAdvanced && (
                         <div className="mt-3 space-y-4 pl-5 border-l-2 border-blue-100">
+                          {/* Target Audience */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Target Audience
@@ -1812,6 +1823,8 @@ export default function StandaloneContent() {
                               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                             />
                           </div>
+
+                          {/* Brand Voice */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Brand Voice
@@ -1829,6 +1842,8 @@ export default function StandaloneContent() {
                               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                             />
                           </div>
+
+                          {/* E-E-A-T */}
                           <div className="flex items-center">
                             <label className="flex items-center">
                               <input
@@ -1847,86 +1862,211 @@ export default function StandaloneContent() {
                               </span>
                             </label>
                           </div>
-                          <div className="border-t pt-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <label className="flex items-center">
+
+                          {/* ========== NEW SIMPLIFIED IMAGE SELECTION ========== */}
+                          <div className="border-2 border-orange-200 bg-orange-50 rounded-lg p-4">
+                            <h4 className="text-sm font-medium text-gray-700 mb-3">
+                              AI Image Generation
+                            </h4>
+                            <p className="text-xs text-gray-600 mb-4">
+                              Choose your image generation option
+                            </p>
+                            
+                            <div className="space-y-3">
+                              {/* Option 1: No Images */}
+                              <label className="flex items-start p-3 border-2 rounded-lg cursor-pointer bg-white hover:border-gray-400 transition-all">
                                 <input
-                                  type="checkbox"
-                                  checked={formData.includeImages}
-                                  onChange={(e) =>
+                                  type="radio"
+                                  name="imageOption"
+                                  checked={!formData.includeImages}
+                                  onChange={() =>
                                     setFormData((prev) => ({
                                       ...prev,
-                                      includeImages: e.target.checked,
+                                      includeImages: false,
+                                      imageCount: 1,
+                                      imageStyle: 'natural',
                                     }))
                                   }
-                                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                  className="mt-1 text-orange-600"
                                 />
-                                <span className="ml-2 text-sm font-medium text-gray-700">
-                                  Generate Images with DALL-E 3
-                                </span>
-                              </label>
-                              <span className="text-xs text-orange-600">
-                                $0.04-$0.12 per image
-                              </span>
-                            </div>
-                            {formData.includeImages && (
-                              <div className="space-y-3 pl-6 border-l-2 border-orange-100 bg-orange-50 p-3 rounded">
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                      Number of Images
-                                    </label>
-                                    <select
-                                      value={formData.imageCount}
-                                      onChange={(e) =>
-                                        setFormData((prev) => ({
-                                          ...prev,
-                                          imageCount: parseInt(e.target.value),
-                                        }))
-                                      }
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                      <option value={1}>1 Image (Hero)</option>
-                                      <option value={2}>
-                                        2 Images (Hero + Support)
-                                      </option>
-                                      <option value={3}>
-                                        3 Images (Full Set)
-                                      </option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                      Image Style
-                                    </label>
-                                    <select
-                                      value={formData.imageStyle}
-                                      onChange={(e) =>
-                                        setFormData((prev) => ({
-                                          ...prev,
-                                          imageStyle: e.target.value,
-                                        }))
-                                      }
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                      <option value="natural">
-                                        Natural/Photorealistic
-                                      </option>
-                                      <option value="digital_art">
-                                        Digital Art
-                                      </option>
-                                      <option value="photographic">
-                                        Professional Photography
-                                      </option>
-                                      <option value="cinematic">
-                                        Cinematic
-                                      </option>
-                                    </select>
-                                  </div>
+                                <div className="ml-3 flex-1">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    No Images
+                                  </span>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    Generate text content only
+                                  </p>
+                                  <span className="inline-block mt-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                    No additional cost
+                                  </span>
                                 </div>
-                              </div>
-                            )}
+                              </label>
+
+                              {/* Option 2: DALL-E 3 */}
+                              <label className="flex items-start p-3 border-2 rounded-lg cursor-pointer bg-white hover:border-blue-400 transition-all">
+                                <input
+                                  type="radio"
+                                  name="imageOption"
+                                  checked={formData.includeImages && formData.imageStyle !== 'nano_banana'}
+                                  onChange={() =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      includeImages: true,
+                                      imageStyle: 'natural',
+                                    }))
+                                  }
+                                  className="mt-1 text-orange-600"
+                                />
+                                <div className="ml-3 flex-1">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center">
+                                      <Image className="w-4 h-4 text-blue-600 mr-2" />
+                                      <span className="text-sm font-medium text-gray-700">
+                                        DALL-E 3 (OpenAI)
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-orange-600 font-medium">
+                                      $0.04/image
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-600 mb-2">
+                                    Professional AI images with style control
+                                  </p>
+
+                                  {/* Show options when selected */}
+                                  {formData.includeImages && formData.imageStyle !== 'nano_banana' && (
+                                    <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Image Count
+                                          </label>
+                                          <select
+                                            value={formData.imageCount}
+                                            onChange={(e) =>
+                                              setFormData((prev) => ({
+                                                ...prev,
+                                                imageCount: parseInt(e.target.value),
+                                              }))
+                                            }
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md"
+                                          >
+                                            <option value={1}>1 Image</option>
+                                            <option value={2}>2 Images</option>
+                                            <option value={3}>3 Images</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Style
+                                          </label>
+                                          <select
+                                            value={formData.imageStyle}
+                                            onChange={(e) =>
+                                              setFormData((prev) => ({
+                                                ...prev,
+                                                imageStyle: e.target.value,
+                                              }))
+                                            }
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md"
+                                          >
+                                            <option value="natural">Natural</option>
+                                            <option value="digital_art">Digital Art</option>
+                                            <option value="photographic">Photography</option>
+                                            <option value="cinematic">Cinematic</option>
+                                          </select>
+                                        </div>
+                                      </div>
+                                      <div className="text-xs">
+                                        <span className="text-gray-600">Total: </span>
+                                        <span className="text-orange-600 font-bold">
+                                          ${(formData.imageCount * 0.04).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </label>
+
+                              {/* Option 3: Nano Banana */}
+                              <label className="flex items-start p-3 border-2 rounded-lg cursor-pointer bg-gradient-to-br from-yellow-50 to-orange-50 hover:border-yellow-400 transition-all">
+                                <input
+                                  type="radio"
+                                  name="imageOption"
+                                  checked={formData.includeImages && formData.imageStyle === 'nano_banana'}
+                                  onChange={() =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      includeImages: true,
+                                      imageStyle: 'nano_banana',
+                                    }))
+                                  }
+                                  className="mt-1 text-orange-600"
+                                />
+                                <div className="ml-3 flex-1">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center">
+                                      <span className="text-base mr-1">🍌</span>
+                                      <span className="text-sm font-medium text-gray-700">
+                                        Nano Banana
+                                      </span>
+                                      <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                                        ✨ New!
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-orange-600 font-medium">
+                                      $0.04/image
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-600 mb-2">
+                                    <strong>Vibrant & fun!</strong> Perfect for social media and youth content
+                                  </p>
+
+                                  {/* Show options when selected */}
+                                  {formData.includeImages && formData.imageStyle === 'nano_banana' && (
+                                    <div className="mt-3 pt-3 border-t border-yellow-200 space-y-3">
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Image Count
+                                          </label>
+                                          <select
+                                            value={formData.imageCount}
+                                            onChange={(e) =>
+                                              setFormData((prev) => ({
+                                                ...prev,
+                                                imageCount: parseInt(e.target.value),
+                                              }))
+                                            }
+                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md"
+                                          >
+                                            <option value={1}>1 Image</option>
+                                            <option value={2}>2 Images</option>
+                                            <option value={3}>3 Images</option>
+                                          </select>
+                                        </div>
+                                        <div className="flex items-center justify-center">
+                                          <div className="text-center">
+                                            <div className="text-xs text-gray-500 mb-1">Total</div>
+                                            <div className="text-base font-bold text-orange-600">
+                                              ${(formData.imageCount * 0.04).toFixed(2)}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="bg-yellow-100 border border-yellow-200 rounded p-2">
+                                        <p className="text-xs text-yellow-800">
+                                          <strong>💡 Best for:</strong> Parties, food, festivals, entertainment & social media!
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </label>
+                            </div>
                           </div>
+                          {/* ========== END IMAGE SELECTION ========== */}
+
                         </div>
                       )}
                     </div>
