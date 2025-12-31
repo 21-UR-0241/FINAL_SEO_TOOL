@@ -4219,6 +4219,7 @@ interface ProcessingOptions {
   priorityUrls?: string[];
   enableContentExpansion?: boolean;      // ✅ ADD
   enableEATImprovements?: boolean;       // ✅ ADD
+  enableReadabilityImprovements?: boolean;  // ✅ ADD THIS
   contentExpansionMinWords?: number;     // ✅ ADD
   contentExpansionIdealWords?: number;   // ✅ ADD
   maxPagesPerSession?: number;           // ✅ ADD
@@ -6434,60 +6435,60 @@ private ensureImagesPreserved(
     );
   }
 
-  private async fixBrokenInternalLinks(
-    creds: WordPressCredentials,
-    fixes: AIFix[],
-    userId?: string
-  ): Promise<{ applied: AIFix[]; errors: string[] }> {
-    const [posts, pages] = await Promise.all([
-      this.getWordPressContent(creds, "posts").catch(() => []),
-      this.getWordPressContent(creds, "pages").catch(() => []),
-    ]);
+private async fixBrokenInternalLinks(
+  creds: WordPressCredentials,
+  fixes: AIFix[],
+  userId?: string
+): Promise<{ applied: AIFix[]; errors: string[] }> {
+  const [posts, pages] = await Promise.all([
+    this.getWordPressContent(creds, "posts").catch(() => []),
+    this.getWordPressContent(creds, "pages").catch(() => []),
+  ]);
 
-    const validUrls = new Set([...posts, ...pages].map((c) => c.link));
+  const validUrls = new Set([...posts, ...pages].map((c) => c.link));
 
-    return this.fixWordPressContent(
-      creds,
-      fixes,
-      async (content, fix) => {
-        const contentHtml = content.content?.rendered || content.content || "";
-        const $ = cheerio.load(contentHtml, this.getCheerioConfig());
+  return this.fixWordPressContent(
+    creds,
+    fixes,
+    async (content, fix) => {
+      const contentHtml = content.content?.rendered || content.content || "";
+      const $ = cheerio.load(contentHtml, this.getCheerioConfig());
 
-        let fixedLinks = 0;
+      let fixedLinks = 0;
 
-        $('a[href*="' + creds.url + '"]').each((_, elem) => {
-          const href = $(elem).attr("href");
-          if (href && !validUrls.has(href)) {
-            const similarUrl = this.findSimilarUrl(href, validUrls);
-            if (similarUrl) {
-              $(elem).attr("href", similarUrl);
-              fixedLinks++;
-            } else {
-              const text = $(elem).text();
-              $(elem).replaceWith(text);
-              fixedLinks++;
-            }
+      $('a[href*="' + creds.url + '"]').each((_, elem) => {
+        const href = $(elem).attr("href");
+        if (href && !validUrls.has(href)) {
+          const similarUrl = this.findSimilarUrl(href, validUrls);
+          if (similarUrl) {
+            $(elem).attr("href", similarUrl);
+            fixedLinks++;
+          } else {
+            const text = $(elem).text();
+            $(elem).replaceWith(text);
+            fixedLinks++;
           }
-        });
-
-        if (fixedLinks > 0) {
-          const finalContent = this.extractHtmlContent($);
-          return {
-            updated: true,
-            data: { content: finalContent },
-            description: `Fixed ${fixedLinks} broken internal links`,
-          };
         }
+      });
 
+      if (fixedLinks > 0) {
+        const finalContent = this.extractHtmlContent($);
         return {
-          updated: false,
-          data: {},
-          description: "No broken internal links found",
+          updated: true,
+          data: { content: finalContent },
+          description: `Fixed ${fixedLinks} broken internal links`,
         };
-      },
-      userId
-    );
-  }
+      }
+
+      return {
+        updated: false,
+        data: {},
+        description: "All internal links already working correctly",  // ✅ CHANGED
+      };
+    },
+    userId
+  );
+}
 
   private async fixImageDimensions(
     creds: WordPressCredentials,
@@ -7720,6 +7721,709 @@ private async improveEAT(
   );
 }
 
+
+private async improveReadability(
+  creds: WordPressCredentials,
+  fixes: AIFix[],
+  userId?: string
+): Promise<{ applied: AIFix[]; errors: string[] }> {
+  this.addLog("Readability improvement enabled", "info");
+  
+  return this.fixWordPressContent(
+    creds,
+    fixes,
+    async (content, fix) => {
+      // Get URL and page type for exclusion check
+      const pageUrl = content.link || '';
+      const pageType = content.type || 'page';
+      
+      // 🔴 CRITICAL: Check if this page should be excluded from readability improvements
+      if (this.shouldExcludeFromReadability(pageUrl, pageType)) {
+        return {
+          updated: false,
+          data: {},
+          description: `Readability improvement not applicable - functional/technical page (${pageUrl})`,
+        };
+      }
+      
+      let contentHtml = content.content?.rendered || content.content || "";
+      
+      // Apply basic improvements first (fast, no AI needed)
+      contentHtml = this.applyBasicContentImprovements(contentHtml);
+      
+      const currentText = this.extractTextFromHTML(contentHtml);
+      const currentWordCount = currentText.split(/\s+/).filter(w => w.length > 0).length;
+      
+      // Don't improve readability on very short content (let expansion handle it first)
+      if (currentWordCount < 100) {
+        return {
+          updated: false,
+          data: {},
+          description: `Content too short (${currentWordCount} words) - expand content first before improving readability`,
+        };
+      }
+      
+      const readabilityScore = this.calculateReadabilityScore(currentText);
+      const gradeLevel = this.getGradeLevel(readabilityScore);
+      
+      if (readabilityScore >= 65) {
+        return {
+          updated: false,
+          data: {},
+          description: `Readability already excellent (${readabilityScore}/100 - ${gradeLevel})`,
+        };
+      }
+      
+      if (readabilityScore >= 60) {
+        this.addLog(
+          `Readability acceptable (${readabilityScore}/100 - ${gradeLevel}) but could be improved to 65+`,
+          "info"
+        );
+      } else {
+        this.addLog(
+          `Readability score: ${readabilityScore}/100 (${gradeLevel}) - improvement needed`,
+          "warning"
+        );
+      }
+
+      const title = content.title?.rendered || content.title || "";
+      
+      try {
+        const originalImages = this.extractImages(contentHtml);
+        this.addLog(`Preserving ${originalImages.length} images during readability improvement`, "info");
+        
+        // 🆕 FIRST ATTEMPT
+        const improvedContent = await this.improveReadabilityWithAI(
+          title,
+          contentHtml,
+          userId,
+          readabilityScore,
+          currentWordCount,
+          false  // isRetry = false
+        );
+        
+        const validation = this.validateContentLength(
+          contentHtml,
+          improvedContent,
+          "Readability improvement",
+          true
+        );
+        
+        if (!validation.valid) {
+          this.addLog(`❌ First attempt failed validation: ${validation.reason}`, "error");
+          
+          // 🆕 CHECK IF IT'S A CONTENT REDUCTION FAILURE (worth retrying)
+          const improvedWordCount = this.extractTextFromHTML(improvedContent)
+            .split(/\s+/)
+            .filter(w => w.length > 0).length;
+          
+          const wasReduction = improvedWordCount < currentWordCount;
+          
+          if (wasReduction) {
+            this.addLog(
+              `🔄 Retrying with anti-reduction emphasis (AI reduced ${currentWordCount} → ${improvedWordCount} words)...`,
+              "warning"
+            );
+            
+            try {
+              // 🆕 RETRY WITH STRICTER PRESERVATION RULES
+              const retryContent = await this.improveReadabilityWithAI(
+                title,
+                contentHtml,
+                userId,
+                readabilityScore,
+                currentWordCount,
+                true  // isRetry = true
+              );
+              
+              const retryValidation = this.validateContentLength(
+                contentHtml,
+                retryContent,
+                "Readability improvement (retry)",
+                true
+              );
+              
+              if (retryValidation.valid) {
+                // 🆕 RETRY SUCCEEDED!
+                const finalContent = this.ensureImagesPreserved(retryContent, originalImages);
+                
+                const finalText = this.extractTextFromHTML(finalContent);
+                const finalWordCount = finalText.split(/\s+/).filter(w => w.length > 0).length;
+                const finalReadability = this.calculateReadabilityScore(finalText);
+                const finalGrade = this.getGradeLevel(finalReadability);
+                
+                // Check if readability actually improved
+                if (finalReadability <= readabilityScore) {
+                  return {
+                    updated: false,
+                    data: {},
+                    description: `Readability unchanged or worse after retry (${readabilityScore} → ${finalReadability})`,
+                  };
+                }
+                
+                const improvement = finalReadability - readabilityScore;
+                const meetsTarget = finalReadability >= 60;
+                const targetStatus = meetsTarget 
+                  ? `✅ Target achieved (${finalGrade})` 
+                  : `⚠️ ${60 - finalReadability} points short of 60 target`;
+                
+                this.addLog(
+                  `✅ Retry succeeded: ${readabilityScore} → ${finalReadability} (+${improvement} points, ${currentWordCount} → ${finalWordCount} words)`,
+                  "success"
+                );
+                
+                return {
+                  updated: true,
+                  data: { content: finalContent },
+                  description: `Improved readability from ${readabilityScore} to ${finalReadability} (+${improvement} points, ${finalGrade}) ${targetStatus} [retry succeeded]`,
+                };
+              } else {
+                // 🆕 RETRY ALSO FAILED VALIDATION
+                const retryWordCount = this.extractTextFromHTML(retryContent)
+                  .split(/\s+/)
+                  .filter(w => w.length > 0).length;
+                
+                this.addLog(
+                  `❌ Retry also failed validation: ${retryValidation.reason}`,
+                  "error"
+                );
+                
+                if (retryWordCount < currentWordCount) {
+                  this.addLog(
+                    `🚨 Retry STILL reduced content (${currentWordCount} → ${retryWordCount}) - AI is consistently reducing despite warnings`,
+                    "error"
+                  );
+                }
+                
+                return {
+                  updated: false,
+                  data: {},
+                  description: `Readability improvement failed after retry: ${retryValidation.reason}`,
+                };
+              }
+            } catch (retryError: any) {
+              this.addLog(`Retry attempt threw error: ${retryError.message}`, "error");
+              return {
+                updated: false,
+                data: {},
+                description: `Readability improvement retry failed: ${retryError.message}`,
+              };
+            }
+          } else {
+            // Not a reduction error, so don't retry (might be hallucination or other issue)
+            return {
+              updated: false,
+              data: {},
+              description: validation.reason,
+            };
+          }
+        }
+        
+        // 🆕 FIRST ATTEMPT SUCCEEDED
+        const finalContent = this.ensureImagesPreserved(improvedContent, originalImages);
+        
+        const finalText = this.extractTextFromHTML(finalContent);
+        const finalWordCount = finalText.split(/\s+/).filter(w => w.length > 0).length;
+        const finalReadability = this.calculateReadabilityScore(finalText);
+        const finalGrade = this.getGradeLevel(finalReadability);
+        
+        if (finalReadability <= readabilityScore) {
+          return {
+            updated: false,
+            data: {},
+            description: `Readability unchanged or worse (${readabilityScore} → ${finalReadability})`,
+          };
+        }
+        
+        if (finalWordCount < currentWordCount) {
+          // This shouldn't happen due to validation, but double-check
+          return {
+            updated: false,
+            data: {},
+            description: `Readability improvement reduced content (${currentWordCount} → ${finalWordCount} words) - REJECTED`,
+          };
+        }
+        
+        const improvement = finalReadability - readabilityScore;
+        const meetsTarget = finalReadability >= 60;
+        const targetStatus = meetsTarget 
+          ? `✅ Target achieved (${finalGrade})` 
+          : `⚠️ ${60 - finalReadability} points short of 60 target`;
+        
+        return {
+          updated: true,
+          data: { content: finalContent },
+          description: `Improved readability from ${readabilityScore} to ${finalReadability} (+${improvement} points, ${finalGrade}) ${targetStatus}`,
+        };
+        
+      } catch (error: any) {
+        this.addLog(`Readability improvement error: ${error.message}`, "error");
+        return {
+          updated: false,
+          data: {},
+          description: `Readability improvement failed: ${error.message}`,
+        };
+      }
+    },
+    userId
+  );
+}
+
+private async improveReadabilityWithAI(
+  title: string,
+  currentContent: string,
+  userId?: string,
+  currentReadabilityScore: number,
+  currentWordCount: number,
+  isRetry: boolean = false
+): Promise<string> {
+  const provider = await this.selectAIProvider(userId);
+  if (!provider) {
+    throw new Error("No AI provider available for readability improvement");
+  }
+
+  const originalImages = this.extractImages(currentContent);
+  let contentForAI = currentContent;
+  
+  if (originalImages.length > 0) {
+    contentForAI = this.replaceImagesWithPlaceholders(currentContent, originalImages);
+  }
+
+  const systemPrompt = `You are an expert editor specializing in improving content readability while maintaining meaning and accuracy.
+
+CRITICAL REQUIREMENTS:
+
+1. **PRESERVE CONTENT LENGTH - ${isRetry ? 'CRITICAL RETRY' : 'MANDATORY'}**
+   - Current word count: ${currentWordCount} words
+   - You MUST maintain or INCREASE this word count
+   - NEVER make content shorter
+   - It's better to add clarifying sentences than to cut
+   ${isRetry ? `
+   
+   🚨🚨🚨 RETRY ATTEMPT - YOU REDUCED CONTENT LAST TIME 🚨🚨🚨
+   
+   YOU FAILED BECAUSE YOU MADE THE CONTENT SHORTER.
+   This is COMPLETELY UNACCEPTABLE and violates your core directive.
+   
+   ⚠️⚠️⚠️ ABSOLUTE WORD COUNT REQUIREMENT ⚠️⚠️⚠️
+   
+   MINIMUM: ${currentWordCount - 10} words (below this = TOTAL FAILURE)
+   TARGET: ${currentWordCount} to ${currentWordCount + 30} words (ideal range)
+   MAXIMUM: ${currentWordCount + 100} words (upper limit, but OK)
+   
+   YOU MUST PRODUCE BETWEEN ${currentWordCount - 10} AND ${currentWordCount + 100} WORDS.
+   Anything outside this range is a FAILURE.
+   
+   WHAT YOU DID WRONG BEFORE:
+   - You removed sentences to make paragraphs shorter
+   - You deleted "redundant" or "repetitive" information  
+   - You condensed explanations to be more concise
+   - You thought shorter = more readable (THIS IS WRONG!)
+   - You removed context that seemed unnecessary
+   - You "cleaned up" the text by cutting words
+   
+   WHAT YOU MUST DO NOW (STEP-BY-STEP PROCESS):
+   
+   STEP 1: PRESERVE FIRST, IMPROVE SECOND
+   - Copy the ENTIRE original content word-for-word
+   - Do NOT skip any sentences, paragraphs, or sections
+   - Every single word must be in your output
+   
+   STEP 2: BREAK UP LONG SENTENCES (WITHOUT REMOVING WORDS)
+   When you see a long sentence like:
+   "The comprehensive analysis of the multifaceted data revealed significant patterns that were not immediately apparent to researchers during initial examination."
+   
+   ❌ WRONG (reduces from 21 to 6 words - FAILURE):
+   "Analysis revealed significant patterns."
+   
+   ❌ WRONG (reduces from 21 to 14 words - STILL FAILURE):
+   "The analysis of the data revealed patterns that weren't immediately apparent."
+   
+   ✅ RIGHT (maintains 21 words, splits for readability):
+   "The comprehensive analysis of the multifaceted data revealed significant patterns. These patterns were not immediately apparent to researchers during initial examination."
+   
+   ✅ ALSO RIGHT (expands to 23 words):
+   "The comprehensive analysis of the multifaceted data revealed significant patterns. These important patterns were not immediately apparent to researchers during their initial examination."
+   
+   STEP 3: BREAK UP LONG PARAGRAPHS (WITHOUT REMOVING WORDS)
+   When you see a 5-sentence paragraph:
+   
+   ❌ WRONG (removes sentences to make shorter paragraphs):
+   Paragraph 1: [Sentences 1-2 only, deleted sentence 3]
+   Paragraph 2: [Sentences 4-5 only]
+   
+   ✅ RIGHT (splits but keeps ALL sentences):
+   Paragraph 1: [Sentences 1-3]
+   Paragraph 2: [Sentences 4-5]
+   
+   STEP 4: SIMPLIFY VOCABULARY (BY REPLACING, NOT DELETING)
+   
+   ❌ WRONG (deletes the complex phrase entirely):
+   "utilize the comprehensive methodology" → [deleted]
+   
+   ❌ WRONG (oversimplifies and loses meaning):
+   "utilize the comprehensive methodology" → "use it"
+   
+   ✅ RIGHT (replaces with simpler equivalent):
+   "utilize the comprehensive methodology" → "use the complete method"
+   
+   STEP 5: ADD TRANSITION WORDS (INCREASES WORD COUNT)
+   Between paragraphs, ADD words like:
+   - "Additionally,"
+   - "Furthermore,"
+   - "Moreover,"
+   - "In addition,"
+   - "As a result,"
+   - "Therefore,"
+   - "However,"
+   
+   This ADDS 1-2 words per paragraph transition.
+   
+   STEP 6: VERIFY BEFORE RETURNING
+   Before you return your output:
+   1. Count the words in your output
+   2. If < ${currentWordCount - 10} words: GO BACK and ADD clarifying sentences
+   3. If ${currentWordCount - 10} to ${currentWordCount + 100} words: GOOD, proceed
+   4. If > ${currentWordCount + 100} words: Slightly reduce (but don't go below ${currentWordCount})
+   
+   EXAMPLES OF COMPLETE TRANSFORMATIONS:
+   
+   EXAMPLE 1: 
+   Original (45 words):
+   "The implementation of the new system requires careful consideration of multiple factors including data migration, user training, system integration, and ongoing maintenance costs that must be evaluated before making a final decision about proceeding with the project."
+   
+   ❌ WRONG (25 words - MASSIVE FAILURE):
+   "Implementing the new system requires considering data migration, user training, integration, and maintenance costs before deciding to proceed."
+   
+   ✅ RIGHT (47 words - maintains/slightly expands):
+   "The implementation of the new system requires careful consideration of multiple factors. These include data migration, user training, system integration, and ongoing maintenance costs. All of these factors must be thoroughly evaluated before making a final decision about proceeding with the project."
+   
+   EXAMPLE 2:
+   Original (30 words):
+   "Users frequently encounter difficulties when attempting to navigate complex interfaces without adequate guidance or documentation available to them which leads to frustration and decreased productivity."
+   
+   ❌ WRONG (12 words - TOTAL FAILURE):
+   "Users struggle with complex interfaces that lack guidance, causing frustration and low productivity."
+   
+   ✅ RIGHT (32 words - maintains/slightly expands):
+   "Users frequently encounter difficulties when attempting to navigate complex interfaces. This happens especially when adequate guidance or documentation is not available to them. This leads to frustration and decreased productivity."
+   
+   THIS IS YOUR LAST CHANCE. PRESERVE EVERY BIT OF INFORMATION.
+   
+   FINAL REMINDER:
+   - Current content: ${currentWordCount} words
+   - You MUST produce: ${currentWordCount - 10} to ${currentWordCount + 100} words
+   - Ideal target: ${currentWordCount} to ${currentWordCount + 30} words
+   - Below ${currentWordCount - 10} = COMPLETE FAILURE
+   ` : ''}
+
+2. **PRESERVE ALL IMAGE PLACEHOLDERS**
+   - DO NOT remove any text like: __IMAGE_PLACEHOLDER_X_XXXXX__
+   - These are image markers that MUST stay exactly as written
+
+3. **READABILITY IMPROVEMENTS TO MAKE:**
+   - Break up long paragraphs (max 3-4 sentences per paragraph)
+   - Shorten complex sentences (aim for 15-20 words per sentence)
+   - Use simpler, more common words where possible
+   - Add transition words between paragraphs
+   - Use active voice instead of passive voice
+   - Replace jargon with plain language (or explain technical terms)
+   - Add bullet points or numbered lists for sequential information
+   - Use subheadings (h3 tags) to break up long sections
+   ${isRetry ? `
+   
+   ⚠️ CRITICAL PROCESS FOR RETRY:
+   1. Copy ENTIRE original content first (${currentWordCount} words)
+   2. Find long sentences (>25 words) and SPLIT them (keep all words)
+   3. Find long paragraphs (>4 sentences) and SPLIT them (keep all words)
+   4. ADD transition words between new paragraphs (+1-2 words each)
+   5. Replace complex words with simpler ones (word count stays same)
+   6. Count final words: MUST be ${currentWordCount - 10} to ${currentWordCount + 100}
+   ` : ''}
+
+4. **WHAT NOT TO CHANGE:**
+   - Don't change the core message or facts
+   - Don't remove important information
+   - Don't alter technical accuracy
+   - Don't change proper nouns or specific terminology
+   - Keep all links intact
+   - Preserve the HTML structure (h2, p, ul, etc.)
+
+5. **OUTPUT FORMAT:**
+   - Return ONLY the improved HTML content
+   - NO preambles or explanations
+   - NO markdown code blocks
+
+Current Readability Score: ${currentReadabilityScore}/100
+Goal: Improve to 60+ (good readability)
+${isRetry ? '\n\n⚠️⚠️⚠️ ABSOLUTE REQUIREMENT: ${currentWordCount - 10} to ${currentWordCount + 100} WORDS. DO NOT PRODUCE LESS THAN ${currentWordCount - 10} WORDS. ⚠️⚠️⚠️' : ''}`;
+
+  const userPrompt = `Improve the readability of this content while preserving its length and meaning:
+
+Title: ${title}
+
+Current Content (${currentWordCount} words):
+${contentForAI}
+
+SPECIFIC IMPROVEMENTS NEEDED:
+1. Break paragraphs that are longer than 4 sentences
+2. Split sentences that are longer than 25 words
+3. Replace complex words with simpler alternatives
+4. Add transition words (However, Therefore, Additionally, etc.)
+5. Convert passive voice to active voice
+6. Add subheadings (h3) every 2-3 paragraphs if missing
+7. Use bullet points for lists of items
+
+CRITICAL REMINDERS:
+- Maintain word count: ${currentWordCount}+ words
+- Preserve all image placeholders: __IMAGE_PLACEHOLDER_X_XXXXX__
+- Keep all factual information
+- Return ONLY the HTML content
+
+${isRetry ? `
+🚨🚨🚨 RETRY MODE - PREVIOUS ATTEMPT REDUCED CONTENT 🚨🚨🚨
+
+Your previous attempt FAILED because you made it shorter.
+
+REQUIRED WORD COUNT RANGE: ${currentWordCount - 10} to ${currentWordCount + 100} words
+IDEAL TARGET: ${currentWordCount} to ${currentWordCount + 30} words
+
+HOW TO IMPROVE READABILITY WITHOUT REDUCING:
+
+✅ DO THIS:
+- Split long sentences into 2-3 shorter ones (KEEP ALL WORDS)
+- Split long paragraphs into 2 smaller ones (KEEP ALL PARAGRAPHS)
+- Replace "utilize" → "use" (1:1 replacement, not deletion)
+- ADD transition words: "Additionally," "Furthermore," etc.
+- ADD clarifying phrases: "This means that...", "In other words..."
+
+❌ DO NOT DO THIS:
+- Remove "redundant" sentences (KEEP THEM ALL)
+- Delete "unnecessary" words (KEEP THEM ALL)
+- Condense long explanations (EXPAND them instead)
+- Simplify by cutting content (SIMPLIFY by splitting)
+- "Clean up" by removing text (NEVER REMOVE)
+
+VERIFICATION CHECKLIST BEFORE RETURNING:
+□ Did I preserve ALL original sentences?
+□ Did I only SPLIT sentences, not delete them?
+□ Did I ADD transition words between paragraphs?
+□ Is my word count ${currentWordCount - 10} to ${currentWordCount + 100}?
+□ If below ${currentWordCount - 10}, did I ADD clarifying sentences?
+
+WORD COUNT TARGET: ${currentWordCount - 10} to ${currentWordCount + 100} words
+If you produce less than ${currentWordCount - 10} words, you FAIL.
+` : ''}
+
+Begin improvement now:`;
+
+  try {
+    const result = await this.callAIProvider(
+      provider,
+      systemPrompt,
+      userPrompt,
+      isRetry ? 8000 : 6000,  // More tokens for retry attempts
+      0.5,
+      userId
+    );
+
+    let cleaned = this.cleanAndValidateContent(result);
+    
+    // Apply humanization to improved content
+    cleaned = this.humanizeContent(cleaned, {
+      tone: 'professional',
+      aggressiveDeAI: true
+    });
+    
+    if (originalImages.length > 0) {
+      cleaned = this.restoreImagesFromPlaceholders(cleaned, originalImages);
+      cleaned = this.ensureImagesPreserved(cleaned, originalImages);
+    }
+    
+    // Log word count result
+    const finalWordCount = this.extractTextFromHTML(cleaned)
+      .split(/\s+/)
+      .filter(w => w.length > 0).length;
+    
+    this.addLog(
+      `Readability AI ${isRetry ? '(retry)' : ''}: ${currentWordCount} → ${finalWordCount} words`,
+      finalWordCount >= currentWordCount ? "success" : "warning"
+    );
+    
+    return cleaned;
+    
+  } catch (error: any) {
+    this.addLog(`Readability AI improvement failed: ${error.message}`, "error");
+    throw error;
+  }
+}
+  // ENHANCED: Humanize content with configurable options
+private humanizeContent(
+  content: string,
+  options: {
+    tone?: 'casual' | 'professional' | 'technical';
+    aggressiveDeAI?: boolean;
+  } = {}
+): string {
+  const { tone = 'professional', aggressiveDeAI = true } = options;
+  let humanized = content;
+  let totalReplacements = 0; // ✅ Track actual replacements
+
+  // Phase 1: Basic contractions (safe for all content)
+  const basicReplacements: [RegExp, string][] = [
+    [/\bit is\b/gi, "it's"],
+    [/\byou are\b/gi, "you're"],
+    [/\bwe are\b/gi, "we're"],
+    [/\bthey are\b/gi, "they're"],
+    [/\bcannot\b/gi, "can't"],
+    [/\bwill not\b/gi, "won't"],
+    [/\bdo not\b/gi, "don't"],
+    [/\bdoes not\b/gi, "doesn't"],
+    [/\bdid not\b/gi, "didn't"],
+    [/\bshould not\b/gi, "shouldn't"],
+    [/\bwould not\b/gi, "wouldn't"],
+  ];
+
+  for (const [pattern, replacement] of basicReplacements) {
+    const before = humanized;
+    humanized = humanized.replace(pattern, replacement);
+    if (before !== humanized) {
+      totalReplacements += (before.match(pattern) || []).length; // ✅ Count matches
+    }
+  }
+
+  // Phase 2: Remove obvious AI patterns
+  if (aggressiveDeAI) {
+    const aiPatterns: [RegExp, string][] = [
+      // Robotic introductions
+      [/\bIn this article, we will explore\b/gi, "Let's explore"],
+      [/\bIn this comprehensive guide\b/gi, "In this guide"],
+      [/\bIn this blog post\b/gi, "Here"],
+      [/\bIn the following sections\b/gi, "Below"],
+      
+      // Overly formal transitions
+      [/\bFurthermore,\b/g, "Also,"],
+      [/\bMoreover,\b/g, "Plus,"],
+      [/\bNevertheless,\b/g, "Still,"],
+      [/\bConsequently,\b/g, "So,"],
+      [/\bIn addition,\b/g, "Also,"],
+      [/\bTherefore,\b/g, "So,"],
+      
+      // AI clichés
+      [/\bdelve into\b/gi, "explore"],
+      [/\bembarking on a journey\b/gi, "starting"],
+      [/\bin today's digital landscape\b/gi, "today"],
+      [/\bin today's fast-paced world\b/gi, "today"],
+      [/\bit's important to note that\b/gi, "note that"],
+      [/\bit's worth mentioning that\b/gi, "also"],
+      [/\bit is crucial to understand\b/gi, "it's crucial to understand"],
+      
+      // Redundant phrases
+      [/\bin order to\b/gi, "to"],
+      [/\bdue to the fact that\b/gi, "because"],
+      [/\bfor the purpose of\b/gi, "to"],
+      [/\bin the event that\b/gi, "if"],
+    ];
+
+    for (const [pattern, replacement] of aiPatterns) {
+      const before = humanized;
+      humanized = humanized.replace(pattern, replacement);
+      if (before !== humanized) {
+        totalReplacements += (before.match(pattern) || []).length; // ✅ Count matches
+      }
+    }
+  }
+
+  // Phase 3: Casual tone (only if requested)
+  if (tone === 'casual') {
+    const casualReplacements: [RegExp, string][] = [
+      [/\bHowever,\b/g, "But,"],
+      [/\bUtilize\b/gi, "Use"],
+      [/\bPurchase\b/gi, "Buy"],
+      [/\bObtain\b/gi, "Get"],
+    ];
+
+    for (const [pattern, replacement] of casualReplacements) {
+      const before = humanized;
+      humanized = humanized.replace(pattern, replacement);
+      if (before !== humanized) {
+        totalReplacements += (before.match(pattern) || []).length; // ✅ Count matches
+      }
+    }
+  }
+
+  // ✅ Updated logging
+  if (totalReplacements > 0) {
+    this.addLog(
+      `Humanized content: ${totalReplacements} AI pattern${totalReplacements !== 1 ? 's' : ''} removed/replaced`,
+      'success'
+    );
+  }
+
+  return humanized;
+}
+  /**
+ * Calculates Flesch Reading Ease score (0-100, higher = easier)
+ */
+private calculateReadabilityScore(text: string): number {
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const words = text.split(/\s+/).filter(w => w.length > 0);
+  
+  if (sentences.length === 0 || words.length === 0) {
+    return 0;
+  }
+  
+  const syllables = words.reduce((count, word) => count + this.countSyllables(word), 0);
+  
+  const avgWordsPerSentence = words.length / sentences.length;
+  const avgSyllablesPerWord = syllables / words.length;
+  
+  // Flesch Reading Ease formula
+  // 206.835 - 1.015(total words / total sentences) - 84.6(total syllables / total words)
+  const score = 206.835 - (1.015 * avgWordsPerSentence) - (84.6 * avgSyllablesPerWord);
+  
+  // Clamp to 0-100 range
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/**
+ * Counts syllables in a word (simple approximation)
+ */
+private countSyllables(word: string): number {
+  word = word.toLowerCase().replace(/[^a-z]/g, '');
+  
+  if (word.length <= 3) return 1;
+  
+  // Count vowel groups
+  const vowelMatches = word.match(/[aeiouy]+/g);
+  let count = vowelMatches ? vowelMatches.length : 1;
+  
+  // Adjust for silent 'e' at end
+  if (word.endsWith('e')) {
+    count--;
+  }
+  
+  // Adjust for 'le' ending (like "table")
+  if (word.endsWith('le') && word.length > 2) {
+    count++;
+  }
+  
+  // Minimum 1 syllable
+  return Math.max(1, count);
+}
+
+/**
+ * Converts Flesch Reading Ease score to grade level description
+ */
+private getGradeLevel(score: number): string {
+  if (score >= 90) return 'Very Easy (5th grade)';
+  if (score >= 80) return 'Easy (6th grade)';
+  if (score >= 70) return 'Fairly Easy (7th grade)';
+  if (score >= 60) return 'Standard (8th-9th grade)';
+  if (score >= 50) return 'Fairly Difficult (10th-12th grade)';
+  if (score >= 30) return 'Difficult (College level)';
+  return 'Very Difficult (College graduate)';
+} 
   // ==================== AI PROVIDER MANAGEMENT ====================
 
   private async selectAIProvider(userId?: string): Promise<string | null> {
@@ -8227,25 +8931,6 @@ private async testWordPressConnection(
     return cleaned;
   }
 
-  private humanizeContent(content: string): string {
-    const replacements: [RegExp, string][] = [
-      [/Furthermore,/g, "Also,"],
-      [/Moreover,/g, "Plus,"],
-      [/Nevertheless,/g, "Still,"],
-      [/Consequently,/g, "So,"],
-      [/\bit is\b/g, "it's"],
-      [/\byou are\b/g, "you're"],
-      [/\bwe are\b/g, "we're"],
-      [/\bcannot\b/g, "can't"],
-    ];
-
-    let humanized = content;
-    for (const [pattern, replacement] of replacements) {
-      humanized = humanized.replace(pattern, replacement);
-    }
-
-    return humanized;
-  }
 
   private cleanAndValidateContent(content: string): string {
   if (!content) {
