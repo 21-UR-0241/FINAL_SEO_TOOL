@@ -21,7 +21,7 @@ import { Eye, EyeOff, Lock, User, Mail, LogOut } from "lucide-react";
    - For development: http://localhost:3000
    - For production: Your Render backend URL
 ───────────────────────────────────────────────────────────── */
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 /* ─────────────────────────────────────────────────────────────
    INLINE SANITIZERS (gentle-on-change, stricter-on-submit)

@@ -205,7 +205,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { CompactSidebarUserMenu, useAuth } from "@/pages/authentication";
 
 // ✅ Always use env-based API URL (Render / local safe)
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // =============================================================================
 // MOBILE SIDEBAR CONTEXT
