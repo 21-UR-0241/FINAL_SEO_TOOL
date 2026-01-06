@@ -1752,7 +1752,7 @@ export const highIntentBlogs = pgTable(
 
 
 // ============================================================================
-// BILLING TABLES
+// BILLING TABLES - UPDATED WITH STRIPE INTEGRATION
 // ============================================================================
 
 export const subscriptionPlans = pgTable("subscription_plans", {
@@ -1792,12 +1792,14 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   trialStart: timestamp("trial_start"),
   trialEnd: timestamp("trial_end"),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }), // ✨ ADDED
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("idx_user_subscriptions_user_id").on(table.userId),
   index("idx_user_subscriptions_status").on(table.status),
   index("idx_user_subscriptions_period_end").on(table.currentPeriodEnd),
+  index("idx_user_subscriptions_stripe_customer_id").on(table.stripeCustomerId), // ✨ ADDED
 ]);
 
 export const billingAddresses = pgTable("billing_addresses", {
@@ -1866,6 +1868,7 @@ export const invoices = pgTable("invoices", {
   dueDate: timestamp("due_date").notNull(),
   paidAt: timestamp("paid_at"),
   billingAddressId: varchar("billing_address_id").references(() => billingAddresses.id),
+  stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }), // ✨ ADDED
   lineItems: jsonb("line_items"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1875,6 +1878,7 @@ export const invoices = pgTable("invoices", {
   index("idx_invoices_subscription_id").on(table.subscriptionId),
   index("idx_invoices_status").on(table.status),
   index("idx_invoices_due_date").on(table.dueDate),
+  index("idx_invoices_stripe_invoice_id").on(table.stripeInvoiceId), // ✨ ADDED
 ]);
 
 export const transactions = pgTable("transactions", {
@@ -1893,6 +1897,7 @@ export const transactions = pgTable("transactions", {
   status: text("status").notNull(),
   stripeChargeId: varchar("stripe_charge_id", { length: 255 }),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }), // ✨ ADDED
   paypalTransactionId: varchar("paypal_transaction_id", { length: 255 }),
   failureCode: varchar("failure_code", { length: 50 }),
   failureMessage: text("failure_message"),
@@ -1906,6 +1911,7 @@ export const transactions = pgTable("transactions", {
   index("idx_transactions_invoice_id").on(table.invoiceId),
   index("idx_transactions_subscription_id").on(table.subscriptionId),
   index("idx_transactions_status").on(table.status),
+  index("idx_transactions_stripe_invoice_id").on(table.stripeInvoiceId), // ✨ ADDED
   index("idx_transactions_created_at").on(table.createdAt.desc()),
 ]);
 
@@ -1973,7 +1979,7 @@ export const promoCodeRedemptions = pgTable("promo_code_redemptions", {
 ]);
 
 // ============================================================================
-// INSERT SCHEMAS - BILLING
+// INSERT SCHEMAS - BILLING (UPDATED)
 // ============================================================================
 
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).pick({
@@ -2002,6 +2008,7 @@ export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions
   trialStart: true,
   trialEnd: true,
   stripeSubscriptionId: true,
+  stripeCustomerId: true, // ✨ ADDED
 });
 
 export const insertBillingAddressSchema = createInsertSchema(billingAddresses).pick({
@@ -2041,6 +2048,7 @@ export const insertInvoiceSchema = createInsertSchema(invoices).pick({
   invoiceDate: true,
   dueDate: true,
   billingAddressId: true,
+  stripeInvoiceId: true, // ✨ ADDED
   lineItems: true,
   notes: true,
 });
@@ -2055,6 +2063,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).pick({
   status: true,
   stripeChargeId: true,
   stripePaymentIntentId: true,
+  stripeInvoiceId: true, // ✨ ADDED
   paypalTransactionId: true,
   failureCode: true,
   failureMessage: true,
@@ -2074,8 +2083,7 @@ export const insertPromoCodeSchema = createInsertSchema(promoCodes).pick({
   validFrom: true,
   validUntil: true,
   isActive: true,
-});
-
+}); 
 // ============================================================================
 // TYPE EXPORTS - BILLING
 // ============================================================================

@@ -14,6 +14,8 @@ import {
   promoCodeRedemptions,
 } from "../../shared/schema";
 import { stripeService } from "../services/stripe-service";
+import { WebhookHandler } from "../services/webhook-handler";
+import Stripe from "stripe";
 
 const router = Router();
 
@@ -31,8 +33,7 @@ const requireAuth = (req: Request, res: Response, next: Function) => {
   next();
 };
 
-
-// server/routes/billing.ts
+// Debug logging
 router.use((req, _res, next) => {
   console.log('🔵 Billing router hit:', req.method, req.path);
   next();
@@ -107,27 +108,87 @@ router.get("/plans/:planId", async (req: Request, res: Response) => {
  * Get user's current subscription
  * Returns flat object matching frontend expectations
  */
+router.get("/subscription", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    console.log("📊 Fetching subscription for user:", userId);
+
+    const [result] = await db
+      .select({
+        subscriptionId: userSubscriptions.id,
+        planId: userSubscriptions.planId,
+        planName: subscriptionPlans.name,
+        status: userSubscriptions.status,
+        billingInterval: userSubscriptions.billingInterval,
+        currentPeriodEnd: userSubscriptions.currentPeriodEnd,
+        cancelAtPeriodEnd: userSubscriptions.cancelAtPeriodEnd,
+        monthlyPrice: subscriptionPlans.monthlyPrice,
+        yearlyPrice: subscriptionPlans.yearlyPrice,
+      })
+      .from(userSubscriptions)
+      .innerJoin(
+        subscriptionPlans,
+        eq(userSubscriptions.planId, subscriptionPlans.id),
+      )
+      .where(
+        and(
+          eq(userSubscriptions.userId, userId),
+          sql`${userSubscriptions.status} IN ('active', 'trial')`,
+        ),
+      )
+      .orderBy(desc(userSubscriptions.createdAt))
+      .limit(1);
+
+    if (!result) {
+      console.log("❌ No subscription found for user:", userId);
+      return res.status(404).json({
+        success: false,
+        message: "No subscription found",
+      });
+    }
+
+    console.log("✅ Subscription found:", {
+      id: result.subscriptionId,
+      plan: result.planName,
+      interval: result.billingInterval,
+    });
+
+    const amount =
+      result.billingInterval === "year"
+        ? Number(result.yearlyPrice)
+        : Number(result.monthlyPrice);
+
+    return res.json({
+      success: true,
+      id: result.subscriptionId,
+      planId: result.planId,
+      planName: result.planName,
+      status: result.status,
+      interval: result.billingInterval,
+      currentPeriodEnd: result.currentPeriodEnd.toISOString(),
+      cancelAtPeriodEnd: result.cancelAtPeriodEnd || false,
+      amount,
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching subscription:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch subscription",
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/billing/subscription
+ * Create a new subscription
+ */
 router.post("/subscription", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { planId, interval, paymentDetails, promoCode } = req.body as {
-      planId: string;
-      interval: "month" | "year";
-      paymentDetails?: {
-        cardLast4?: string;
-        cardName?: string;
-        billingAddress?: {
-          address: string;
-          city: string;
-          state: string;
-          zip: string;
-          country?: string;
-        };
-      };
-      promoCode?: string;
-    };
+    const { planId, interval, paymentDetails, promoCode } = req.body;
 
-    // --- validations (leave as-is) ---
     if (!planId || !interval) {
       return res.status(400).json({
         success: false,
@@ -135,6 +196,7 @@ router.post("/subscription", requireAuth, async (req: Request, res: Response) =>
       });
     }
 
+    // Check if user already has an active/trial subscription
     const [existingSubscription] = await db
       .select()
       .from(userSubscriptions)
@@ -156,6 +218,7 @@ router.post("/subscription", requireAuth, async (req: Request, res: Response) =>
       });
     }
 
+    // Get plan details
     const [plan] = await db
       .select()
       .from(subscriptionPlans)
@@ -169,202 +232,289 @@ router.post("/subscription", requireAuth, async (req: Request, res: Response) =>
       });
     }
 
-    // --- pricing & promo logic (unchanged) ---
+    // Pricing
     const subtotal =
       interval === "year"
         ? Number(plan.yearlyPrice)
         : Number(plan.monthlyPrice);
+
     const taxRate = 0.08;
     let discountAmount = 0;
-    let promoCodeData: any = null;
+    let promoCodeData: typeof promoCodes.$inferSelect | null = null;
 
-    // ... your existing promo code validation logic ...
+    // Promo code validation (if provided)
+    if (promoCode) {
+      const [promo] = await db
+        .select()
+        .from(promoCodes)
+        .where(
+          and(
+            eq(promoCodes.code, promoCode),
+            eq(promoCodes.isActive, true),
+          ),
+        )
+        .limit(1);
+
+      if (promo) {
+        const now = new Date();
+
+        // Validate promo code
+        if (promo.validFrom && new Date(promo.validFrom) > now) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "INVALID_PROMO",
+              message: "Promo code not yet valid",
+            },
+          });
+        }
+        if (promo.validUntil && new Date(promo.validUntil) < now) {
+          return res.status(400).json({
+            success: false,
+            error: { code: "INVALID_PROMO", message: "Promo code expired" },
+          });
+        }
+
+        if (
+          promo.maxRedemptions &&
+          promo.redemptionsCount >= promo.maxRedemptions
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "INVALID_PROMO",
+              message: "Promo code has reached max redemptions",
+            },
+          });
+        }
+
+        // Check if user already used this promo
+        const [redemption] = await db
+          .select()
+          .from(promoCodeRedemptions)
+          .where(
+            and(
+              eq(promoCodeRedemptions.promoCodeId, promo.id),
+              eq(promoCodeRedemptions.userId, userId),
+            ),
+          )
+          .limit(1);
+
+        if (redemption) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "INVALID_PROMO",
+              message: "Promo code already used",
+            },
+          });
+        }
+
+        // Check plan applicability
+        if (
+          promo.applicablePlans &&
+          promo.applicablePlans.length > 0 &&
+          !promo.applicablePlans.includes(planId)
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "INVALID_PROMO",
+              message: "Promo code not applicable to this plan",
+            },
+          });
+        }
+
+        promoCodeData = promo;
+
+        if (promo.discountType === "percentage") {
+          discountAmount = subtotal * (Number(promo.discountValue) / 100);
+        } else {
+          discountAmount = Number(promo.discountValue);
+        }
+      }
+    }
 
     const finalSubtotal = Math.max(0, subtotal - discountAmount);
     const taxAmount = finalSubtotal * taxRate;
     const totalAmount = finalSubtotal + taxAmount;
 
-    // --- run transaction, but RETURN the results instead of res.json here ---
-    const { subscription, invoice, transaction } = await db.transaction(
-      async (tx) => {
-        // Billing address
-        let addressId: string | null = null;
-        if (paymentDetails?.billingAddress) {
-          const [address] = await tx
-            .insert(billingAddresses)
-            .values({
-              userId,
-              streetAddress: paymentDetails.billingAddress.address,
-              city: paymentDetails.billingAddress.city,
-              stateProvince: paymentDetails.billingAddress.state,
-              postalCode: paymentDetails.billingAddress.zip,
-              country: paymentDetails.billingAddress.country || "US",
-              isDefault: true,
-            })
-            .returning();
-          addressId = address.id;
-        }
-
-        // Payment method
-        let paymentMethodId: string | null = null;
-        if (planId !== "free" && paymentDetails) {
-          const [payment] = await tx
-            .insert(paymentMethods)
-            .values({
-              userId,
-              type: "card",
-              cardBrand: "visa",
-              cardLast4: paymentDetails.cardLast4,
-              cardExpMonth: "12",
-              cardExpYear: "2025",
-              cardholderName: paymentDetails.cardName,
-              billingAddressId: addressId,
-              isDefault: true,
-            })
-            .returning();
-          paymentMethodId = payment.id;
-        }
-
-        // Period dates
-        const now = new Date();
-        const periodEnd = new Date(now);
-        if (interval === "month") {
-          periodEnd.setMonth(periodEnd.getMonth() + 1);
-        } else {
-          periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-        }
-
-        // Subscription
-        const [subscription] = await tx
-          .insert(userSubscriptions)
+    // Use Drizzle transaction
+    const result = await db.transaction(async (tx) => {
+      // 1. Billing address
+      let addressId: string | null = null;
+      if (paymentDetails?.billingAddress) {
+        const [address] = await tx
+          .insert(billingAddresses)
           .values({
             userId,
-            planId,
-            billingInterval: interval,
-            status: "active",
-            currentPeriodStart: now,
-            currentPeriodEnd: periodEnd,
+            streetAddress: paymentDetails.billingAddress.address,
+            city: paymentDetails.billingAddress.city,
+            stateProvince: paymentDetails.billingAddress.state,
+            postalCode: paymentDetails.billingAddress.zip,
+            country: paymentDetails.billingAddress.country || "US",
+            isDefault: true,
           })
           .returning();
+        addressId = address.id;
+      }
 
-        // Invoice
-        const invoiceNumber = `INV-${Date.now()}-${userId.substring(0, 8)}`;
-        const [invoice] = await tx
-          .insert(invoices)
+      // 2. Payment method (only for paid plans)
+      let paymentMethodId: string | null = null;
+      if (planId !== "free" && paymentDetails) {
+        const [payment] = await tx
+          .insert(paymentMethods)
           .values({
             userId,
-            subscriptionId: subscription.id,
-            invoiceNumber,
-            subtotal: finalSubtotal.toFixed(2),
-            taxRate: taxRate.toFixed(4),
-            taxAmount: taxAmount.toFixed(2),
-            totalAmount: totalAmount.toFixed(2),
-            amountDue: totalAmount.toFixed(2),
-            status: "open",
-            invoiceDate: now,
-            dueDate: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+            type: "card",
+            cardBrand: "visa",
+            cardLast4: paymentDetails.cardLast4,
+            cardExpMonth: "12",
+            cardExpYear: "2025",
+            cardholderName: paymentDetails.cardName,
             billingAddressId: addressId,
-            lineItems: [
-              {
-                description: `${plan.name} - ${
-                  interval === "year" ? "Annual" : "Monthly"
-                } Subscription`,
-                quantity: 1,
-                unitPrice: subtotal,
-                amount: subtotal,
-              },
-              ...(discountAmount > 0
-                ? [
-                    {
-                      description: `Promo Code: ${promoCode}`,
-                      quantity: 1,
-                      unitPrice: -discountAmount,
-                      amount: -discountAmount,
-                    },
-                  ]
-                : []),
-            ],
+            isDefault: true,
           })
           .returning();
+        paymentMethodId = payment.id;
+      }
 
-        // Transaction
-        const [transaction] = await tx
-          .insert(transactions)
-          .values({
-            userId,
-            invoiceId: invoice.id,
-            subscriptionId: subscription.id,
-            paymentMethodId,
-            transactionType: "payment",
-            amount: totalAmount.toFixed(2),
-            status: "succeeded",
-            description: `Initial ${plan.name} subscription payment`,
-            processedAt: new Date(),
-          })
-          .returning();
+      // 3. Calculate period dates
+      const now = new Date();
+      const periodEnd = new Date(now);
 
-        // Mark invoice paid
-        await tx
-          .update(invoices)
-          .set({
-            status: "paid",
-            amountPaid: totalAmount.toFixed(2),
-            paidAt: new Date(),
-          })
-          .where(eq(invoices.id, invoice.id));
+      if (interval === "month") {
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+      } else {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+      }
 
-        // Promo code usage
-        if (promoCodeData) {
-          await tx.insert(promoCodeRedemptions).values({
-            promoCodeId: promoCodeData.id,
-            userId,
-            subscriptionId: subscription.id,
-            discountAmount: discountAmount.toFixed(2),
-          });
-          await tx
-            .update(promoCodes)
-            .set({
-              redemptionsCount: sql`${promoCodes.redemptionsCount} + 1`,
-            })
-            .where(eq(promoCodes.id, promoCodeData.id));
-        }
+      // 4. Create subscription
+      const [subscription] = await tx
+        .insert(userSubscriptions)
+        .values({
+          userId,
+          planId,
+          billingInterval: interval,
+          status: "active",
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        })
+        .returning();
 
-        // Usage
-        await tx.insert(subscriptionUsage).values({
+      // 5. Create invoice
+      const invoiceNumber = `INV-${Date.now()}-${userId.substring(0, 8)}`;
+
+      const [invoice] = await tx
+        .insert(invoices)
+        .values({
           userId,
           subscriptionId: subscription.id,
-          websitesCreated: 0,
-          articlesGenerated: 0,
-          periodStart: now,
-          periodEnd: periodEnd,
+          invoiceNumber,
+          subtotal: finalSubtotal.toFixed(2),
+          taxRate: taxRate.toFixed(4),
+          taxAmount: taxAmount.toFixed(2),
+          totalAmount: totalAmount.toFixed(2),
+          amountDue: totalAmount.toFixed(2),
+          status: "open",
+          invoiceDate: now,
+          dueDate: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+          billingAddressId: addressId,
+          lineItems: [
+            {
+              description: `${plan.name} - ${
+                interval === "year" ? "Annual" : "Monthly"
+              } Subscription`,
+              quantity: 1,
+              unitPrice: subtotal,
+              amount: subtotal,
+            },
+            ...(discountAmount > 0
+              ? [
+                  {
+                    description: `Promo Code: ${promoCode}`,
+                    quantity: 1,
+                    unitPrice: -discountAmount,
+                    amount: -discountAmount,
+                  },
+                ]
+              : []),
+          ],
+        })
+        .returning();
+
+      // 6. Create transaction
+      const [transaction] = await tx
+        .insert(transactions)
+        .values({
+          userId,
+          invoiceId: invoice.id,
+          subscriptionId: subscription.id,
+          paymentMethodId,
+          transactionType: "payment",
+          amount: totalAmount.toFixed(2),
+          status: "succeeded",
+          description: `Initial ${plan.name} subscription payment`,
+          processedAt: new Date(),
+        })
+        .returning();
+
+      // 7. Mark invoice as paid
+      await tx
+        .update(invoices)
+        .set({
+          status: "paid",
+          amountPaid: totalAmount.toFixed(2),
+          paidAt: new Date(),
+        })
+        .where(eq(invoices.id, invoice.id));
+
+      // 8. Handle promo code redemption
+      if (promoCodeData) {
+        await tx.insert(promoCodeRedemptions).values({
+          promoCodeId: promoCodeData.id,
+          userId,
+          subscriptionId: subscription.id,
+          discountAmount: discountAmount.toFixed(2),
         });
 
-        // Return the data for use outside the transaction
-        return { subscription, invoice, transaction };
-      },
-    );
+        await tx
+          .update(promoCodes)
+          .set({
+            redemptionsCount: sql`${promoCodes.redemptionsCount} + 1`,
+          })
+          .where(eq(promoCodes.id, promoCodeData.id));
+      }
 
-    // ✅ At this point, the transaction has committed successfully
+      // 9. Initialize usage tracking
+      await tx.insert(subscriptionUsage).values({
+        userId,
+        subscriptionId: subscription.id,
+        websitesCreated: 0,
+        articlesGenerated: 0,
+        periodStart: now,
+        periodEnd: periodEnd,
+      });
+
+      return { subscription, invoice, transaction };
+    });
+
+    console.log("✅ Subscription created successfully");
+
     return res.json({
       success: true,
-      data: {
-        subscription,
-        invoice,
-        transaction,
-      },
+      data: result,
     });
   } catch (error: any) {
-    console.error("Error creating subscription:", error);
+    console.error("❌ Error creating subscription:", error);
 
-    // Avoid trying to send another response if one already went out
-    if (res.headersSent) {
-      return;
+    // Avoid sending multiple responses
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        error: { code: "SUBSCRIPTION_FAILED", message: error.message },
+      });
     }
-
-    return res.status(500).json({
-      success: false,
-      error: { code: "SUBSCRIPTION_FAILED", message: error.message },
-    });
   }
 });
 
@@ -378,7 +528,7 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const userId = req.user!.id;
-      const { newPlanId } = req.body as { newPlanId?: string };
+      const { newPlanId } = req.body;
 
       if (!newPlanId) {
         return res.status(400).json({
@@ -443,7 +593,10 @@ router.post(
       console.error("Error upgrading subscription:", error);
       res.status(500).json({
         success: false,
-        error: { code: "UPGRADE_FAILED", message: error.message },
+        error: {
+          code: "UPGRADE_FAILED",
+          message: error.message,
+        },
       });
     }
   },
@@ -460,7 +613,7 @@ router.post(
 router.post("/promo/validate", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { code, planId } = req.body as { code?: string; planId?: string };
+    const { code, planId } = req.body;
 
     if (!code || !planId) {
       return res.status(400).json({
@@ -485,8 +638,8 @@ router.post("/promo/validate", requireAuth, async (req: Request, res: Response) 
       });
     }
 
-    // Check validity period
     const now = new Date();
+
     if (promo.validFrom && new Date(promo.validFrom) > now) {
       return res.status(400).json({
         success: false,
@@ -503,7 +656,6 @@ router.post("/promo/validate", requireAuth, async (req: Request, res: Response) 
       });
     }
 
-    // Check redemptions
     if (
       promo.maxRedemptions &&
       promo.redemptionsCount >= promo.maxRedemptions
@@ -517,7 +669,6 @@ router.post("/promo/validate", requireAuth, async (req: Request, res: Response) 
       });
     }
 
-    // Check if already used
     const [redemption] = await db
       .select()
       .from(promoCodeRedemptions)
@@ -536,7 +687,6 @@ router.post("/promo/validate", requireAuth, async (req: Request, res: Response) 
       });
     }
 
-    // Check plan applicability
     if (
       promo.applicablePlans &&
       promo.applicablePlans.length > 0 &&
@@ -551,7 +701,6 @@ router.post("/promo/validate", requireAuth, async (req: Request, res: Response) 
       });
     }
 
-    // Get plan to calculate discount
     const [plan] = await db
       .select()
       .from(subscriptionPlans)
@@ -727,11 +876,7 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const userId = req.user!.id;
-      const { planId, interval, promoCode } = req.body as {
-        planId?: string;
-        interval?: "month" | "year";
-        promoCode?: string;
-      };
+      const { planId, interval, promoCode } = req.body;
 
       if (!planId || !interval) {
         return res.status(400).json({
@@ -743,7 +888,6 @@ router.post(
         });
       }
 
-      // Verify plan exists
       const [plan] = await db
         .select()
         .from(subscriptionPlans)
@@ -760,7 +904,6 @@ router.post(
       const frontendUrl =
         process.env.FRONTEND_URL || "http://localhost:5173";
 
-      // Create Stripe checkout session
       const session = await stripeService.createCheckoutSession({
         userId,
         planId,
@@ -822,12 +965,12 @@ router.post(
 );
 
 // ============================================================================
-// SUBSCRIPTION CANCEL / RESUME (Stripe-aware)
+// SUBSCRIPTION CANCEL / RESUME
 // ============================================================================
 
 /**
  * POST /api/billing/subscription/cancel
- * Cancel subscription (updated to use Stripe)
+ * Cancel subscription
  */
 router.post(
   "/subscription/cancel",
@@ -835,7 +978,7 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const userId = req.user!.id;
-      const { immediate } = req.body as { immediate?: boolean };
+      const { immediate } = req.body;
 
       console.log("🚫 Cancelling subscription for user:", userId);
 
@@ -860,7 +1003,6 @@ router.post(
         });
       }
 
-      // Cancel in Stripe if stripe subscription exists
       if (subscription.stripeSubscriptionId) {
         await stripeService.cancelSubscription(
           subscription.stripeSubscriptionId,
@@ -868,7 +1010,6 @@ router.post(
         );
       }
 
-      // Update in database
       if (immediate) {
         await db
           .update(userSubscriptions)
@@ -912,7 +1053,7 @@ router.post(
 
 /**
  * POST /api/billing/subscription/resume
- * Resume a cancelled subscription (updated to use Stripe)
+ * Resume a cancelled subscription
  */
 router.post(
   "/subscription/resume",
@@ -945,14 +1086,12 @@ router.post(
         });
       }
 
-      // Resume in Stripe if stripe subscription exists
       if (subscription.stripeSubscriptionId) {
         await stripeService.resumeSubscription(
           subscription.stripeSubscriptionId,
         );
       }
 
-      // Update in database
       await db
         .update(userSubscriptions)
         .set({
@@ -981,39 +1120,97 @@ router.post(
 /**
  * POST /api/billing/subscription/reactivate
  * Legacy endpoint - redirects to /resume
- * Keep for backwards compatibility (frontend uses /reactivate)
  */
 router.post(
   "/subscription/reactivate",
   requireAuth,
   async (req: Request, res: Response) => {
-    // Just forward to the resume endpoint
+    // Forward to resume endpoint
     req.url = "/subscription/resume";
     return router.handle(req, res);
   },
 );
 
-// ========================================================================
+// ============================================================================
 // STRIPE WEBHOOK
-// ========================================================================
+// ============================================================================
+
+/**
+ * POST /api/billing/webhooks/stripe
+ * Handle Stripe webhook events
+ */
 router.post(
   "/webhooks/stripe",
-  // Use raw body for Stripe signature verification
   express.raw({ type: "application/json" }),
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const sig = req.headers["stripe-signature"] as string;
       const event = stripeService.constructWebhookEvent(req.body, sig);
 
-      // TODO: handle event types you care about, e.g.:
-      // - checkout.session.completed
-      // - customer.subscription.created
-      // - customer.subscription.updated
-      // - invoice.paid
-      // - invoice.payment_failed
-
-      // For now just log and return 200
       console.log("🔔 Stripe webhook received:", event.type);
+
+      // Handle different event types using WebhookHandler
+      switch (event.type) {
+        case "checkout.session.completed": {
+          await WebhookHandler.handleCheckoutCompleted(
+            event.data.object as Stripe.Checkout.Session
+          );
+          break;
+        }
+
+        case "customer.subscription.created": {
+          await WebhookHandler.handleSubscriptionCreated(
+            event.data.object as Stripe.Subscription
+          );
+          break;
+        }
+
+        case "customer.subscription.updated": {
+          await WebhookHandler.handleSubscriptionUpdated(
+            event.data.object as Stripe.Subscription
+          );
+          break;
+        }
+
+        case "customer.subscription.deleted": {
+          await WebhookHandler.handleSubscriptionDeleted(
+            event.data.object as Stripe.Subscription
+          );
+          break;
+        }
+
+        case "invoice.paid": {
+          await WebhookHandler.handleInvoicePaid(
+            event.data.object as Stripe.Invoice
+          );
+          break;
+        }
+
+        case "invoice.payment_failed": {
+          await WebhookHandler.handleInvoicePaymentFailed(
+            event.data.object as Stripe.Invoice
+          );
+          break;
+        }
+
+        case "payment_intent.succeeded": {
+          await WebhookHandler.handlePaymentSucceeded(
+            event.data.object as Stripe.PaymentIntent
+          );
+          break;
+        }
+
+        case "payment_intent.payment_failed": {
+          await WebhookHandler.handlePaymentFailed(
+            event.data.object as Stripe.PaymentIntent
+          );
+          break;
+        }
+
+        default:
+          console.log("ℹ️ Unhandled event type:", event.type);
+      }
+
       res.json({ received: true });
     } catch (err: any) {
       console.error("❌ Stripe webhook error:", err.message);
