@@ -1,4 +1,7 @@
 
+
+// //DON'T REMOVE!
+
 // import { aiService } from "server/services/ai-service";
 // import { wordpressService } from "server/services/wordpress-service";
 // import { wordPressAuthService } from "server/services/wordpress-auth";
@@ -57,6 +60,80 @@
 //   };
 // }
 
+
+// // ═══════════════════════════════════════════════════════════
+// // STEP 1: ADD THESE after your existing interfaces (before AIFixService class)
+// // ═══════════════════════════════════════════════════════════
+
+// // Configuration Constants
+// const CONTENT_EXPANSION_CONFIG = {
+//   MAX_PAGES_PER_SESSION: 5,
+//   MIN_WORD_COUNT: 800,
+//   IDEAL_WORD_COUNT: 1200,
+//   MAX_WORD_COUNT: 3000,
+//   MIN_CONTENT_RETENTION: 0.98,
+//   MAX_AI_RETRIES: 2,
+//   TIMEOUT_PER_PAGE: 180000, // 3 minutes
+//   REQUIRE_BACKUP: true,
+//   VALIDATION_STRICT: true,
+//   ALLOW_WORD_REDUCTION: false,
+// };
+
+// const EAT_IMPROVEMENT_CONFIG = {
+//   MAX_PAGES_PER_SESSION: 5,
+//   MIN_CONTENT_RETENTION: 0.95,
+//   MAX_AI_RETRIES: 2,
+//   TIMEOUT_PER_PAGE: 120000, // 2 minutes
+//   REQUIRE_BACKUP: true,
+//   MIN_EAT_SCORE: 2,
+// };
+
+// const CONTENT_PROTECTION_CONFIG = {
+//   ABSOLUTE_MIN_RETENTION: 0.98,
+//   MIN_CHAR_RETENTION: 0.97,
+//   MIN_PARAGRAPH_RETENTION: 0.95,
+//   ALLOW_WORD_REDUCTION: false,
+//   MAX_WORD_REDUCTION_PERCENT: 0,
+//   STRICT_MODE: true,
+// };
+
+// // New Interfaces
+// interface ContentExpansionResult {
+//   success: boolean;
+//   originalWordCount: number;
+//   finalWordCount: number;
+//   wordsAdded: number;
+//   imagesPreserved: boolean;
+//   imageCount: number;
+//   error?: string;
+// }
+
+// interface ContentBackup {
+//   postId: number;
+//   originalContent: string;
+//   originalExcerpt?: string;
+//   originalTitle?: string;
+//   timestamp: Date;
+//   wordCount: number;
+// }
+
+// // Update existing ProcessingOptions interface - FIND and ADD these properties:
+// interface ProcessingOptions {
+//   mode?: ProcessingMode;
+//   batchSize?: number;
+//   maxItems?: number;
+//   progressCallback?: (current: number, total: number) => void;
+//   priorityUrls?: string[];
+//   enableContentExpansion?: boolean;      // ✅ ADD
+//   enableEATImprovements?: boolean;       // ✅ ADD
+//   enableReadabilityImprovements?: boolean;  // ✅ ADD THIS
+//   contentExpansionMinWords?: number;     // ✅ ADD
+//   contentExpansionIdealWords?: number;   // ✅ ADD
+//   maxPagesPerSession?: number;           // ✅ ADD
+//   requireBackup?: boolean;                // ✅ ADD
+// }
+
+
 // export enum ProcessingMode {
 //   SAMPLE = "sample",
 //   PARTIAL = "partial",
@@ -64,13 +141,7 @@
 //   PRIORITY = "priority",
 // }
 
-// interface ProcessingOptions {
-//   mode?: ProcessingMode;
-//   batchSize?: number;
-//   maxItems?: number;
-//   progressCallback?: (current: number, total: number) => void;
-//   priorityUrls?: string[];
-// }
+
 
 // interface ProcessingLimits {
 //   maxItems: number;
@@ -159,6 +230,396 @@
 //   }
 
 
+// // ═══════════════════════════════════════════════════════════
+// // STEP 2: ADD THESE METHODS to the AIFixService class
+// // (Add after the existing addLog method)
+// // ═══════════════════════════════════════════════════════════
+
+// /**
+//  * Creates backup before content modification
+//  */
+// private async createContentModificationBackup(
+//   fixes: AIFix[],
+//   operationType: 'content_expansion' | 'eat_improvement'
+// ): Promise<Map<number, ContentBackup>> {
+//   const backups = new Map<number, ContentBackup>();
+  
+//   try {
+//     this.addLog(`🔒 Creating ${operationType} backup...`, "info");
+    
+//     const postIds = fixes
+//       .map(f => f.wordpressPostId)
+//       .filter(id => id) as number[];
+    
+//     if (postIds.length === 0) {
+//       this.addLog("No posts to backup", "warning");
+//       return backups;
+//     }
+
+//     await storage.createBackup({
+//       userId: this.currentUserId!,
+//       websiteId: this.currentWebsiteId!,
+//       backupType: operationType,
+//       status: "completed",
+//       data: {
+//         affectedPostIds: postIds,
+//         timestamp: new Date().toISOString(),
+//         operationType,
+//       },
+//       metadata: {
+//         reason: `Before AI ${operationType.replace('_', ' ')} (HIGH RISK operation)`,
+//         postCount: postIds.length,
+//         sessionId: randomUUID(),
+//       },
+//     });
+    
+//     this.addLog(`✅ Backup created for ${postIds.length} posts`, "success");
+//     return backups;
+    
+//   } catch (error: any) {
+//     this.addLog(`❌ Backup creation failed: ${error.message}`, "error");
+//     throw new Error(`SAFETY: Cannot proceed without backup - ${error.message}`);
+//   }
+// }
+
+// /**
+//  * Verifies backup exists
+//  */
+// private async verifyBackupExists(operationType: string): Promise<boolean> {
+//   try {
+//     const recentBackups = await storage.getBackupsByWebsite(
+//       this.currentWebsiteId!,
+//       this.currentUserId!
+//     );
+    
+//     const relevantBackup = recentBackups.find(b => 
+//       b.backupType === operationType &&
+//       new Date(b.createdAt).getTime() > Date.now() - 300000 // Within last 5 minutes
+//     );
+    
+//     return !!relevantBackup;
+//   } catch {
+//     return false;
+//   }
+// }
+
+// /**
+//  * Deep content comparison to detect removal
+//  */
+// private performDeepContentComparison(
+//   originalHtml: string,
+//   modifiedHtml: string
+// ): {
+//   isValid: boolean;
+//   issues: string[];
+//   stats: {
+//     originalWords: number;
+//     modifiedWords: number;
+//     originalChars: number;
+//     modifiedChars: number;
+//     originalParagraphs: number;
+//     modifiedParagraphs: number;
+//   };
+// } {
+//   const issues: string[] = [];
+  
+//   const originalText = this.extractTextFromHTML(originalHtml);
+//   const modifiedText = this.extractTextFromHTML(modifiedHtml);
+  
+//   const originalWords = originalText.split(/\s+/).filter(w => w.length > 0).length;
+//   const modifiedWords = modifiedText.split(/\s+/).filter(w => w.length > 0).length;
+  
+//   const originalChars = originalText.replace(/\s/g, '').length;
+//   const modifiedChars = modifiedText.replace(/\s/g, '').length;
+  
+//   const originalParagraphs = (originalHtml.match(/<p[^>]*>/gi) || []).length;
+//   const modifiedParagraphs = (modifiedHtml.match(/<p[^>]*>/gi) || []).length;
+  
+//   // Word count must NOT decrease
+//   if (modifiedWords < originalWords) {
+//     issues.push(
+//       `Word count DECREASED: ${originalWords} → ${modifiedWords} (-${originalWords - modifiedWords} words)`
+//     );
+//   }
+  
+//   // Character retention check
+//   const charRetention = modifiedChars / originalChars;
+//   if (charRetention < CONTENT_PROTECTION_CONFIG.MIN_CHAR_RETENTION) {
+//     issues.push(
+//       `Character loss: Only ${(charRetention * 100).toFixed(1)}% retained`
+//     );
+//   }
+  
+//   return {
+//     isValid: issues.length === 0,
+//     issues,
+//     stats: {
+//       originalWords,
+//       modifiedWords,
+//       originalChars,
+//       modifiedChars,
+//       originalParagraphs,
+//       modifiedParagraphs,
+//     }
+//   };
+// }
+
+// /**
+//  * Verifies key content is present
+//  */
+// private verifyKeyContentPresent(
+//   originalHtml: string,
+//   modifiedHtml: string
+// ): {
+//   allPresent: boolean;
+//   missingHeadings: string[];
+//   missingParagraphs: number;
+//   missingSentences: number;
+// } {
+//   const $ = cheerio.load(originalHtml, this.getCheerioConfig());
+//   const modifiedText = this.extractTextFromHTML(modifiedHtml).toLowerCase();
+  
+//   const headings: string[] = [];
+//   $('h1, h2, h3, h4, h5, h6').each((_, elem) => {
+//     const text = $(elem).text().trim();
+//     if (text.length > 0) {
+//       headings.push(text);
+//     }
+//   });
+  
+//   const missingHeadings = headings.filter(heading => 
+//     !modifiedText.includes(heading.toLowerCase())
+//   );
+  
+//   return {
+//     allPresent: missingHeadings.length === 0,
+//     missingHeadings,
+//     missingParagraphs: 0,
+//     missingSentences: 0,
+//   };
+// }
+
+// /**
+//  * Validates content expansion
+//  */
+// private validateContentExpansion(
+//   originalContent: string,
+//   expandedContent: string,
+//   originalImages: Array<{ src: string; element: string }>,
+//   minWords: number
+// ): ContentExpansionResult {
+//   try {
+//     this.addLog("   🔍 Running strict content validation...", "info");
+    
+//     const comparison = this.performDeepContentComparison(
+//       originalContent,
+//       expandedContent
+//     );
+    
+//     if (!comparison.isValid) {
+//       this.addLog("   ❌ Content validation failed:", "error");
+//       comparison.issues.forEach(issue => {
+//         this.addLog(`      ${issue}`, "error");
+//       });
+      
+//       return {
+//         success: false,
+//         originalWordCount: comparison.stats.originalWords,
+//         finalWordCount: comparison.stats.modifiedWords,
+//         wordsAdded: comparison.stats.modifiedWords - comparison.stats.originalWords,
+//         imagesPreserved: false,
+//         imageCount: 0,
+//         error: `Content protection failed: ${comparison.issues[0]}`
+//       };
+//     }
+    
+//     const keyContent = this.verifyKeyContentPresent(originalContent, expandedContent);
+    
+//     if (!keyContent.allPresent && keyContent.missingHeadings.length > 0) {
+//       return {
+//         success: false,
+//         originalWordCount: comparison.stats.originalWords,
+//         finalWordCount: comparison.stats.modifiedWords,
+//         wordsAdded: comparison.stats.modifiedWords - comparison.stats.originalWords,
+//         imagesPreserved: false,
+//         imageCount: 0,
+//         error: `Headings removed: ${keyContent.missingHeadings[0]}`
+//       };
+//     }
+    
+//     const originalWordCount = comparison.stats.originalWords;
+//     const finalWordCount = comparison.stats.modifiedWords;
+//     const wordsAdded = finalWordCount - originalWordCount;
+    
+//     if (wordsAdded <= 0) {
+//       return {
+//         success: false,
+//         originalWordCount,
+//         finalWordCount,
+//         wordsAdded: 0,
+//         imagesPreserved: false,
+//         imageCount: 0,
+//         error: `No expansion: ${originalWordCount} → ${finalWordCount} words`
+//       };
+//     }
+    
+//     if (finalWordCount < minWords) {
+//       return {
+//         success: false,
+//         originalWordCount,
+//         finalWordCount,
+//         wordsAdded,
+//         imagesPreserved: false,
+//         imageCount: 0,
+//         error: `Below minimum: ${finalWordCount} < ${minWords} words`
+//       };
+//     }
+    
+//     if (finalWordCount > CONTENT_EXPANSION_CONFIG.MAX_WORD_COUNT) {
+//       return {
+//         success: false,
+//         originalWordCount,
+//         finalWordCount,
+//         wordsAdded,
+//         imagesPreserved: false,
+//         imageCount: 0,
+//         error: `Exceeded maximum: ${finalWordCount} > ${CONTENT_EXPANSION_CONFIG.MAX_WORD_COUNT}`
+//       };
+//     }
+    
+//     const expandedImageCount = (expandedContent.match(/<img/g) || []).length;
+//     const imagesPreserved = expandedImageCount >= originalImages.length;
+    
+//     this.addLog("   ✅ All validation checks passed", "success");
+//     this.addLog(`      Words: ${originalWordCount} → ${finalWordCount} (+${wordsAdded})`, "success");
+//     this.addLog(`      Images: ${expandedImageCount}/${originalImages.length} preserved`, "success");
+    
+//     return {
+//       success: true,
+//       originalWordCount,
+//       finalWordCount,
+//       wordsAdded,
+//       imagesPreserved,
+//       imageCount: expandedImageCount,
+//     };
+
+//   } catch (error: any) {
+//     return {
+//       success: false,
+//       originalWordCount: 0,
+//       finalWordCount: 0,
+//       wordsAdded: 0,
+//       imagesPreserved: false,
+//       imageCount: 0,
+//       error: `Validation error: ${error.message}`
+//     };
+//   }
+// }
+
+// /**
+//  * Analyzes E-E-A-T signals
+//  */
+// private analyzeEATSignals(content: string): {
+//   score: number;
+//   signals: string[];
+//   missing: string[];
+// } {
+//   const signals: string[] = [];
+//   const missing: string[] = [];
+  
+//   const contentLower = content.toLowerCase();
+  
+//   const hasAuthor = 
+//     contentLower.includes('author') ||
+//     contentLower.includes('written by') ||
+//     contentLower.includes('by ') ||
+//     contentLower.includes('expert');
+  
+//   if (hasAuthor) {
+//     signals.push('Author Attribution');
+//   } else {
+//     missing.push('Author Attribution');
+//   }
+  
+//   const hasCitations = 
+//     contentLower.includes('source') ||
+//     contentLower.includes('according to') ||
+//     contentLower.includes('study') ||
+//     contentLower.includes('research') ||
+//     (content.match(/https?:\/\//g) || []).length >= 2;
+  
+//   if (hasCitations) {
+//     signals.push('Citations/Sources');
+//   } else {
+//     missing.push('Citations/Sources');
+//   }
+  
+//   const hasExpertise = 
+//     contentLower.includes('experience') ||
+//     contentLower.includes('credential') ||
+//     contentLower.includes('certified') ||
+//     contentLower.includes('years of') ||
+//     contentLower.includes('professional');
+  
+//   if (hasExpertise) {
+//     signals.push('Expertise Indicators');
+//   } else {
+//     missing.push('Expertise Indicators');
+//   }
+  
+//   return {
+//     score: signals.length,
+//     signals,
+//     missing
+//   };
+// }
+// /**
+//  * Adds E-E-A-T signals using AI
+//  */
+// private async addEATSignals(
+//   title: string,
+//   content: string,
+//   missingSignals: string[],
+//   provider: string,
+//   userId?: string
+// ): Promise<string> {
+//   const systemPrompt = `You are an expert content editor enhancing E-E-A-T signals.
+
+// CRITICAL REQUIREMENTS:
+// 1. PRESERVE 100% of existing content
+// 2. PRESERVE ALL image placeholders
+// 3. ADD missing E-E-A-T signals naturally
+// 4. Return ONLY the enhanced HTML
+
+// SIGNALS TO ADD:
+// ${missingSignals.map(s => `- ${s}`).join('\n')}
+
+// STYLE:
+// - Keep original tone
+// - Be specific (use real-sounding credentials)
+// - Place additions naturally
+// - Don't sound artificially authoritative`;
+
+//   const userPrompt = `Enhance with: ${missingSignals.join(', ')}
+
+// Title: ${title}
+
+// Content:
+// ${content}
+
+// Add signals WITHOUT removing content.`;
+
+//   const response = await this.callAIProvider(
+//     provider,
+//     systemPrompt,
+//     userPrompt,
+//     4000,
+//     0.7,
+//     userId
+//   );
+
+//   return this.cleanAndValidateContent(response);
+// }
 
 
 //   // API Key Management Methods
@@ -311,38 +772,6 @@
 //     return allContent.slice(0, maxItems);
 //   }
 
-
-//   //don't remove!
-//   // private async getWordPressContentPaginated(
-//   //   creds: WordPressCredentials,
-//   //   type: "posts" | "pages",
-//   //   page: number = 1,
-//   //   perPage: number = 50
-//   // ): Promise<any[]> {
-//   //   const endpoint = `${creds.url.replace(/\/$/, "")}/wp-json/wp/v2/${type}`;
-//   //   const auth = Buffer.from(
-//   //     `${creds.username}:${creds.applicationPassword}`
-//   //   ).toString("base64");
-
-//   //   const response = await fetch(
-//   //     `${endpoint}?per_page=${perPage}&page=${page}&status=publish`,
-//   //     {
-//   //       headers: {
-//   //         Authorization: `Basic ${auth}`,
-//   //         "Content-Type": "application/json",
-//   //       },
-//   //     }
-//   //   );
-
-//   //   if (!response.ok) {
-//   //     if (response.status === 400 || response.status === 404) {
-//   //       return [];
-//   //     }
-//   //     throw new Error(`Failed to fetch ${type}: ${response.status}`);
-//   //   }
-//   //   return response.json();
-//   // }
-
 //   private async getWordPressContentPaginated(
 //   creds: WordPressCredentials,
 //   type: "posts" | "pages",
@@ -372,7 +801,9 @@
 // }
 
 //   // Main entry point
-//   async analyzeAndFixWebsite(
+// // ✅ REPLACE your analyzeAndFixWebsite method with this:
+
+// async analyzeAndFixWebsite(
 //   websiteId: string,
 //   userId: string,
 //   dryRun: boolean = false,
@@ -385,6 +816,12 @@
 //     forceReanalysis?: boolean;
 //     processingMode?: ProcessingMode;
 //     processingOptions?: ProcessingOptions;
+//     // ✅ ADD THESE NEW PROPERTIES
+//     enableContentExpansion?: boolean;
+//     enableEATImprovements?: boolean;
+//     contentExpansionMinWords?: number;
+//     contentExpansionIdealWords?: number;
+//     maxPagesPerSession?: number;
 //   } = {}
 // ): Promise<AIFixResult> {
 //   this.log = [];
@@ -395,6 +832,47 @@
 //   this.addLog("=== Starting AI Fix Analysis ===", "info");
 //   this.addLog(`Session ID: ${fixSessionId}`, "info");
 //   this.addLog(`Dry run: ${dryRun}`, "info");
+
+//   // ✅ ADD THIS - Merge processing options
+//   const processingOptions: ProcessingOptions = {
+//     ...options.processingOptions,
+//     enableContentExpansion: 
+//       options.enableContentExpansion ?? 
+//       options.processingOptions?.enableContentExpansion ?? 
+//       false,
+//     enableEATImprovements: 
+//       options.enableEATImprovements ?? 
+//       options.processingOptions?.enableEATImprovements ?? 
+//       false,
+//     contentExpansionMinWords: 
+//       options.contentExpansionMinWords ?? 
+//       options.processingOptions?.contentExpansionMinWords,
+//     contentExpansionIdealWords:
+//       options.contentExpansionIdealWords ??
+//       options.processingOptions?.contentExpansionIdealWords,
+//     maxPagesPerSession:
+//       options.maxPagesPerSession ??
+//       options.processingOptions?.maxPagesPerSession,
+//     requireBackup: true, // Always require backup for safety
+//   };
+
+//   // ✅ ADD THIS - Log enabled features
+//   if (processingOptions.enableContentExpansion) {
+//     this.addLog("✅ Content Expansion: ENABLED", "success");
+//     const minWords = processingOptions.contentExpansionMinWords || CONTENT_EXPANSION_CONFIG.MIN_WORD_COUNT;
+//     const maxPages = processingOptions.maxPagesPerSession || CONTENT_EXPANSION_CONFIG.MAX_PAGES_PER_SESSION;
+//     this.addLog(`   Min words: ${minWords}, Max pages: ${maxPages}`, "info");
+//   } else {
+//     this.addLog("⚪ Content Expansion: DISABLED (safe mode)", "info");
+//   }
+
+//   if (processingOptions.enableEATImprovements) {
+//     this.addLog("✅ E-E-A-T Improvements: ENABLED", "success");
+//     const maxPages = processingOptions.maxPagesPerSession || EAT_IMPROVEMENT_CONFIG.MAX_PAGES_PER_SESSION;
+//     this.addLog(`   Max pages: ${maxPages}`, "info");
+//   } else {
+//     this.addLog("⚪ E-E-A-T Improvements: DISABLED (safe mode)", "info");
+//   }
 
 //   try {
 //     this.addLog(
@@ -425,82 +903,84 @@
 
 //     this.addLog(`Will attempt to fix ${fixesToApply.length} issues`);
 
-//       if (!dryRun) {
-//         const result = await this.applyFixesAndAnalyze(
-//           website,
-//           websiteId,
-//           userId,
-//           fixesToApply,
-//           fixSessionId,
-//           { ...options, enableReanalysis: false }
-//         );
+//     if (!dryRun) {
+//       // ✅ UPDATE THIS - Pass processingOptions
+//       const result = await this.applyFixesAndAnalyze(
+//         website,
+//         websiteId,
+//         userId,
+//         fixesToApply,
+//         fixSessionId,
+//         { ...options, processingOptions, enableReanalysis: false } // ✅ ADD processingOptions
+//       );
 
-//         let purgeResult: { success: boolean; purgedCaches: string[]; recommendedWaitMinutes: number } | null = null;
+//       let purgeResult: { success: boolean; purgedCaches: string[]; recommendedWaitMinutes: number } | null = null;
+      
+//       try {
+//         const creds = this.getWordPressCredentials(website);
+//         purgeResult = await this.purgeWordPressCache(creds);
         
-//         try {
-//           const creds = this.getWordPressCredentials(website);
-//           purgeResult = await this.purgeWordPressCache(creds);
-          
-//           if (purgeResult.success) {
-//             this.addLog(
-//               `Cache purged successfully: ${purgeResult.purgedCaches.join(', ')}`,
-//               "success"
-//             );
-//           }
-//         } catch (error: any) {
-//           this.addLog(`Cache purge failed: ${error.message}`, "warning");
+//         if (purgeResult.success) {
+//           this.addLog(
+//             `Cache purged successfully: ${purgeResult.purgedCaches.join(', ')}`,
+//             "success"
+//           );
 //         }
+//       } catch (error: any) {
+//         this.addLog(`Cache purge failed: ${error.message}`, "warning");
+//       }
 
-//         if (options.enableReanalysis !== false) {
-//           const recommendedWaitMinutes = purgeResult?.recommendedWaitMinutes || 15;
-//           const hoursDelay = options.forceReanalysis ? (recommendedWaitMinutes / 60) : 24;
+//       if (options.enableReanalysis !== false) {
+//         const recommendedWaitMinutes = purgeResult?.recommendedWaitMinutes || 15;
+//         const hoursDelay = options.forceReanalysis ? (recommendedWaitMinutes / 60) : 24;
+        
+//         if (options.forceReanalysis) {
+//           this.addLog(
+//             `Force reanalysis enabled - waiting ${recommendedWaitMinutes} minutes for cache to clear`,
+//             "info"
+//           );
           
-//           if (options.forceReanalysis) {
-//             this.addLog(
-//               `Force reanalysis enabled - waiting ${recommendedWaitMinutes} minutes for cache to clear`,
-//               "info"
-//             );
-            
-//             const reanalysisData = await this.performFullReanalysis(
-//               website,
-//               userId,
-//               websiteId,
-//               recommendedWaitMinutes * 60 * 1000,
-//               purgeResult?.purgedCaches || []
-//             );
-            
-//             result.reanalysis = reanalysisData;
-            
-//             if (reanalysisData.success) {
-//               if (reanalysisData.scoreImprovement > 0) {
-//                 result.message += ` SEO score improved: ${reanalysisData.initialScore} → ${reanalysisData.finalScore} (+${reanalysisData.scoreImprovement} points)`;
-//               } else if (!reanalysisData.cacheCleared) {
-//                 result.message += ` Reanalysis completed but cache may still be active. Recommend manual recheck in 30 minutes.`;
-//               } else {
-//                 result.message += ` Reanalysis complete. Score: ${reanalysisData.finalScore} (no immediate improvement detected)`;
-//               }
+//           const reanalysisData = await this.performFullReanalysis(
+//             website,
+//             userId,
+//             websiteId,
+//             recommendedWaitMinutes * 60 * 1000,
+//             purgeResult?.purgedCaches || []
+//           );
+          
+//           result.reanalysis = reanalysisData;
+          
+//           if (reanalysisData.success) {
+//             if (reanalysisData.scoreImprovement > 0) {
+//               result.message += ` SEO score improved: ${reanalysisData.initialScore} → ${reanalysisData.finalScore} (+${reanalysisData.scoreImprovement} points)`;
+//             } else if (!reanalysisData.cacheCleared) {
+//               result.message += ` Reanalysis completed but cache may still be active. Recommend manual recheck in 30 minutes.`;
 //             } else {
-//               result.message += ` Reanalysis failed: ${reanalysisData.error || 'Unknown error'}`;
+//               result.message += ` Reanalysis complete. Score: ${reanalysisData.finalScore} (no immediate improvement detected)`;
 //             }
 //           } else {
-//             await this.scheduleDelayedReanalysis(websiteId, userId, hoursDelay);
-//             result.message += ` Reanalysis scheduled for ${hoursDelay} hours to allow full cache invalidation.`;
+//             result.message += ` Reanalysis failed: ${reanalysisData.error || 'Unknown error'}`;
 //           }
+//         } else {
+//           await this.scheduleDelayedReanalysis(websiteId, userId, hoursDelay);
+//           result.message += ` Reanalysis scheduled for ${hoursDelay} hours to allow full cache invalidation.`;
 //         }
-
-//         return result;
-//       } else {
-//         return await this.performDryRun(
-//           fixesToApply,
-//           fixSessionId,
-//           options,
-//           website
-//         );
 //       }
-//     } catch (error) {
-//       return this.createErrorResult(error, dryRun, fixSessionId);
+
+//       return result;
+//     } else {
+//       // ✅ UPDATE THIS - Pass processingOptions to dry run
+//       return await this.performDryRun(
+//         fixesToApply,
+//         fixSessionId,
+//         { ...options, processingOptions }, // ✅ ADD processingOptions
+//         website
+//       );
 //     }
+//   } catch (error) {
+//     return this.createErrorResult(error, dryRun, fixSessionId);
 //   }
+// }
 
 //   private async scheduleDelayedReanalysis(
 //     websiteId: string,
@@ -622,209 +1102,6 @@
 //   }));
 // }
 
-
-// //don't remove!
-// // private async purgeWordPressCache(creds: WordPressCredentials): Promise<{
-// //     success: boolean;
-// //     purgedCaches: string[];
-// //     recommendedWaitMinutes: number;
-// //   }> {
-// //     this.addLog("Attempting comprehensive cache purge...", "info");
-    
-// //     const auth = Buffer.from(
-// //       `${creds.username}:${creds.applicationPassword}`
-// //     ).toString('base64');
-    
-// //     const purgedCaches: string[] = [];
-// //     let recommendedWaitMinutes = 5;
-    
-// //     let hasCDN = false;
-// //     try {
-// //       const testResponse = await fetch(creds.url, { 
-// //         method: 'HEAD',
-// //         headers: { 'User-Agent': 'Mozilla/5.0' }
-// //       });
-      
-// //       const cfRay = testResponse.headers.get('cf-ray');
-// //       const xCache = testResponse.headers.get('x-cache');
-// //       const xCDN = testResponse.headers.get('x-cdn');
-      
-// //       if (cfRay) {
-// //         hasCDN = true;
-// //         this.addLog("Cloudflare CDN detected - cache propagation may take 10-15 minutes", "warning");
-// //         recommendedWaitMinutes = 15;
-// //       } else if (xCache || xCDN) {
-// //         hasCDN = true;
-// //         this.addLog("CDN detected - cache propagation may take 10 minutes", "warning");
-// //         recommendedWaitMinutes = 10;
-// //       }
-// //     } catch (error: any) {
-// //       this.addLog(`CDN detection failed: ${error.message}`, "info");
-// //     }
-    
-// //     const purgeMethods = [
-// //       {
-// //         name: 'LiteSpeed Cache',
-// //         execute: async () => {
-// //           const response = await fetch(`${creds.url}/wp-json/litespeed/v1/purge_all`, {
-// //             method: 'POST',
-// //             headers: {
-// //               'Authorization': `Basic ${auth}`,
-// //               'Content-Type': 'application/json'
-// //             }
-// //           });
-// //           return response.ok;
-// //         }
-// //       },
-// //       {
-// //         name: 'WP Rocket',
-// //         execute: async () => {
-// //           const response = await fetch(`${creds.url}/wp-json/wp-rocket/v1/purge-cache`, {
-// //             method: 'POST',
-// //             headers: {
-// //               'Authorization': `Basic ${auth}`,
-// //               'Content-Type': 'application/json'
-// //             }
-// //           });
-// //           return response.ok;
-// //         }
-// //       },
-// //       {
-// //         name: 'W3 Total Cache',
-// //         execute: async () => {
-// //           const response = await fetch(`${creds.url}/wp-json/w3tc/v1/flush`, {
-// //             method: 'POST',
-// //             headers: {
-// //               'Authorization': `Basic ${auth}`,
-// //               'Content-Type': 'application/json'
-// //             }
-// //           });
-// //           return response.ok;
-// //         }
-// //       },
-// //       {
-// //         name: 'WP Super Cache',
-// //         execute: async () => {
-// //           const response = await fetch(`${creds.url}/wp-json/wp-super-cache/v1/cache`, {
-// //             method: 'DELETE',
-// //             headers: {
-// //               'Authorization': `Basic ${auth}`,
-// //               'Content-Type': 'application/json'
-// //             }
-// //           });
-// //           return response.ok;
-// //         }
-// //       },
-// //       {
-// //         name: 'WP Fastest Cache',
-// //         execute: async () => {
-// //           const response = await fetch(`${creds.url}/wp-json/wpfc/v1/cache/delete`, {
-// //             method: 'POST',
-// //             headers: {
-// //               'Authorization': `Basic ${auth}`,
-// //               'Content-Type': 'application/json'
-// //             }
-// //           });
-// //           return response.ok;
-// //         }
-// //       },
-// //       {
-// //         name: 'Autoptimize',
-// //         execute: async () => {
-// //           const response = await fetch(`${creds.url}/wp-json/autoptimize/v1/cache/purge`, {
-// //             method: 'POST',
-// //             headers: {
-// //               'Authorization': `Basic ${auth}`,
-// //               'Content-Type': 'application/json'
-// //             }
-// //           });
-// //           return response.ok;
-// //         }
-// //       },
-// //       {
-// //         name: 'Redis Object Cache',
-// //         execute: async () => {
-// //           const response = await fetch(`${creds.url}/wp-json/redis-cache/v1/flush`, {
-// //             method: 'POST',
-// //             headers: {
-// //               'Authorization': `Basic ${auth}`,
-// //               'Content-Type': 'application/json'
-// //             }
-// //           });
-// //           return response.ok;
-// //         }
-// //       },
-// //       {
-// //         name: 'Transient Cache',
-// //         execute: async () => {
-// //           const response = await fetch(`${creds.url}/wp-json/wp/v2/settings`, {
-// //             method: 'POST',
-// //             headers: { 
-// //               'Authorization': `Basic ${auth}`, 
-// //               'Content-Type': 'application/json'
-// //             },
-// //             body: JSON.stringify({ 
-// //               _wpnonce: Date.now().toString()
-// //             })
-// //           });
-// //           return response.status === 200 || response.status === 403;
-// //         }
-// //       }
-// //     ];
-
-// //     for (const method of purgeMethods) {
-// //       try {
-// //         const success = await method.execute();
-// //         if (success) {
-// //           purgedCaches.push(method.name);
-// //           this.addLog(`Cache purged via ${method.name}`, "success");
-// //         }
-// //       } catch (error: any) {
-// //         if (error.message && !error.message.includes('404')) {
-// //           this.addLog(`${method.name} purge attempt: ${error.message}`, "info");
-// //         }
-// //       }
-// //     }
-    
-// //     try {
-// //       await fetch(`${creds.url}?nocache=${Date.now()}`, {
-// //         headers: {
-// //           'Cache-Control': 'no-cache, no-store, must-revalidate',
-// //           'Pragma': 'no-cache'
-// //         }
-// //       });
-// //     } catch (error) {
-// //       // Ignore errors
-// //     }
-    
-// //     const success = purgedCaches.length > 0;
-    
-// //     if (success) {
-// //       this.addLog(
-// //         `Successfully purged: ${purgedCaches.join(', ')} (${purgedCaches.length} cache system${purgedCaches.length > 1 ? 's' : ''})`, 
-// //         "success"
-// //       );
-      
-// //       if (hasCDN) {
-// //         this.addLog(
-// //           `CDN detected - recommend waiting ${recommendedWaitMinutes} minutes for full propagation`, 
-// //           "warning"
-// //         );
-// //       }
-// //     } else {
-// //       this.addLog(
-// //         "Could not purge cache via API - changes may take 10-30 minutes to propagate (cache TTL)", 
-// //         "warning"
-// //       );
-// //       recommendedWaitMinutes = 30;
-// //     }
-    
-// //     return {
-// //       success,
-// //       purgedCaches,
-// //       recommendedWaitMinutes
-// //     };
-// //   }
 
 
 // private async purgeWordPressCache(creds: WordPressCredentials): Promise<{
@@ -1010,61 +1287,65 @@
 //   };
 // }
 
+// // ✅ REPLACE your current applyFixesAndAnalyze with this:
 
-//   private async applyFixesAndAnalyze(
-//     website: any,
-//     websiteId: string,
-//     userId: string,
-//     fixesToApply: AIFix[],
-//     fixSessionId: string,
-//     options: any
-//   ): Promise<AIFixResult> {
-//     await this.markIssuesAsFixing(fixesToApply, fixSessionId);
+// private async applyFixesAndAnalyze(
+//   website: any,
+//   websiteId: string,
+//   userId: string,
+//   fixesToApply: AIFix[],
+//   fixSessionId: string,
+//   options: any
+// ): Promise<AIFixResult> {
+//   await this.markIssuesAsFixing(fixesToApply, fixSessionId);
 
-//     if (!options.skipBackup) {
-//       await this.createWebsiteBackup(website, userId);
-//     }
-
-//     const { appliedFixes, errors } = await this.applyFixes(
-//       website,
-//       fixesToApply,
-//       userId
-//     );
-
-//     try {
-//       const creds = this.getWordPressCredentials(website);
-//       await this.purgeWordPressCache(creds);
-//     } catch (error: any) {
-//       this.addLog(`Cache purge failed: ${error.message}`, "warning");
-//     }
-
-//     await this.updateIssueStatusesAfterFix(
-//       websiteId,
-//       userId,
-//       appliedFixes,
-//       fixSessionId
-//     );
-//     await this.cleanupStuckFixingIssues(websiteId, userId, fixSessionId);
-
-//     let reanalysisData: ReanalysisResult | undefined;
-
-//     await this.createActivityLog(
-//       userId,
-//       websiteId,
-//       appliedFixes,
-//       reanalysisData,
-//       fixSessionId
-//     );
-
-//     return this.createSuccessResult(
-//       appliedFixes,
-//       errors,
-//       fixesToApply.length,
-//       false,
-//       reanalysisData,
-//       fixSessionId
-//     );
+//   if (!options.skipBackup) {
+//     await this.createWebsiteBackup(website, userId);
 //   }
+
+//   // ✅ UPDATE THIS LINE - Pass processingOptions
+//   const { appliedFixes, errors } = await this.applyFixes(
+//     website,
+//     fixesToApply,
+//     userId,
+//     options.processingOptions  // ✅ ADD THIS PARAMETER
+//   );
+
+//   try {
+//     const creds = this.getWordPressCredentials(website);
+//     await this.purgeWordPressCache(creds);
+//   } catch (error: any) {
+//     this.addLog(`Cache purge failed: ${error.message}`, "warning");
+//   }
+
+//   await this.updateIssueStatusesAfterFix(
+//     websiteId,
+//     userId,
+//     appliedFixes,
+//     fixSessionId
+//   );
+//   await this.cleanupStuckFixingIssues(websiteId, userId, fixSessionId);
+
+//   let reanalysisData: ReanalysisResult | undefined;
+
+//   await this.createActivityLog(
+//     userId,
+//     websiteId,
+//     appliedFixes,
+//     reanalysisData,
+//     fixSessionId
+//   );
+
+//   return this.createSuccessResult(
+//     appliedFixes,
+//     errors,
+//     fixesToApply.length,
+//     false,
+//     reanalysisData,
+//     fixSessionId
+//   );
+// }
+
 
 //   private async performDryRun(
 //     fixesToApply: AIFix[],
@@ -1118,10 +1399,11 @@
 //     });
 //   }
 
-//   private async applyFixes(
+// private async applyFixes(
 //   website: any,
 //   fixes: AIFix[],
-//   userId?: string
+//   userId?: string,
+//   processingOptions?: ProcessingOptions  // ✅ ADD THIS
 // ): Promise<{ appliedFixes: AIFix[]; errors: string[] }> {
 //   const creds = this.getWordPressCredentials(website);
 //   await this.testWordPressConnection(creds);
@@ -1136,7 +1418,8 @@
 //     this.addLog(`Processing ${typeFixes.length} fixes of type: ${fixType}`);
 
 //     try {
-//       const strategy = this.getFixStrategy(fixType);
+//       // ✅ UPDATE THIS LINE - pass processingOptions
+//       const strategy = this.getFixStrategy(fixType, processingOptions);
 
 //       if (!strategy) {
 //         this.addLog(
@@ -1157,7 +1440,8 @@
 //       const uniqueFixes = this.deduplicateFixesByIssue(typeFixes);
 //       this.addLog(`Deduplicated to ${uniqueFixes.length} unique fix targets`);
 
-//       const result = await strategy(creds, uniqueFixes, userId);
+//       // ✅ UPDATE THIS LINE - pass processingOptions
+//       const result = await strategy(creds, uniqueFixes, userId, processingOptions);
 
 //       if (result.applied.length > 0) {
 //         result.applied.forEach((fix) => {
@@ -1199,63 +1483,77 @@
 //   return { appliedFixes, errors };
 // }
 
-//   private getFixStrategy(fixType: string): ((creds: WordPressCredentials, fixes: AIFix[], userId?: string) => Promise<{ applied: AIFix[]; errors: string[] }>) | null {
-//     const normalizedType = fixType.replace(/__/g, "_").toLowerCase();
+// // ✅ REPLACE your current getFixStrategy with this updated version:
 
-//     const methodMap: Record<string, string> = {
-//       missing_alt_text: "fixImageAltText",
-//       images_missing_alt_text: "fixImageAltText",
-//       missing_meta_description: "fixMetaDescriptions",
-//       meta_description_too_long: "fixMetaDescriptions",
-//       meta_description_too_short: "fixMetaDescriptions",
-//       duplicate_meta_descriptions: "fixDuplicateMetaDescriptions",
-//       title_tag_too_long: "fixTitleTags",
-//       title_tag_too_short: "fixTitleTags",
-//       poor_title_tag: "fixTitleTags",
-//       missing_title_tag: "fixTitleTags",
-//       missing_page_title: "fixTitleTags",
-//       heading_structure: "fixHeadingStructure",
-//       improper_heading_hierarchy: "fixHeadingStructure",
-//       missing_h1: "fixHeadingStructure",
-//       missing_h1_tag: "fixHeadingStructure",
-//       multiple_h1_tags: "fixHeadingStructure",
-//       heading_structure_could_improve: "fixHeadingStructure",
-//       thin_content: "expandThinContent",
-//       content_too_short: "expandThinContent",
-//       content_could_be_expanded: "expandThinContent",
-//       low_content_depth: "expandThinContent",
-//       poor_readability: "improveReadability",
-//       low_readability: "improveReadability",
-//       limited_expertise_signals: "improveEAT",
-//       limited_trustworthiness_signals: "improveEAT",
-//       low_eat_signals: "improveEAT",
-//       external_links_missing_attributes: "fixExternalLinkAttributes",
-//       broken_internal_links: "fixBrokenInternalLinks",
-//       images_missing_lazy_loading: "fixImageDimensions",
-//       missing_image_dimensions: "fixImageDimensions",
-//       missing_schema_markup: "addSchemaMarkup",
-//       missing_schema: "addSchemaMarkup",
-//       missing_open_graph_tags: "addOpenGraphTags",
-//       missing_canonical_url: "fixCanonicalUrls",
-//       missing_viewport_meta_tag: "addViewportMetaTag",
-//       missing_faq_schema: "addFAQSchema",
-//     };
+// private getFixStrategy(
+//   fixType: string,
+//   processingOptions?: ProcessingOptions  // ✅ ADD THIS
+// ): ((
+//   creds: WordPressCredentials,
+//   fixes: AIFix[],
+//   userId?: string,
+//   options?: ProcessingOptions  // ✅ ADD THIS
+// ) => Promise<{ applied: AIFix[]; errors: string[] }>) | null {
+//   const normalizedType = fixType.replace(/__/g, "_").toLowerCase();
 
-//     const methodName = methodMap[normalizedType] || methodMap[fixType];
-//     if (!methodName) {
-//       this.addLog(`No method mapping found for ${fixType}`, "warning");
-//       return null;
-//     }
+//   const methodMap: Record<string, string> = {
+//     missing_alt_text: "fixImageAltText",
+//     images_missing_alt_text: "fixImageAltText",
+//     missing_meta_description: "fixMetaDescriptions",
+//     meta_description_too_long: "fixMetaDescriptions",
+//     meta_description_too_short: "fixMetaDescriptions",
+//     duplicate_meta_descriptions: "fixDuplicateMetaDescriptions",
+//     title_tag_too_long: "fixTitleTags",
+//     title_tag_too_short: "fixTitleTags",
+//     poor_title_tag: "fixTitleTags",
+//     missing_title_tag: "fixTitleTags",
+//     missing_page_title: "fixTitleTags",
+//     heading_structure: "fixHeadingStructure",
+//     improper_heading_hierarchy: "fixHeadingStructure",
+//     missing_h1: "fixHeadingStructure",
+//     missing_h1_tag: "fixHeadingStructure",
+//     multiple_h1_tags: "fixHeadingStructure",
+//     heading_structure_could_improve: "fixHeadingStructure",
+//     thin_content: "expandThinContent",
+//     content_too_short: "expandThinContent",
+//     content_could_be_expanded: "expandThinContent",
+//     low_content_depth: "expandThinContent",
+//     poor_readability: "improveReadability",
+//     low_readability: "improveReadability",
+//     limited_expertise_signals: "improveEAT",
+//     limited_trustworthiness_signals: "improveEAT",
+//     low_eat_signals: "improveEAT",
+//     external_links_missing_attributes: "fixExternalLinkAttributes",
+//     broken_internal_links: "fixBrokenInternalLinks",
+//     images_missing_lazy_loading: "fixImageDimensions",
+//     missing_image_dimensions: "fixImageDimensions",
+//     missing_schema_markup: "addSchemaMarkup",
+//     missing_schema: "addSchemaMarkup",
+//     missing_open_graph_tags: "addOpenGraphTags",
+//     missing_canonical_url: "fixCanonicalUrls",
+//     missing_viewport_meta_tag: "addViewportMetaTag",
+//     missing_faq_schema: "addFAQSchema",
+//   };
 
-//     const method = (this as any)[methodName];
-//     if (!method || typeof method !== "function") {
-//       this.addLog(`Method ${methodName} not found or not a function`, "error");
-//       return null;
-//     }
-
-//     this.addLog(`Found strategy method: ${methodName} for ${fixType}`, "success");
-//     return method.bind(this);
+//   const methodName = methodMap[normalizedType] || methodMap[fixType];
+//   if (!methodName) {
+//     this.addLog(`No method mapping found for ${fixType}`, "warning");
+//     return null;
 //   }
+
+//   const method = (this as any)[methodName];
+//   if (!method || typeof method !== "function") {
+//     this.addLog(`Method ${methodName} not found or not a function`, "error");
+//     return null;
+//   }
+
+//   this.addLog(`Found strategy method: ${methodName} for ${fixType}`, "success");
+  
+//   // ✅ RETURN WRAPPER THAT PASSES processingOptions
+//   return (creds: WordPressCredentials, fixes: AIFix[], userId?: string) => {
+//     return method.call(this, creds, fixes, userId, processingOptions);
+//   };
+// }
 
 //   // ==================== FIX STRATEGIES ====================
 
@@ -2044,60 +2342,60 @@
 //     );
 //   }
 
-//   private async fixBrokenInternalLinks(
-//     creds: WordPressCredentials,
-//     fixes: AIFix[],
-//     userId?: string
-//   ): Promise<{ applied: AIFix[]; errors: string[] }> {
-//     const [posts, pages] = await Promise.all([
-//       this.getWordPressContent(creds, "posts").catch(() => []),
-//       this.getWordPressContent(creds, "pages").catch(() => []),
-//     ]);
+// private async fixBrokenInternalLinks(
+//   creds: WordPressCredentials,
+//   fixes: AIFix[],
+//   userId?: string
+// ): Promise<{ applied: AIFix[]; errors: string[] }> {
+//   const [posts, pages] = await Promise.all([
+//     this.getWordPressContent(creds, "posts").catch(() => []),
+//     this.getWordPressContent(creds, "pages").catch(() => []),
+//   ]);
 
-//     const validUrls = new Set([...posts, ...pages].map((c) => c.link));
+//   const validUrls = new Set([...posts, ...pages].map((c) => c.link));
 
-//     return this.fixWordPressContent(
-//       creds,
-//       fixes,
-//       async (content, fix) => {
-//         const contentHtml = content.content?.rendered || content.content || "";
-//         const $ = cheerio.load(contentHtml, this.getCheerioConfig());
+//   return this.fixWordPressContent(
+//     creds,
+//     fixes,
+//     async (content, fix) => {
+//       const contentHtml = content.content?.rendered || content.content || "";
+//       const $ = cheerio.load(contentHtml, this.getCheerioConfig());
 
-//         let fixedLinks = 0;
+//       let fixedLinks = 0;
 
-//         $('a[href*="' + creds.url + '"]').each((_, elem) => {
-//           const href = $(elem).attr("href");
-//           if (href && !validUrls.has(href)) {
-//             const similarUrl = this.findSimilarUrl(href, validUrls);
-//             if (similarUrl) {
-//               $(elem).attr("href", similarUrl);
-//               fixedLinks++;
-//             } else {
-//               const text = $(elem).text();
-//               $(elem).replaceWith(text);
-//               fixedLinks++;
-//             }
+//       $('a[href*="' + creds.url + '"]').each((_, elem) => {
+//         const href = $(elem).attr("href");
+//         if (href && !validUrls.has(href)) {
+//           const similarUrl = this.findSimilarUrl(href, validUrls);
+//           if (similarUrl) {
+//             $(elem).attr("href", similarUrl);
+//             fixedLinks++;
+//           } else {
+//             const text = $(elem).text();
+//             $(elem).replaceWith(text);
+//             fixedLinks++;
 //           }
-//         });
-
-//         if (fixedLinks > 0) {
-//           const finalContent = this.extractHtmlContent($);
-//           return {
-//             updated: true,
-//             data: { content: finalContent },
-//             description: `Fixed ${fixedLinks} broken internal links`,
-//           };
 //         }
+//       });
 
+//       if (fixedLinks > 0) {
+//         const finalContent = this.extractHtmlContent($);
 //         return {
-//           updated: false,
-//           data: {},
-//           description: "No broken internal links found",
+//           updated: true,
+//           data: { content: finalContent },
+//           description: `Fixed ${fixedLinks} broken internal links`,
 //         };
-//       },
-//       userId
-//     );
-//   }
+//       }
+
+//       return {
+//         updated: false,
+//         data: {},
+//         description: "All internal links already working correctly",  // ✅ CHANGED
+//       };
+//     },
+//     userId
+//   );
+// }
 
 //   private async fixImageDimensions(
 //     creds: WordPressCredentials,
@@ -2392,36 +2690,482 @@
 //   }
 
 
+//   private async fixWordPressContentWithPrecheck(
+//   creds: WordPressCredentials,
+//   fixes: AIFix[],
+//   fixProcessor: (
+//     content: any,
+//     fix: AIFix
+//   ) => Promise<{
+//     updated: boolean;
+//     data: any;
+//     description: string;
+//     shouldSkip?: boolean;  // ✅ NEW: Flag to skip page
+//     error?: string;
+//   }>,
+//   userId?: string,
+//   processingOptions?: ProcessingOptions,
+//   preCheckValue?: number  // ✅ NEW: Value for pre-filtering (minWords or minEATScore)
+// ): Promise<{ applied: AIFix[]; errors: string[] }> {
+//   const applied: AIFix[] = [];
+//   const errors: string[] = [];
+
+//   try {
+//     const limits = processingOptions?.mode
+//       ? this.getProcessingLimits(processingOptions.mode)
+//       : { maxItems: 10, batchSize: 5, delayBetweenBatches: 1000 };
+
+//     const maxItems = processingOptions?.maxItems || limits.maxItems;
+//     const batchSize = processingOptions?.batchSize || limits.batchSize;
+
+//     let allContent: any[];
+//     if (
+//       processingOptions?.mode === ProcessingMode.PRIORITY &&
+//       processingOptions?.priorityUrls
+//     ) {
+//       allContent = await this.fetchPriorityContent(
+//         creds,
+//         processingOptions.priorityUrls
+//       );
+//     } else {
+//       allContent = await this.getAllWordPressContent(creds, maxItems);
+//     }
+
+//     this.addLog(`Fetched ${allContent.length} content items to analyze`);
+
+//     // ✅ NEW: Pre-filter content that needs fixes
+//     const contentNeedingFixes: any[] = [];
+//     const skippedContent: Array<{ id: number; reason: string }> = [];
+
+//     for (const content of allContent) {
+//       const contentHtml = content.content?.rendered || content.content || "";
+      
+//       // Quick pre-check without full processing
+//       if (preCheckValue !== undefined) {
+//         // For content expansion: check word count
+//         if (typeof preCheckValue === 'number' && preCheckValue >= 100) {
+//           const wordCount = this.extractTextFromHTML(contentHtml)
+//             .split(/\s+/)
+//             .filter(w => w.length > 0).length;
+          
+//           if (wordCount >= preCheckValue) {
+//             skippedContent.push({
+//               id: content.id,
+//               reason: `Already sufficient: ${wordCount} words`
+//             });
+            
+//             // Add to applied fixes as successful (already compliant)
+//             applied.push({
+//               type: fixes[0]?.type || 'content_expansion',
+//               description: `Content already sufficient: ${wordCount} words`,
+//               wordpressPostId: content.id,
+//               success: true,
+//               impact: 'low',
+//             });
+//             continue;
+//           }
+//         }
+//         // For E-E-A-T: check score
+//         else if (preCheckValue >= 0 && preCheckValue <= 3) {
+//           const eatScore = this.analyzeEATSignals(contentHtml);
+          
+//           if (eatScore.score >= preCheckValue) {
+//             skippedContent.push({
+//               id: content.id,
+//               reason: `E-E-A-T already adequate: ${eatScore.score}/3`
+//             });
+            
+//             // Add to applied fixes as successful (already compliant)
+//             applied.push({
+//               type: fixes[0]?.type || 'eat_improvement',
+//               description: `E-E-A-T already adequate: ${eatScore.score}/3`,
+//               wordpressPostId: content.id,
+//               success: true,
+//               impact: 'low',
+//             });
+//             continue;
+//           }
+//         }
+//       }
+      
+//       contentNeedingFixes.push(content);
+//     }
+
+//     // ✅ Log pre-filtering results
+//     if (skippedContent.length > 0) {
+//       this.addLog(`✅ Skipped ${skippedContent.length} pages (already compliant):`, "success");
+//       skippedContent.forEach(({ id, reason }) => {
+//         this.addLog(`   • Page ${id}: ${reason}`, "info");
+//       });
+//     }
+
+//     if (contentNeedingFixes.length === 0) {
+//       this.addLog("✅ All pages already compliant - no fixes needed!", "success");
+//       return { applied, errors };
+//     }
+
+//     this.addLog(`📝 Processing ${contentNeedingFixes.length} pages that need fixes`, "info");
+
+//     // ✅ Process only content that needs fixes
+//     let processedCount = 0;
+//     const processedContentIds = new Set<number>();
+
+//     for (let i = 0; i < contentNeedingFixes.length; i += batchSize) {
+//       const batch = contentNeedingFixes.slice(i, Math.min(i + batchSize, contentNeedingFixes.length));
+      
+//       for (const content of batch) {
+//         if (processedContentIds.has(content.id)) {
+//           this.addLog(`Skipping already processed content ${content.id}`, "info");
+//           continue;
+//         }
+
+//         const originalImages = this.extractImages(content.content?.rendered || "");
+//         let contentWasUpdated = false;
+//         let updateData: any = {};
+//         let hasContentConflict = false;
+
+//         for (const fix of fixes) {
+//           try {
+//             const result = await fixProcessor(content, fix);
+
+//             // ✅ Handle shouldSkip flag
+//             if (result.shouldSkip) {
+//               applied.push({
+//                 ...fix,
+//                 description: result.description,
+//                 wordpressPostId: content.id,
+//                 success: true,  // Already compliant = success
+//               });
+//               this.addLog(result.description, "info");
+//               continue;
+//             }
+
+//             const isAlreadyCompliant = 
+//               !result.updated && 
+//               (result.description?.includes("already") || 
+//                result.description?.includes("compliant") ||
+//                result.description?.includes("optimal") ||
+//                result.description?.includes("sufficient") ||
+//                result.description?.includes("not enough"));
+
+//             applied.push({
+//               ...fix,
+//               description: result.description,
+//               wordpressPostId: content.id,
+//               success: result.updated || isAlreadyCompliant,
+//             });
+
+//             if (result.updated) {
+//               if (result.data.content) {
+//                 const validation = this.validateContentLength(
+//                   content.content?.rendered || content.content || "",
+//                   result.data.content,
+//                   fix.type
+//                 );
+                
+//                 if (!validation.valid) {
+//                   this.addLog(`⚠️ ${validation.reason} - Skipping this fix`, "warning");
+//                   applied[applied.length - 1].success = false;
+//                   applied[applied.length - 1].error = validation.reason;
+//                   continue;
+//                 }
+                
+//                 result.data.content = this.ensureImagesPreserved(
+//                   result.data.content,
+//                   originalImages
+//                 );
+                
+//                 if (updateData.content) {
+//                   hasContentConflict = true;
+//                   this.addLog(
+//                     `⚠️ Multiple fixes modifying content for ${content.id} - later fix will override`,
+//                     "warning"
+//                   );
+//                 }
+//               }
+              
+//               updateData = { ...updateData, ...result.data };
+//               contentWasUpdated = true;
+//               this.addLog(result.description, "success");
+//             } else if (isAlreadyCompliant) {
+//               this.addLog(result.description, "info");
+//             }
+
+//           } catch (error) {
+//             const errorMsg = `Fix failed for content ${content.id}: ${
+//               error instanceof Error ? error.message : "Unknown error"
+//             }`;
+//             errors.push(errorMsg);
+//             this.addLog(errorMsg, "error");
+            
+//             applied.push({
+//               ...fix,
+//               description: errorMsg,
+//               wordpressPostId: content.id,
+//               success: false,
+//               error: errorMsg,
+//             });
+//           }
+//         }
+
+//         if (contentWasUpdated && Object.keys(updateData).length > 0) {
+//           try {
+//             await this.updateWordPressContent(
+//               creds,
+//               content.id,
+//               updateData,
+//               content.contentType
+//             );
+//             processedContentIds.add(content.id);
+            
+//             if (hasContentConflict) {
+//               this.addLog(
+//                 `⚠️ Content ${content.id} had multiple HTML modifications - verify results`,
+//                 "warning"
+//               );
+//             }
+//           } catch (error: any) {
+//             errors.push(`WordPress update failed for ${content.id}: ${error.message}`);
+//             this.addLog(`WordPress update failed for ${content.id}`, "error");
+//           }
+//         }
+
+//         processedCount++;
+//         if (processingOptions?.progressCallback) {
+//           processingOptions.progressCallback(processedCount, contentNeedingFixes.length);
+//         }
+//       }
+
+//       if (i + batchSize < contentNeedingFixes.length) {
+//         await new Promise((resolve) =>
+//           setTimeout(resolve, limits.delayBetweenBatches)
+//         );
+//       }
+//     }
+
+//     // ✅ Final summary
+//     this.addLog("", "info");
+//     this.addLog("═══════════════════════════════════════════", "info");
+//     this.addLog(`✅ PROCESSING COMPLETE`, "success");
+//     this.addLog(`   Total pages analyzed: ${allContent.length}`, "info");
+//     this.addLog(`   Already compliant (skipped): ${skippedContent.length}`, "success");
+//     this.addLog(`   Processed (needed fixes): ${processedCount}`, "info");
+//     this.addLog(`   Successfully fixed: ${applied.filter(f => f.success && !f.description?.includes('already')).length}`, "success");
+//     this.addLog("═══════════════════════════════════════════", "info");
+
+//     return { applied, errors };
+//   } catch (error: any) {
+//     const errorMsg = `WordPress content fix failed: ${error.message}`;
+//     errors.push(errorMsg);
+//     this.addLog(errorMsg, "error");
+//     return { applied, errors };
+//   }
+// }
 
 // private async expandThinContent(
 //   creds: WordPressCredentials,
 //   fixes: AIFix[],
-//   userId?: string
+//   userId?: string,
+//   processingOptions?: ProcessingOptions
 // ): Promise<{ applied: AIFix[]; errors: string[] }> {
-//   // ⚡ DISABLED FOR PERFORMANCE AND RELIABILITY
-//   // 
-//   // Reasons for disabling:
-//   // - Takes 90-240 seconds per page (very slow)
-//   // - Makes 2 AI attempts with retry logic
-//   // - Often reduces content instead of expanding (validation catches it)
-//   // - Image loss risk during AI processing
-//   // - Minimal SEO benefit (+2-5 points)
-//   // - Manual content expansion produces better quality
   
-//   this.addLog("Content expansion disabled for performance", "info");
+//   if (!processingOptions?.enableContentExpansion) {
+//     this.addLog("📝 Content expansion DISABLED", "info");
+//     return {
+//       applied: fixes.map(fix => ({
+//         ...fix,
+//         success: true,
+//         description: "Content expansion skipped - feature disabled for safety"
+//       })),
+//       errors: []
+//     };
+//   }
+
+//   const maxPages = processingOptions?.maxPagesPerSession || 
+//                    CONTENT_EXPANSION_CONFIG.MAX_PAGES_PER_SESSION;
   
-//   return {
-//     applied: fixes.map(fix => ({
-//       ...fix,
-//       success: true,
-//       description: "Content length adequate (AI expansion disabled for speed and reliability)"
-//     })),
-//     errors: []
-//   };
+//   if (fixes.length > maxPages) {
+//     this.addLog(`⚠️ SAFETY LIMIT: ${fixes.length} pages → limiting to ${maxPages}`, "warning");
+//     fixes = fixes.slice(0, maxPages);
+//   }
+
+//   const provider = await this.selectAIProvider(userId);
+//   if (!provider) {
+//     this.addLog("❌ No AI provider available", "error");
+//     return { applied: [], errors: ["No AI provider available"] };
+//   }
+
+//   const requireBackup = processingOptions?.requireBackup ?? 
+//                         CONTENT_EXPANSION_CONFIG.REQUIRE_BACKUP;
+  
+//   if (requireBackup) {
+//     try {
+//       await this.createContentModificationBackup(fixes, 'content_expansion');
+//       const backupVerified = await this.verifyBackupExists('content_expansion');
+//       if (!backupVerified) {
+//         throw new Error("Backup verification failed");
+//       }
+//     } catch (error: any) {
+//       this.addLog(`❌ Backup failed: ${error.message}`, "error");
+//       return { applied: [], errors: [`Safety requirement failed: ${error.message}`] };
+//     }
+//   }
+
+//   const minWords = processingOptions?.contentExpansionMinWords || 
+//                    CONTENT_EXPANSION_CONFIG.MIN_WORD_COUNT;
+//   const idealWords = processingOptions?.contentExpansionIdealWords || 
+//                      CONTENT_EXPANSION_CONFIG.IDEAL_WORD_COUNT;
+
+//   this.addLog("", "info");
+//   this.addLog("═══════════════════════════════════════════", "info");
+//   this.addLog("  🚀 CONTENT EXPANSION STARTED", "info");
+//   this.addLog("═══════════════════════════════════════════", "info");
+//   this.addLog(`  Provider: ${provider}`, "info");
+//   this.addLog(`  Pages: ${fixes.length}`, "info");
+//   this.addLog(`  Target: ${minWords}-${idealWords} words`, "info");
+//   this.addLog(`  Backup: ${requireBackup ? 'Created ✓' : 'Skipped'}`, "info");
+//   this.addLog("═══════════════════════════════════════════", "info");
+
+//   // ✅ NEW: Pre-filter pages that need expansion
+//   return this.fixWordPressContentWithPrecheck(
+//     creds,
+//     fixes,
+//     async (content, fix) => {
+//       const startTime = Date.now();
+//       const contentHtml = content.content?.rendered || content.content || "";
+//       const title = content.title?.rendered || content.title || "";
+      
+//       const currentWordCount = this.extractTextFromHTML(contentHtml)
+//         .split(/\s+/)
+//         .filter(w => w.length > 0).length;
+
+//       this.addLog("", "info");
+//       this.addLog(`📄 Processing: "${title.substring(0, 60)}..."`, "info");
+//       this.addLog(`   Current: ${currentWordCount} words`, "info");
+
+//       // ✅ UPDATED: Return skip instruction instead of processing
+//       if (currentWordCount >= minWords) {
+//         this.addLog(`   ✓ Already sufficient (${currentWordCount} ≥ ${minWords})`, "success");
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `Content sufficient: ${currentWordCount} words`,
+//           shouldSkip: true  // ✅ NEW: Signal to skip this page
+//         };
+//       }
+
+//       const wordsNeeded = minWords - currentWordCount;
+//       this.addLog(`   Target: Add ${wordsNeeded}+ words`, "info");
+
+//       const originalImages = this.extractImages(contentHtml);
+//       this.addLog(`   🖼️  Protecting ${originalImages.length} images`, "info");
+
+//       let expandedContent: string | null = null;
+//       let expansionResult: ContentExpansionResult | null = null;
+//       let attemptCount = 0;
+//       const maxRetries = CONTENT_EXPANSION_CONFIG.MAX_AI_RETRIES;
+
+//       while (attemptCount <= maxRetries && !expandedContent) {
+//         attemptCount++;
+//         const isRetry = attemptCount > 1;
+        
+//         if (isRetry) {
+//           this.addLog(`   🔄 Retry ${attemptCount}/${maxRetries + 1}`, "warning");
+//         }
+
+//         try {
+//           const expansionPromise = this.expandContentWithAI(
+//             title,
+//             contentHtml,
+//             provider,
+//             userId,
+//             minWords,
+//             idealWords,
+//             isRetry
+//           );
+
+//           const timeoutPromise = new Promise<never>((_, reject) =>
+//             setTimeout(
+//               () => reject(new Error('Timeout')),
+//               CONTENT_EXPANSION_CONFIG.TIMEOUT_PER_PAGE
+//             )
+//           );
+
+//           expandedContent = await Promise.race([expansionPromise, timeoutPromise]);
+          
+//           expansionResult = this.validateContentExpansion(
+//             contentHtml,
+//             expandedContent,
+//             originalImages,
+//             minWords
+//           );
+
+//           if (!expansionResult.success) {
+//             this.addLog(`   ⚠️  Validation failed: ${expansionResult.error}`, "warning");
+//             expandedContent = null;
+            
+//             if (attemptCount >= maxRetries) {
+//               throw new Error(expansionResult.error);
+//             }
+//           }
+
+//         } catch (error: any) {
+//           this.addLog(`   ❌ Attempt ${attemptCount} failed: ${error.message}`, "error");
+          
+//           if (attemptCount > maxRetries) {
+//             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+//             return {
+//               updated: false,
+//               data: {},
+//               description: `Failed after ${attemptCount} attempts: ${error.message}`,
+//               error: error.message
+//             };
+//           }
+          
+//           await new Promise(r => setTimeout(r, 2000 * attemptCount));
+//         }
+//       }
+
+//       if (!expandedContent || !expansionResult?.success) {
+//         return {
+//           updated: false,
+//           data: {},
+//           description: "Expansion failed validation",
+//           error: expansionResult?.error || "Unknown error"
+//         };
+//       }
+
+//       const finalContent = this.ensureImagesPreserved(expandedContent, originalImages);
+//       const finalImageCount = (finalContent.match(/<img/g) || []).length;
+      
+//       if (finalImageCount < originalImages.length) {
+//         this.addLog(`   ⚠️  Images: ${finalImageCount}/${originalImages.length}`, "warning");
+//       } else {
+//         this.addLog(`   ✓ All ${originalImages.length} images preserved`, "success");
+//       }
+
+//       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+//       const improvement = expansionResult.finalWordCount - expansionResult.originalWordCount;
+
+//       this.addLog(`   ✅ Expanded in ${elapsed}s`, "success");
+//       this.addLog(`   📊 ${expansionResult.originalWordCount} → ${expansionResult.finalWordCount} words (+${improvement})`, "success");
+
+//       return {
+//         updated: true,
+//         data: { content: finalContent },
+//         description: `Expanded: ${expansionResult.originalWordCount} → ${expansionResult.finalWordCount} words (+${improvement} in ${elapsed}s)`
+//       };
+//     },
+//     userId,
+//     processingOptions,
+//     minWords  // ✅ NEW: Pass minWords for pre-filtering
+//   );
 // }
 
 
-
+// /**
+//  * Expands content using AI with strict NO-REMOVAL protection
+//  */
 // private async expandContentWithAI(
 //   title: string,
 //   currentContent: string,
@@ -2443,6 +3187,9 @@
 //     "info"
 //   );
 
+//   // ═══════════════════════════════════════════════════════════
+//   // STEP 1: Protect images before AI processing
+//   // ═══════════════════════════════════════════════════════════
 //   const originalImages = this.extractImages(currentContent);
 //   let contentForAI = currentContent;
   
@@ -2451,89 +3198,160 @@
 //     contentForAI = this.replaceImagesWithPlaceholders(currentContent, originalImages);
 //   }
 
-//   const systemPrompt = `You are an expert content writer who creates comprehensive, valuable content.
+//   // ═══════════════════════════════════════════════════════════
+//   // STEP 2: Ultra-strict AI prompt - NEVER REMOVE CONTENT
+//   // ═══════════════════════════════════════════════════════════
+//   const systemPrompt = `You are an expert content expander who ADDS valuable information WITHOUT removing existing content.
 
-// CRITICAL REQUIREMENTS:
-// 1. The final output MUST be AT LEAST ${minimumWords} words (target: ${targetWordCount} words)
-// 2. PRESERVE 100% of the existing content - NEVER remove or significantly alter existing text
-// 3. PRESERVE ALL image placeholders EXACTLY as they appear (e.g., __IMAGE_PLACEHOLDER_0_1234567890__)
-// 4. ADD substantial new sections and paragraphs to reach the word count
-// 5. Quality over quantity - but you MUST hit the word count target
-// 6. Return ONLY the expanded HTML content - NO preambles, explanations, or meta-commentary
+// 🚨 ABSOLUTE RULES - THESE ARE NON-NEGOTIABLE:
 
-// ⚠️ CRITICAL: DO NOT remove or modify any text that looks like: __IMAGE_PLACEHOLDER_X_XXXXX__
-// These are image markers that must be preserved EXACTLY.
+// ❌ NEVER DELETE any existing text
+// ❌ NEVER REMOVE any existing paragraphs
+// ❌ NEVER SHORTEN any existing sentences
+// ❌ NEVER CHANGE existing headings
+// ❌ NEVER ALTER existing HTML structure
+// ❌ NEVER MODIFY image placeholders (__IMAGE_PLACEHOLDER_X_XXXX__)
+// ❌ NEVER REWRITE existing content
 
-// EXPANSION STRATEGY:
+// ✅ ONLY ADD new content
+// ✅ ONLY EXPAND on existing topics
+// ✅ ONLY INSERT new sections and paragraphs
+
+// YOUR TASK: EXPANSION ONLY, NEVER DELETION OR MODIFICATION
+
+// WORD COUNT REQUIREMENTS:
+// - Current content: ${currentWordCount} words
+// - You MUST ADD: ${wordsNeeded}+ words
+// - Final total MUST BE: ${minimumWords}+ words (target: ${targetWordCount})
+// - This is NOT optional - you MUST reach the word count
+
+// OUTPUT FORMAT:
+// - Return ONLY the expanded HTML content
+// - NO explanations, preambles, or markdown code blocks
+// - NO "Here's the expanded content..." or similar phrases
+// - Start directly with the HTML
+
+// EXPANSION APPROACH:
 // ${isRetry ? `
-// ⚠️ RETRY ATTEMPT - Previous expansion was insufficient
-// - Be MORE aggressive with expansion
-// - Add MORE detailed sections
-// - Include MORE examples and explanations
+// 🔄 RETRY ATTEMPT - Previous expansion was INSUFFICIENT
+
+// You MUST be MORE AGGRESSIVE:
+// - Add LONGER, MORE DETAILED sections (200-300 words each)
+// - Include MULTIPLE specific examples per point
+// - Add COMPREHENSIVE explanations with depth
+// - Include expert insights with credentials
+// - Add statistical data and research findings
+// - Provide detailed case studies
+// - Include troubleshooting sections
+// - Add FAQ sections with 5-10 questions
+// - DOUBLE the amount of new content vs. first attempt
 // ` : `
-// - Add detailed explanations and context
-// - Include practical examples and use cases
-// - Add expert insights and industry perspectives
-// - Provide step-by-step guidance where relevant
-// - Address common questions and concerns
-// - Include relevant statistics and data points
-// - Add comparison and analysis sections
+// Add comprehensive new content:
+// - Detailed background and context (100-200 words)
+// - Multiple practical examples (3-5 examples)
+// - Step-by-step processes and guides
+// - Benefits and advantages (detailed list)
+// - Challenges and solutions (with specifics)
+// - Expert tips and best practices (5-10 tips)
+// - Real-world applications and use cases
+// - Comparisons and alternatives
+// - Future trends and industry insights
+// - Common mistakes to avoid
 // `}
 
-// WORD COUNT VALIDATION:
-// - Current: ${currentWordCount} words
-// - Need to add: ${wordsNeeded}+ words
-// - Target total: ${targetWordCount} words
-// - Absolute minimum: ${minimumWords} words`;
+// HOW TO ADD CONTENT:
+// 1. Keep ALL existing content EXACTLY as written
+// 2. INSERT new paragraphs BETWEEN existing ones
+// 3. ADD new sections AFTER existing content
+// 4. EXPAND bullet points into full paragraphs
+// 5. ADD introductory and concluding paragraphs to sections
+// 6. INSERT examples and explanations naturally
 
-//   const userPrompt = `Expand this ${currentWordCount}-word content to AT LEAST ${minimumWords} words (ideally ${targetWordCount} words):
+// CRITICAL VALIDATION BEFORE RETURNING:
+// Before you return the content, verify:
+// ✓ All original text is STILL PRESENT
+// ✓ All headings are INTACT and UNCHANGED
+// ✓ All image placeholders are PRESERVED (count them!)
+// ✓ Word count is ${minimumWords}+ (count the words!)
+// ✓ You have ONLY ADDED content, NEVER removed
+
+// ⚠️ IF YOU CANNOT ADD ENOUGH CONTENT: Add more sections on related topics, include more examples, expand explanations further. DO NOT give up or return insufficient content.
+
+// Remember: ${isRetry ? 'THIS IS A RETRY - BE MUCH MORE AGGRESSIVE!' : 'EXPANSION ONLY - NEVER REMOVE ANYTHING'}`;
+
+//   const userPrompt = `TASK: Expand this content from ${currentWordCount} words to ${minimumWords}+ words (target: ${targetWordCount})
 
 // Title: ${title}
 
-// Current Content:
+// Current Content (DO NOT REMOVE OR MODIFY ANY OF THIS):
 // ${contentForAI}
 
-// EXPANSION REQUIREMENTS:
-// 1. Keep ALL existing content intact (including image placeholders)
-// 2. Add ${isRetry ? 'SUBSTANTIAL' : 'comprehensive'} new sections covering:
-//    ${isRetry ? `
-//    • Deep-dive analysis of key concepts
-//    • Multiple detailed examples with specific scenarios
-//    • Expert perspectives and industry insights
-//    • Common challenges and detailed solutions
-//    • Advanced tips and best practices
-//    • Comparative analysis and alternatives
-//    • Future trends and predictions
-//    • Real-world case studies
-//    ` : `
-//    • Detailed explanations of key points
-//    • Practical examples and real-world applications
-//    • Step-by-step guides and tutorials
-//    • Common questions and comprehensive answers
-//    • Benefits, challenges, and solutions
-//    • Expert tips and best practices
-//    • Related concepts and deeper context
-//    `}
+// CRITICAL INSTRUCTIONS:
+// 1. Every single word, sentence, and paragraph above MUST remain in your output
+// 2. All image placeholders (like __IMAGE_PLACEHOLDER_X_XXXX__) MUST be preserved exactly
+// 3. You MUST ADD at least ${wordsNeeded} new words
+// 4. Final word count MUST be ${minimumWords}+ words
 
-// 3. Organize new content with proper HTML structure (h2, h3, p tags)
-// 4. Ensure natural flow and readability
-// 5. Make content genuinely valuable and informative
+// NEW CONTENT TO ADD:
+// ${isRetry ? `
+// This is a RETRY. Previous attempt failed. Add MUCH MORE content:
+// - At least 5-8 new substantial sections (200-300 words each)
+// - Include extensive examples with specific scenarios
+// - Add detailed expert analysis with credentials
+// - Provide comprehensive how-to guides
+// - Include multiple case studies
+// - Add detailed comparisons and alternatives
+// - Include industry statistics and research data
+// - Add extensive FAQs (10+ Q&As)
+// - Include troubleshooting guides
+// - Add future trends and predictions
 
-// ${isRetry ? '⚠️ IMPORTANT: This is a retry - you MUST be more aggressive with expansion to reach the word count!' : ''}
+// DO NOT HOLD BACK - Add as much valuable content as needed to reach ${targetWordCount} words!
+// ` : `
+// Add valuable new content on:
+// - Detailed introduction and background
+// - Key concepts explained thoroughly
+// - 3-5 practical examples with specifics
+// - Step-by-step implementation guide
+// - Benefits and advantages (detailed)
+// - Common challenges and solutions
+// - Expert tips and best practices (7-10 tips)
+// - Real-world applications
+// - Comparisons with alternatives
+// - FAQ section (5-7 questions)
+// - Summary and next steps
+// `}
 
-// Remember: The expanded content MUST be at least ${minimumWords} words. Do not under-deliver on word count.`;
+// STRUCTURE YOUR ADDITIONS:
+// - Use <h2> for new major sections
+// - Use <h3> for subsections
+// - Use <p> for paragraphs
+// - Keep natural flow and readability
 
+// ${isRetry ? '🚨 CRITICAL: This is attempt #2. You MUST add significantly MORE content than your first try!' : ''}
+
+// Begin the expanded content now (HTML only, no explanations):`;
+
+//   // ═══════════════════════════════════════════════════════════
+//   // STEP 3: Call AI with timeout protection
+//   // ═══════════════════════════════════════════════════════════
 //   const response = await this.callAIProvider(
 //     provider,
 //     systemPrompt,
 //     userPrompt,
-//     isRetry ? 8000 : 6000,
+//     isRetry ? 10000 : 8000, // More tokens for retry
 //     0.7,
 //     userId
 //   );
 
+//   // ═══════════════════════════════════════════════════════════
+//   // STEP 4: Clean and validate AI response
+//   // ═══════════════════════════════════════════════════════════
 //   let cleaned = this.cleanAndValidateContent(response);
   
+//   // ═══════════════════════════════════════════════════════════
+//   // STEP 5: Restore images
+//   // ═══════════════════════════════════════════════════════════
 //   if (originalImages.length > 0) {
 //     this.addLog(`🖼️ Restoring ${originalImages.length} images after AI processing`, "info");
 //     cleaned = this.restoreImagesFromPlaceholders(cleaned, originalImages);
@@ -2541,15 +3359,30 @@
 //     const restoredCount = (cleaned.match(/<img/g) || []).length;
 //     if (restoredCount < originalImages.length) {
 //       this.addLog(
-//         `⚠️ Image restoration incomplete: ${restoredCount}/${originalImages.length} images restored`,
+//         `⚠️ Image restoration incomplete: ${restoredCount}/${originalImages.length} images`,
 //         "warning"
 //       );
 //       cleaned = this.ensureImagesPreserved(cleaned, originalImages);
+      
+//       // Verify again
+//       const finalImageCount = (cleaned.match(/<img/g) || []).length;
+//       if (finalImageCount < originalImages.length) {
+//         this.addLog(
+//           `❌ Image restoration failed: ${finalImageCount}/${originalImages.length} images`,
+//           "error"
+//         );
+//         throw new Error(
+//           `Image loss detected: ${originalImages.length - finalImageCount} images missing after AI processing`
+//         );
+//       }
 //     } else {
 //       this.addLog(`✅ All ${originalImages.length} images successfully restored`, "success");
 //     }
 //   }
   
+//   // ═══════════════════════════════════════════════════════════
+//   // STEP 6: Validate word count and content integrity
+//   // ═══════════════════════════════════════════════════════════
 //   const finalWordCount = this.extractTextFromHTML(cleaned)
 //     .split(/\s+/)
 //     .filter(w => w.length > 0).length;
@@ -2559,44 +3392,945 @@
 //     finalWordCount >= minimumWords ? "success" : "warning"
 //   );
 
+//   // CRITICAL CHECK #1: Content must have INCREASED, never decreased
 //   if (finalWordCount < currentWordCount) {
 //     throw new Error(
-//       `Content expansion failed: ${currentWordCount} → ${finalWordCount} words. AI removed content instead of adding.`
+//       `❌ CONTENT REMOVAL DETECTED: AI reduced content from ${currentWordCount} to ${finalWordCount} words (-${currentWordCount - finalWordCount} words). This violates the strict NO-REMOVAL rule.`
 //     );
 //   }
+
+//   // CRITICAL CHECK #2: Must have added sufficient words
+//   const wordsAdded = finalWordCount - currentWordCount;
+//   if (wordsAdded < 50) {
+//     throw new Error(
+//       `❌ INSUFFICIENT EXPANSION: Only added ${wordsAdded} words (need to add ${wordsNeeded}+ words). Total: ${finalWordCount} words.`
+//     );
+//   }
+
+//   // CRITICAL CHECK #3: Must meet minimum word count
+//   if (finalWordCount < minimumWords) {
+//     throw new Error(
+//       `❌ BELOW MINIMUM: ${finalWordCount} words (minimum: ${minimumWords}). Only added ${wordsAdded} words, need ${minimumWords - currentWordCount} more words.`
+//     );
+//   }
+
+//   // CRITICAL CHECK #4: Sanity check - prevent AI hallucination
+//   if (finalWordCount > CONTENT_EXPANSION_CONFIG.MAX_WORD_COUNT) {
+//     throw new Error(
+//       `❌ EXCEEDED MAXIMUM: ${finalWordCount} words exceeds maximum ${CONTENT_EXPANSION_CONFIG.MAX_WORD_COUNT} words. Likely AI hallucination or runaway generation.`
+//     );
+//   }
+
+//   // ═══════════════════════════════════════════════════════════
+//   // SUCCESS - Return validated, expanded content
+//   // ═══════════════════════════════════════════════════════════
+//   this.addLog(
+//     `✅ Content expansion validated: +${wordsAdded} words added (${((wordsAdded / currentWordCount) * 100).toFixed(0)}% increase)`,
+//     "success"
+//   );
 
 //   return cleaned;
 // }
 
+
+
+
 // private async improveEAT(
+//   creds: WordPressCredentials,
+//   fixes: AIFix[],
+//   userId?: string,
+//   processingOptions?: ProcessingOptions
+// ): Promise<{ applied: AIFix[]; errors: string[] }> {
+  
+//   if (!processingOptions?.enableEATImprovements) {
+//     this.addLog("🎯 E-E-A-T improvements DISABLED", "info");
+//     return {
+//       applied: fixes.map(fix => ({
+//         ...fix,
+//         success: true,
+//         description: "E-E-A-T improvements skipped - feature disabled for safety"
+//       })),
+//       errors: []
+//     };
+//   }
+
+//   const maxPages = processingOptions?.maxPagesPerSession || 
+//                    EAT_IMPROVEMENT_CONFIG.MAX_PAGES_PER_SESSION;
+  
+//   if (fixes.length > maxPages) {
+//     this.addLog(`⚠️ SAFETY LIMIT: ${fixes.length} pages → limiting to ${maxPages}`, "warning");
+//     fixes = fixes.slice(0, maxPages);
+//   }
+
+//   const provider = await this.selectAIProvider(userId);
+//   if (!provider) {
+//     this.addLog("❌ No AI provider available", "error");
+//     return { applied: [], errors: ["No AI provider available"] };
+//   }
+
+//   const requireBackup = processingOptions?.requireBackup ?? 
+//                         EAT_IMPROVEMENT_CONFIG.REQUIRE_BACKUP;
+  
+//   if (requireBackup) {
+//     try {
+//       await this.createContentModificationBackup(fixes, 'eat_improvement');
+//       const backupVerified = await this.verifyBackupExists('eat_improvement');
+//       if (!backupVerified) {
+//         throw new Error("Backup verification failed");
+//       }
+//     } catch (error: any) {
+//       this.addLog(`❌ Backup failed: ${error.message}`, "error");
+//       return { applied: [], errors: [`Safety requirement failed: ${error.message}`] };
+//     }
+//   }
+
+//   this.addLog("", "info");
+//   this.addLog("═══════════════════════════════════════════", "info");
+//   this.addLog("  🎯 E-E-A-T IMPROVEMENT STARTED", "info");
+//   this.addLog("═══════════════════════════════════════════", "info");
+//   this.addLog(`  Provider: ${provider}`, "info");
+//   this.addLog(`  Pages: ${fixes.length}`, "info");
+//   this.addLog(`  Backup: ${requireBackup ? 'Created ✓' : 'Skipped'}`, "info");
+//   this.addLog("═══════════════════════════════════════════", "info");
+
+//   // ✅ NEW: Pre-filter pages that need E-E-A-T improvement
+//   return this.fixWordPressContentWithPrecheck(
+//     creds,
+//     fixes,
+//     async (content, fix) => {
+//       const startTime = Date.now();
+//       const contentHtml = content.content?.rendered || content.content || "";
+//       const title = content.title?.rendered || content.title || "";
+      
+//       const currentEATScore = this.analyzeEATSignals(contentHtml);
+      
+//       this.addLog("", "info");
+//       this.addLog(`📄 Processing: "${title.substring(0, 60)}..."`, "info");
+//       this.addLog(`   E-E-A-T Score: ${currentEATScore.score}/3`, "info");
+//       this.addLog(`   Signals: ${currentEATScore.signals.join(', ') || 'None'}`, "info");
+
+//       // ✅ UPDATED: Return skip instruction instead of processing
+//       if (currentEATScore.score >= EAT_IMPROVEMENT_CONFIG.MIN_EAT_SCORE) {
+//         this.addLog(`   ✓ Already adequate (${currentEATScore.score}/3)`, "success");
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `E-E-A-T adequate: ${currentEATScore.score}/3`,
+//           shouldSkip: true  // ✅ NEW: Signal to skip this page
+//         };
+//       }
+
+//       this.addLog(`   Target: Add ${3 - currentEATScore.score} signal(s)`, "info");
+
+//       const originalImages = this.extractImages(contentHtml);
+//       this.addLog(`   🖼️  Protecting ${originalImages.length} images`, "info");
+
+//       let improvedContent: string | null = null;
+//       let attemptCount = 0;
+//       const maxRetries = EAT_IMPROVEMENT_CONFIG.MAX_AI_RETRIES;
+
+//       while (attemptCount <= maxRetries && !improvedContent) {
+//         attemptCount++;
+        
+//         if (attemptCount > 1) {
+//           this.addLog(`   🔄 Retry ${attemptCount}/${maxRetries + 1}`, "warning");
+//         }
+
+//         try {
+//           const improvementPromise = this.addEATSignals(
+//             title,
+//             contentHtml,
+//             currentEATScore.missing,
+//             provider,
+//             userId
+//           );
+
+//           const timeoutPromise = new Promise<never>((_, reject) =>
+//             setTimeout(
+//               () => reject(new Error('Timeout')),
+//               EAT_IMPROVEMENT_CONFIG.TIMEOUT_PER_PAGE
+//             )
+//           );
+
+//           improvedContent = await Promise.race([improvementPromise, timeoutPromise]);
+          
+//           const validation = this.validateContentLength(
+//             contentHtml,
+//             improvedContent,
+//             "E-E-A-T enhancement",
+//             true
+//           );
+
+//           if (!validation.valid) {
+//             this.addLog(`   ⚠️  Validation failed: ${validation.reason}`, "warning");
+//             improvedContent = null;
+            
+//             if (attemptCount >= maxRetries) {
+//               throw new Error(validation.reason);
+//             }
+//           }
+
+//         } catch (error: any) {
+//           this.addLog(`   ❌ Attempt ${attemptCount} failed: ${error.message}`, "error");
+          
+//           if (attemptCount > maxRetries) {
+//             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+//             return {
+//               updated: false,
+//               data: {},
+//               description: `Failed after ${attemptCount} attempts: ${error.message}`,
+//               error: error.message
+//             };
+//           }
+          
+//           await new Promise(r => setTimeout(r, 2000 * attemptCount));
+//         }
+//       }
+
+//       if (!improvedContent) {
+//         return {
+//           updated: false,
+//           data: {},
+//           description: "E-E-A-T improvement failed",
+//           error: "No improved content generated"
+//         };
+//       }
+
+//       const finalContent = this.ensureImagesPreserved(improvedContent, originalImages);
+//       const newEATScore = this.analyzeEATSignals(finalContent);
+      
+//       if (newEATScore.score <= currentEATScore.score) {
+//         this.addLog(`   ⚠️  No improvement: ${currentEATScore.score}/3 → ${newEATScore.score}/3`, "warning");
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `No E-E-A-T improvement (still ${newEATScore.score}/3)`
+//         };
+//       }
+
+//       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+//       const improvement = newEATScore.score - currentEATScore.score;
+//       const newSignals = newEATScore.signals.filter(s => !currentEATScore.signals.includes(s));
+
+//       this.addLog(`   ✅ E-E-A-T improved in ${elapsed}s`, "success");
+//       this.addLog(`   📊 ${currentEATScore.score}/3 → ${newEATScore.score}/3 (+${improvement})`, "success");
+//       this.addLog(`   🆕 Added: ${newSignals.join(', ')}`, "success");
+
+//       return {
+//         updated: true,
+//         data: { content: finalContent },
+//         description: `E-E-A-T: ${currentEATScore.score}/3 → ${newEATScore.score}/3. Added: ${newSignals.join(', ')} (${elapsed}s)`
+//       };
+//     },
+//     userId,
+//     processingOptions,
+//     EAT_IMPROVEMENT_CONFIG.MIN_EAT_SCORE  // ✅ NEW: Pass minScore for pre-filtering
+//   );
+// }
+
+
+// private async improveReadability(
 //   creds: WordPressCredentials,
 //   fixes: AIFix[],
 //   userId?: string
 // ): Promise<{ applied: AIFix[]; errors: string[] }> {
-//   // ⚡ DISABLED FOR PERFORMANCE AND RELIABILITY
-//   // 
-//   // Reasons for disabling:
-//   // - Takes 60-180 seconds per page (too slow)
-//   // - Makes 2 AI attempts with long prompts
-//   // - High failure rate (50-70% success)
-//   // - Frequent image loss during processing
-//   // - Minimal SEO benefit (+2-5 points)
-//   // - Can be added manually if truly needed
+//   this.addLog("Readability improvement enabled", "info");
   
-//   this.addLog("E-E-A-T enhancement disabled for performance and reliability", "info");
-  
-//   return {
-//     applied: fixes.map(fix => ({
-//       ...fix,
-//       success: true,
-//       description: "E-E-A-T signals verified as adequate (AI enhancement disabled for speed and reliability)"
-//     })),
-//     errors: []
-//   };
+//   return this.fixWordPressContent(
+//     creds,
+//     fixes,
+//     async (content, fix) => {
+//       // Get URL and page type for exclusion check
+//       const pageUrl = content.link || '';
+//       const pageType = content.type || 'page';
+      
+//       // 🔴 CRITICAL: Check if this page should be excluded from readability improvements
+//       if (this.shouldExcludeFromReadability(pageUrl, pageType)) {
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `Readability improvement not applicable - functional/technical page (${pageUrl})`,
+//         };
+//       }
+      
+//       let contentHtml = content.content?.rendered || content.content || "";
+      
+//       // Apply basic improvements first (fast, no AI needed)
+//       contentHtml = this.applyBasicContentImprovements(contentHtml);
+      
+//       const currentText = this.extractTextFromHTML(contentHtml);
+//       const currentWordCount = currentText.split(/\s+/).filter(w => w.length > 0).length;
+      
+//       // Don't improve readability on very short content (let expansion handle it first)
+//       if (currentWordCount < 100) {
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `Content too short (${currentWordCount} words) - expand content first before improving readability`,
+//         };
+//       }
+      
+//       const readabilityScore = this.calculateReadabilityScore(currentText);
+//       const gradeLevel = this.getGradeLevel(readabilityScore);
+      
+//       if (readabilityScore >= 65) {
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `Readability already excellent (${readabilityScore}/100 - ${gradeLevel})`,
+//         };
+//       }
+      
+//       if (readabilityScore >= 60) {
+//         this.addLog(
+//           `Readability acceptable (${readabilityScore}/100 - ${gradeLevel}) but could be improved to 65+`,
+//           "info"
+//         );
+//       } else {
+//         this.addLog(
+//           `Readability score: ${readabilityScore}/100 (${gradeLevel}) - improvement needed`,
+//           "warning"
+//         );
+//       }
+
+//       const title = content.title?.rendered || content.title || "";
+      
+//       try {
+//         const originalImages = this.extractImages(contentHtml);
+//         this.addLog(`Preserving ${originalImages.length} images during readability improvement`, "info");
+        
+//         // 🆕 FIRST ATTEMPT
+//         const improvedContent = await this.improveReadabilityWithAI(
+//           title,
+//           contentHtml,
+//           userId,
+//           readabilityScore,
+//           currentWordCount,
+//           false  // isRetry = false
+//         );
+        
+//         const validation = this.validateContentLength(
+//           contentHtml,
+//           improvedContent,
+//           "Readability improvement",
+//           true
+//         );
+        
+//         if (!validation.valid) {
+//           this.addLog(`❌ First attempt failed validation: ${validation.reason}`, "error");
+          
+//           // 🆕 CHECK IF IT'S A CONTENT REDUCTION FAILURE (worth retrying)
+//           const improvedWordCount = this.extractTextFromHTML(improvedContent)
+//             .split(/\s+/)
+//             .filter(w => w.length > 0).length;
+          
+//           const wasReduction = improvedWordCount < currentWordCount;
+          
+//           if (wasReduction) {
+//             this.addLog(
+//               `🔄 Retrying with anti-reduction emphasis (AI reduced ${currentWordCount} → ${improvedWordCount} words)...`,
+//               "warning"
+//             );
+            
+//             try {
+//               // 🆕 RETRY WITH STRICTER PRESERVATION RULES
+//               const retryContent = await this.improveReadabilityWithAI(
+//                 title,
+//                 contentHtml,
+//                 userId,
+//                 readabilityScore,
+//                 currentWordCount,
+//                 true  // isRetry = true
+//               );
+              
+//               const retryValidation = this.validateContentLength(
+//                 contentHtml,
+//                 retryContent,
+//                 "Readability improvement (retry)",
+//                 true
+//               );
+              
+//               if (retryValidation.valid) {
+//                 // 🆕 RETRY SUCCEEDED!
+//                 const finalContent = this.ensureImagesPreserved(retryContent, originalImages);
+                
+//                 const finalText = this.extractTextFromHTML(finalContent);
+//                 const finalWordCount = finalText.split(/\s+/).filter(w => w.length > 0).length;
+//                 const finalReadability = this.calculateReadabilityScore(finalText);
+//                 const finalGrade = this.getGradeLevel(finalReadability);
+                
+//                 // Check if readability actually improved
+//                 if (finalReadability <= readabilityScore) {
+//                   return {
+//                     updated: false,
+//                     data: {},
+//                     description: `Readability unchanged or worse after retry (${readabilityScore} → ${finalReadability})`,
+//                   };
+//                 }
+                
+//                 const improvement = finalReadability - readabilityScore;
+//                 const meetsTarget = finalReadability >= 60;
+//                 const targetStatus = meetsTarget 
+//                   ? `✅ Target achieved (${finalGrade})` 
+//                   : `⚠️ ${60 - finalReadability} points short of 60 target`;
+                
+//                 this.addLog(
+//                   `✅ Retry succeeded: ${readabilityScore} → ${finalReadability} (+${improvement} points, ${currentWordCount} → ${finalWordCount} words)`,
+//                   "success"
+//                 );
+                
+//                 return {
+//                   updated: true,
+//                   data: { content: finalContent },
+//                   description: `Improved readability from ${readabilityScore} to ${finalReadability} (+${improvement} points, ${finalGrade}) ${targetStatus} [retry succeeded]`,
+//                 };
+//               } else {
+//                 // 🆕 RETRY ALSO FAILED VALIDATION
+//                 const retryWordCount = this.extractTextFromHTML(retryContent)
+//                   .split(/\s+/)
+//                   .filter(w => w.length > 0).length;
+                
+//                 this.addLog(
+//                   `❌ Retry also failed validation: ${retryValidation.reason}`,
+//                   "error"
+//                 );
+                
+//                 if (retryWordCount < currentWordCount) {
+//                   this.addLog(
+//                     `🚨 Retry STILL reduced content (${currentWordCount} → ${retryWordCount}) - AI is consistently reducing despite warnings`,
+//                     "error"
+//                   );
+//                 }
+                
+//                 return {
+//                   updated: false,
+//                   data: {},
+//                   description: `Readability improvement failed after retry: ${retryValidation.reason}`,
+//                 };
+//               }
+//             } catch (retryError: any) {
+//               this.addLog(`Retry attempt threw error: ${retryError.message}`, "error");
+//               return {
+//                 updated: false,
+//                 data: {},
+//                 description: `Readability improvement retry failed: ${retryError.message}`,
+//               };
+//             }
+//           } else {
+//             // Not a reduction error, so don't retry (might be hallucination or other issue)
+//             return {
+//               updated: false,
+//               data: {},
+//               description: validation.reason,
+//             };
+//           }
+//         }
+        
+//         // 🆕 FIRST ATTEMPT SUCCEEDED
+//         const finalContent = this.ensureImagesPreserved(improvedContent, originalImages);
+        
+//         const finalText = this.extractTextFromHTML(finalContent);
+//         const finalWordCount = finalText.split(/\s+/).filter(w => w.length > 0).length;
+//         const finalReadability = this.calculateReadabilityScore(finalText);
+//         const finalGrade = this.getGradeLevel(finalReadability);
+        
+//         if (finalReadability <= readabilityScore) {
+//           return {
+//             updated: false,
+//             data: {},
+//             description: `Readability unchanged or worse (${readabilityScore} → ${finalReadability})`,
+//           };
+//         }
+        
+//         if (finalWordCount < currentWordCount) {
+//           // This shouldn't happen due to validation, but double-check
+//           return {
+//             updated: false,
+//             data: {},
+//             description: `Readability improvement reduced content (${currentWordCount} → ${finalWordCount} words) - REJECTED`,
+//           };
+//         }
+        
+//         const improvement = finalReadability - readabilityScore;
+//         const meetsTarget = finalReadability >= 60;
+//         const targetStatus = meetsTarget 
+//           ? `✅ Target achieved (${finalGrade})` 
+//           : `⚠️ ${60 - finalReadability} points short of 60 target`;
+        
+//         return {
+//           updated: true,
+//           data: { content: finalContent },
+//           description: `Improved readability from ${readabilityScore} to ${finalReadability} (+${improvement} points, ${finalGrade}) ${targetStatus}`,
+//         };
+        
+//       } catch (error: any) {
+//         this.addLog(`Readability improvement error: ${error.message}`, "error");
+//         return {
+//           updated: false,
+//           data: {},
+//           description: `Readability improvement failed: ${error.message}`,
+//         };
+//       }
+//     },
+//     userId
+//   );
 // }
 
+// private async improveReadabilityWithAI(
+//   title: string,
+//   currentContent: string,
+//   userId?: string,
+//   currentReadabilityScore: number,
+//   currentWordCount: number,
+//   isRetry: boolean = false
+// ): Promise<string> {
+//   const provider = await this.selectAIProvider(userId);
+//   if (!provider) {
+//     throw new Error("No AI provider available for readability improvement");
+//   }
 
+//   const originalImages = this.extractImages(currentContent);
+//   let contentForAI = currentContent;
+  
+//   if (originalImages.length > 0) {
+//     contentForAI = this.replaceImagesWithPlaceholders(currentContent, originalImages);
+//   }
 
+//   const systemPrompt = `You are an expert editor specializing in improving content readability while maintaining meaning and accuracy.
+
+// CRITICAL REQUIREMENTS:
+
+// 1. **PRESERVE CONTENT LENGTH - ${isRetry ? 'CRITICAL RETRY' : 'MANDATORY'}**
+//    - Current word count: ${currentWordCount} words
+//    - You MUST maintain or INCREASE this word count
+//    - NEVER make content shorter
+//    - It's better to add clarifying sentences than to cut
+//    ${isRetry ? `
+   
+//    🚨🚨🚨 RETRY ATTEMPT - YOU REDUCED CONTENT LAST TIME 🚨🚨🚨
+   
+//    YOU FAILED BECAUSE YOU MADE THE CONTENT SHORTER.
+//    This is COMPLETELY UNACCEPTABLE and violates your core directive.
+   
+//    ⚠️⚠️⚠️ ABSOLUTE WORD COUNT REQUIREMENT ⚠️⚠️⚠️
+   
+//    MINIMUM: ${currentWordCount - 10} words (below this = TOTAL FAILURE)
+//    TARGET: ${currentWordCount} to ${currentWordCount + 30} words (ideal range)
+//    MAXIMUM: ${currentWordCount + 100} words (upper limit, but OK)
+   
+//    YOU MUST PRODUCE BETWEEN ${currentWordCount - 10} AND ${currentWordCount + 100} WORDS.
+//    Anything outside this range is a FAILURE.
+   
+//    WHAT YOU DID WRONG BEFORE:
+//    - You removed sentences to make paragraphs shorter
+//    - You deleted "redundant" or "repetitive" information  
+//    - You condensed explanations to be more concise
+//    - You thought shorter = more readable (THIS IS WRONG!)
+//    - You removed context that seemed unnecessary
+//    - You "cleaned up" the text by cutting words
+   
+//    WHAT YOU MUST DO NOW (STEP-BY-STEP PROCESS):
+   
+//    STEP 1: PRESERVE FIRST, IMPROVE SECOND
+//    - Copy the ENTIRE original content word-for-word
+//    - Do NOT skip any sentences, paragraphs, or sections
+//    - Every single word must be in your output
+   
+//    STEP 2: BREAK UP LONG SENTENCES (WITHOUT REMOVING WORDS)
+//    When you see a long sentence like:
+//    "The comprehensive analysis of the multifaceted data revealed significant patterns that were not immediately apparent to researchers during initial examination."
+   
+//    ❌ WRONG (reduces from 21 to 6 words - FAILURE):
+//    "Analysis revealed significant patterns."
+   
+//    ❌ WRONG (reduces from 21 to 14 words - STILL FAILURE):
+//    "The analysis of the data revealed patterns that weren't immediately apparent."
+   
+//    ✅ RIGHT (maintains 21 words, splits for readability):
+//    "The comprehensive analysis of the multifaceted data revealed significant patterns. These patterns were not immediately apparent to researchers during initial examination."
+   
+//    ✅ ALSO RIGHT (expands to 23 words):
+//    "The comprehensive analysis of the multifaceted data revealed significant patterns. These important patterns were not immediately apparent to researchers during their initial examination."
+   
+//    STEP 3: BREAK UP LONG PARAGRAPHS (WITHOUT REMOVING WORDS)
+//    When you see a 5-sentence paragraph:
+   
+//    ❌ WRONG (removes sentences to make shorter paragraphs):
+//    Paragraph 1: [Sentences 1-2 only, deleted sentence 3]
+//    Paragraph 2: [Sentences 4-5 only]
+   
+//    ✅ RIGHT (splits but keeps ALL sentences):
+//    Paragraph 1: [Sentences 1-3]
+//    Paragraph 2: [Sentences 4-5]
+   
+//    STEP 4: SIMPLIFY VOCABULARY (BY REPLACING, NOT DELETING)
+   
+//    ❌ WRONG (deletes the complex phrase entirely):
+//    "utilize the comprehensive methodology" → [deleted]
+   
+//    ❌ WRONG (oversimplifies and loses meaning):
+//    "utilize the comprehensive methodology" → "use it"
+   
+//    ✅ RIGHT (replaces with simpler equivalent):
+//    "utilize the comprehensive methodology" → "use the complete method"
+   
+//    STEP 5: ADD TRANSITION WORDS (INCREASES WORD COUNT)
+//    Between paragraphs, ADD words like:
+//    - "Additionally,"
+//    - "Furthermore,"
+//    - "Moreover,"
+//    - "In addition,"
+//    - "As a result,"
+//    - "Therefore,"
+//    - "However,"
+   
+//    This ADDS 1-2 words per paragraph transition.
+   
+//    STEP 6: VERIFY BEFORE RETURNING
+//    Before you return your output:
+//    1. Count the words in your output
+//    2. If < ${currentWordCount - 10} words: GO BACK and ADD clarifying sentences
+//    3. If ${currentWordCount - 10} to ${currentWordCount + 100} words: GOOD, proceed
+//    4. If > ${currentWordCount + 100} words: Slightly reduce (but don't go below ${currentWordCount})
+   
+//    EXAMPLES OF COMPLETE TRANSFORMATIONS:
+   
+//    EXAMPLE 1: 
+//    Original (45 words):
+//    "The implementation of the new system requires careful consideration of multiple factors including data migration, user training, system integration, and ongoing maintenance costs that must be evaluated before making a final decision about proceeding with the project."
+   
+//    ❌ WRONG (25 words - MASSIVE FAILURE):
+//    "Implementing the new system requires considering data migration, user training, integration, and maintenance costs before deciding to proceed."
+   
+//    ✅ RIGHT (47 words - maintains/slightly expands):
+//    "The implementation of the new system requires careful consideration of multiple factors. These include data migration, user training, system integration, and ongoing maintenance costs. All of these factors must be thoroughly evaluated before making a final decision about proceeding with the project."
+   
+//    EXAMPLE 2:
+//    Original (30 words):
+//    "Users frequently encounter difficulties when attempting to navigate complex interfaces without adequate guidance or documentation available to them which leads to frustration and decreased productivity."
+   
+//    ❌ WRONG (12 words - TOTAL FAILURE):
+//    "Users struggle with complex interfaces that lack guidance, causing frustration and low productivity."
+   
+//    ✅ RIGHT (32 words - maintains/slightly expands):
+//    "Users frequently encounter difficulties when attempting to navigate complex interfaces. This happens especially when adequate guidance or documentation is not available to them. This leads to frustration and decreased productivity."
+   
+//    THIS IS YOUR LAST CHANCE. PRESERVE EVERY BIT OF INFORMATION.
+   
+//    FINAL REMINDER:
+//    - Current content: ${currentWordCount} words
+//    - You MUST produce: ${currentWordCount - 10} to ${currentWordCount + 100} words
+//    - Ideal target: ${currentWordCount} to ${currentWordCount + 30} words
+//    - Below ${currentWordCount - 10} = COMPLETE FAILURE
+//    ` : ''}
+
+// 2. **PRESERVE ALL IMAGE PLACEHOLDERS**
+//    - DO NOT remove any text like: __IMAGE_PLACEHOLDER_X_XXXXX__
+//    - These are image markers that MUST stay exactly as written
+
+// 3. **READABILITY IMPROVEMENTS TO MAKE:**
+//    - Break up long paragraphs (max 3-4 sentences per paragraph)
+//    - Shorten complex sentences (aim for 15-20 words per sentence)
+//    - Use simpler, more common words where possible
+//    - Add transition words between paragraphs
+//    - Use active voice instead of passive voice
+//    - Replace jargon with plain language (or explain technical terms)
+//    - Add bullet points or numbered lists for sequential information
+//    - Use subheadings (h3 tags) to break up long sections
+//    ${isRetry ? `
+   
+//    ⚠️ CRITICAL PROCESS FOR RETRY:
+//    1. Copy ENTIRE original content first (${currentWordCount} words)
+//    2. Find long sentences (>25 words) and SPLIT them (keep all words)
+//    3. Find long paragraphs (>4 sentences) and SPLIT them (keep all words)
+//    4. ADD transition words between new paragraphs (+1-2 words each)
+//    5. Replace complex words with simpler ones (word count stays same)
+//    6. Count final words: MUST be ${currentWordCount - 10} to ${currentWordCount + 100}
+//    ` : ''}
+
+// 4. **WHAT NOT TO CHANGE:**
+//    - Don't change the core message or facts
+//    - Don't remove important information
+//    - Don't alter technical accuracy
+//    - Don't change proper nouns or specific terminology
+//    - Keep all links intact
+//    - Preserve the HTML structure (h2, p, ul, etc.)
+
+// 5. **OUTPUT FORMAT:**
+//    - Return ONLY the improved HTML content
+//    - NO preambles or explanations
+//    - NO markdown code blocks
+
+// Current Readability Score: ${currentReadabilityScore}/100
+// Goal: Improve to 60+ (good readability)
+// ${isRetry ? '\n\n⚠️⚠️⚠️ ABSOLUTE REQUIREMENT: ${currentWordCount - 10} to ${currentWordCount + 100} WORDS. DO NOT PRODUCE LESS THAN ${currentWordCount - 10} WORDS. ⚠️⚠️⚠️' : ''}`;
+
+//   const userPrompt = `Improve the readability of this content while preserving its length and meaning:
+
+// Title: ${title}
+
+// Current Content (${currentWordCount} words):
+// ${contentForAI}
+
+// SPECIFIC IMPROVEMENTS NEEDED:
+// 1. Break paragraphs that are longer than 4 sentences
+// 2. Split sentences that are longer than 25 words
+// 3. Replace complex words with simpler alternatives
+// 4. Add transition words (However, Therefore, Additionally, etc.)
+// 5. Convert passive voice to active voice
+// 6. Add subheadings (h3) every 2-3 paragraphs if missing
+// 7. Use bullet points for lists of items
+
+// CRITICAL REMINDERS:
+// - Maintain word count: ${currentWordCount}+ words
+// - Preserve all image placeholders: __IMAGE_PLACEHOLDER_X_XXXXX__
+// - Keep all factual information
+// - Return ONLY the HTML content
+
+// ${isRetry ? `
+// 🚨🚨🚨 RETRY MODE - PREVIOUS ATTEMPT REDUCED CONTENT 🚨🚨🚨
+
+// Your previous attempt FAILED because you made it shorter.
+
+// REQUIRED WORD COUNT RANGE: ${currentWordCount - 10} to ${currentWordCount + 100} words
+// IDEAL TARGET: ${currentWordCount} to ${currentWordCount + 30} words
+
+// HOW TO IMPROVE READABILITY WITHOUT REDUCING:
+
+// ✅ DO THIS:
+// - Split long sentences into 2-3 shorter ones (KEEP ALL WORDS)
+// - Split long paragraphs into 2 smaller ones (KEEP ALL PARAGRAPHS)
+// - Replace "utilize" → "use" (1:1 replacement, not deletion)
+// - ADD transition words: "Additionally," "Furthermore," etc.
+// - ADD clarifying phrases: "This means that...", "In other words..."
+
+// ❌ DO NOT DO THIS:
+// - Remove "redundant" sentences (KEEP THEM ALL)
+// - Delete "unnecessary" words (KEEP THEM ALL)
+// - Condense long explanations (EXPAND them instead)
+// - Simplify by cutting content (SIMPLIFY by splitting)
+// - "Clean up" by removing text (NEVER REMOVE)
+
+// VERIFICATION CHECKLIST BEFORE RETURNING:
+// □ Did I preserve ALL original sentences?
+// □ Did I only SPLIT sentences, not delete them?
+// □ Did I ADD transition words between paragraphs?
+// □ Is my word count ${currentWordCount - 10} to ${currentWordCount + 100}?
+// □ If below ${currentWordCount - 10}, did I ADD clarifying sentences?
+
+// WORD COUNT TARGET: ${currentWordCount - 10} to ${currentWordCount + 100} words
+// If you produce less than ${currentWordCount - 10} words, you FAIL.
+// ` : ''}
+
+// Begin improvement now:`;
+
+//   try {
+//     const result = await this.callAIProvider(
+//       provider,
+//       systemPrompt,
+//       userPrompt,
+//       isRetry ? 8000 : 6000,  // More tokens for retry attempts
+//       0.5,
+//       userId
+//     );
+
+//     let cleaned = this.cleanAndValidateContent(result);
+    
+//     // Apply humanization to improved content
+//     cleaned = this.humanizeContent(cleaned, {
+//       tone: 'professional',
+//       aggressiveDeAI: true
+//     });
+    
+//     if (originalImages.length > 0) {
+//       cleaned = this.restoreImagesFromPlaceholders(cleaned, originalImages);
+//       cleaned = this.ensureImagesPreserved(cleaned, originalImages);
+//     }
+    
+//     // Log word count result
+//     const finalWordCount = this.extractTextFromHTML(cleaned)
+//       .split(/\s+/)
+//       .filter(w => w.length > 0).length;
+    
+//     this.addLog(
+//       `Readability AI ${isRetry ? '(retry)' : ''}: ${currentWordCount} → ${finalWordCount} words`,
+//       finalWordCount >= currentWordCount ? "success" : "warning"
+//     );
+    
+//     return cleaned;
+    
+//   } catch (error: any) {
+//     this.addLog(`Readability AI improvement failed: ${error.message}`, "error");
+//     throw error;
+//   }
+// }
+//   // ENHANCED: Humanize content with configurable options
+// private humanizeContent(
+//   content: string,
+//   options: {
+//     tone?: 'casual' | 'professional' | 'technical';
+//     aggressiveDeAI?: boolean;
+//   } = {}
+// ): string {
+//   const { tone = 'professional', aggressiveDeAI = true } = options;
+//   let humanized = content;
+//   let totalReplacements = 0; // ✅ Track actual replacements
+
+//   // Phase 1: Basic contractions (safe for all content)
+//   const basicReplacements: [RegExp, string][] = [
+//     [/\bit is\b/gi, "it's"],
+//     [/\byou are\b/gi, "you're"],
+//     [/\bwe are\b/gi, "we're"],
+//     [/\bthey are\b/gi, "they're"],
+//     [/\bcannot\b/gi, "can't"],
+//     [/\bwill not\b/gi, "won't"],
+//     [/\bdo not\b/gi, "don't"],
+//     [/\bdoes not\b/gi, "doesn't"],
+//     [/\bdid not\b/gi, "didn't"],
+//     [/\bshould not\b/gi, "shouldn't"],
+//     [/\bwould not\b/gi, "wouldn't"],
+//   ];
+
+//   for (const [pattern, replacement] of basicReplacements) {
+//     const before = humanized;
+//     humanized = humanized.replace(pattern, replacement);
+//     if (before !== humanized) {
+//       totalReplacements += (before.match(pattern) || []).length; // ✅ Count matches
+//     }
+//   }
+
+//   // Phase 2: Remove obvious AI patterns
+//   if (aggressiveDeAI) {
+//     const aiPatterns: [RegExp, string][] = [
+//       // Robotic introductions
+//       [/\bIn this article, we will explore\b/gi, "Let's explore"],
+//       [/\bIn this comprehensive guide\b/gi, "In this guide"],
+//       [/\bIn this blog post\b/gi, "Here"],
+//       [/\bIn the following sections\b/gi, "Below"],
+      
+//       // Overly formal transitions
+//       [/\bFurthermore,\b/g, "Also,"],
+//       [/\bMoreover,\b/g, "Plus,"],
+//       [/\bNevertheless,\b/g, "Still,"],
+//       [/\bConsequently,\b/g, "So,"],
+//       [/\bIn addition,\b/g, "Also,"],
+//       [/\bTherefore,\b/g, "So,"],
+      
+//       // AI clichés
+//       [/\bdelve into\b/gi, "explore"],
+//       [/\bembarking on a journey\b/gi, "starting"],
+//       [/\bin today's digital landscape\b/gi, "today"],
+//       [/\bin today's fast-paced world\b/gi, "today"],
+//       [/\bit's important to note that\b/gi, "note that"],
+//       [/\bit's worth mentioning that\b/gi, "also"],
+//       [/\bit is crucial to understand\b/gi, "it's crucial to understand"],
+      
+//       // Redundant phrases
+//       [/\bin order to\b/gi, "to"],
+//       [/\bdue to the fact that\b/gi, "because"],
+//       [/\bfor the purpose of\b/gi, "to"],
+//       [/\bin the event that\b/gi, "if"],
+//     ];
+
+//     for (const [pattern, replacement] of aiPatterns) {
+//       const before = humanized;
+//       humanized = humanized.replace(pattern, replacement);
+//       if (before !== humanized) {
+//         totalReplacements += (before.match(pattern) || []).length; // ✅ Count matches
+//       }
+//     }
+//   }
+
+//   // Phase 3: Casual tone (only if requested)
+//   if (tone === 'casual') {
+//     const casualReplacements: [RegExp, string][] = [
+//       [/\bHowever,\b/g, "But,"],
+//       [/\bUtilize\b/gi, "Use"],
+//       [/\bPurchase\b/gi, "Buy"],
+//       [/\bObtain\b/gi, "Get"],
+//     ];
+
+//     for (const [pattern, replacement] of casualReplacements) {
+//       const before = humanized;
+//       humanized = humanized.replace(pattern, replacement);
+//       if (before !== humanized) {
+//         totalReplacements += (before.match(pattern) || []).length; // ✅ Count matches
+//       }
+//     }
+//   }
+
+//   // ✅ Updated logging
+//   if (totalReplacements > 0) {
+//     this.addLog(
+//       `Humanized content: ${totalReplacements} AI pattern${totalReplacements !== 1 ? 's' : ''} removed/replaced`,
+//       'success'
+//     );
+//   }
+
+//   return humanized;
+// }
+//   /**
+//  * Calculates Flesch Reading Ease score (0-100, higher = easier)
+//  */
+// private calculateReadabilityScore(text: string): number {
+//   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+//   const words = text.split(/\s+/).filter(w => w.length > 0);
+  
+//   if (sentences.length === 0 || words.length === 0) {
+//     return 0;
+//   }
+  
+//   const syllables = words.reduce((count, word) => count + this.countSyllables(word), 0);
+  
+//   const avgWordsPerSentence = words.length / sentences.length;
+//   const avgSyllablesPerWord = syllables / words.length;
+  
+//   // Flesch Reading Ease formula
+//   // 206.835 - 1.015(total words / total sentences) - 84.6(total syllables / total words)
+//   const score = 206.835 - (1.015 * avgWordsPerSentence) - (84.6 * avgSyllablesPerWord);
+  
+//   // Clamp to 0-100 range
+//   return Math.max(0, Math.min(100, Math.round(score)));
+// }
+
+// /**
+//  * Counts syllables in a word (simple approximation)
+//  */
+// private countSyllables(word: string): number {
+//   word = word.toLowerCase().replace(/[^a-z]/g, '');
+  
+//   if (word.length <= 3) return 1;
+  
+//   // Count vowel groups
+//   const vowelMatches = word.match(/[aeiouy]+/g);
+//   let count = vowelMatches ? vowelMatches.length : 1;
+  
+//   // Adjust for silent 'e' at end
+//   if (word.endsWith('e')) {
+//     count--;
+//   }
+  
+//   // Adjust for 'le' ending (like "table")
+//   if (word.endsWith('le') && word.length > 2) {
+//     count++;
+//   }
+  
+//   // Minimum 1 syllable
+//   return Math.max(1, count);
+// }
+
+// /**
+//  * Converts Flesch Reading Ease score to grade level description
+//  */
+// private getGradeLevel(score: number): string {
+//   if (score >= 90) return 'Very Easy (5th grade)';
+//   if (score >= 80) return 'Easy (6th grade)';
+//   if (score >= 70) return 'Fairly Easy (7th grade)';
+//   if (score >= 60) return 'Standard (8th-9th grade)';
+//   if (score >= 50) return 'Fairly Difficult (10th-12th grade)';
+//   if (score >= 30) return 'Difficult (College level)';
+//   return 'Very Difficult (College graduate)';
+// } 
 //   // ==================== AI PROVIDER MANAGEMENT ====================
 
 //   private async selectAIProvider(userId?: string): Promise<string | null> {
@@ -2937,16 +4671,6 @@
 //   return response.json();
 // }
 
-//   //don't remove!
-//   // private async testWordPressConnection(
-//   //   creds: WordPressCredentials
-//   // ): Promise<void> {
-//   //   const connectionTest = await wordpressService.testConnection(creds);
-//   //   if (!connectionTest.success) {
-//   //     throw new Error(connectionTest.message || "WordPress connection failed");
-//   //   }
-//   //   this.addLog("WordPress connection verified", "success");
-//   // }
 // private async testWordPressConnection(
 //   creds: WordPressCredentials
 // ): Promise<void> {
@@ -3114,25 +4838,6 @@
 //     return cleaned;
 //   }
 
-//   private humanizeContent(content: string): string {
-//     const replacements: [RegExp, string][] = [
-//       [/Furthermore,/g, "Also,"],
-//       [/Moreover,/g, "Plus,"],
-//       [/Nevertheless,/g, "Still,"],
-//       [/Consequently,/g, "So,"],
-//       [/\bit is\b/g, "it's"],
-//       [/\byou are\b/g, "you're"],
-//       [/\bwe are\b/g, "we're"],
-//       [/\bcannot\b/g, "can't"],
-//     ];
-
-//     let humanized = content;
-//     for (const [pattern, replacement] of replacements) {
-//       humanized = humanized.replace(pattern, replacement);
-//     }
-
-//     return humanized;
-//   }
 
 //   private cleanAndValidateContent(content: string): string {
 //   if (!content) {
@@ -4073,28 +5778,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { aiService } from "server/services/ai-service";
 import { wordpressService } from "server/services/wordpress-service";
 import { wordPressAuthService } from "server/services/wordpress-auth";
@@ -4323,6 +6006,45 @@ class AIFixService {
   }
 
 
+
+private filterReadabilityExclusions(fixes: AIFix[]): {
+  toProcess: AIFix[];
+  skipped: number;
+} {
+  const toProcess: AIFix[] = [];
+  let skipped = 0;
+
+  for (const fix of fixes) {
+    if (fix.type !== 'poor_readability') {
+      toProcess.push(fix);
+      continue;
+    }
+
+    const pageUrl = fix.description.match(/https?:\/\/[^\s)]+/)?.[0] || '';
+    const urlLower = pageUrl.toLowerCase();
+    const excludePatterns = [
+      '/contact', '/checkout', '/cart', '/shop', '/product',
+      '/my-account', '/login', '/register', '/payment', '/order', '/wp-admin',
+    ];
+    
+    const shouldExclude = excludePatterns.some(pattern => urlLower.includes(pattern));
+
+    if (shouldExclude) {
+      skipped++;
+      this.addLog(`ℹ️ Skipping readability for functional page: ${pageUrl}`, "info");
+    } else {
+      toProcess.push(fix);
+    }
+  }
+
+  if (skipped > 0) {
+    this.addLog(`ℹ️ Pre-filtered ${skipped} functional pages (not failures)`, "success");
+  }
+
+  return { toProcess, skipped };
+}
+
+  
 // ═══════════════════════════════════════════════════════════
 // STEP 2: ADD THESE METHODS to the AIFixService class
 // (Add after the existing addLog method)
@@ -7722,6 +9444,7 @@ private async improveEAT(
 }
 
 
+
 private async improveReadability(
   creds: WordPressCredentials,
   fixes: AIFix[],
@@ -7733,28 +9456,13 @@ private async improveReadability(
     creds,
     fixes,
     async (content, fix) => {
-      // Get URL and page type for exclusion check
-      const pageUrl = content.link || '';
-      const pageType = content.type || 'page';
-      
-      // 🔴 CRITICAL: Check if this page should be excluded from readability improvements
-      if (this.shouldExcludeFromReadability(pageUrl, pageType)) {
-        return {
-          updated: false,
-          data: {},
-          description: `Readability improvement not applicable - functional/technical page (${pageUrl})`,
-        };
-      }
-      
       let contentHtml = content.content?.rendered || content.content || "";
       
-      // Apply basic improvements first (fast, no AI needed)
       contentHtml = this.applyBasicContentImprovements(contentHtml);
       
       const currentText = this.extractTextFromHTML(contentHtml);
       const currentWordCount = currentText.split(/\s+/).filter(w => w.length > 0).length;
       
-      // Don't improve readability on very short content (let expansion handle it first)
       if (currentWordCount < 100) {
         return {
           updated: false,
@@ -7767,6 +9475,10 @@ private async improveReadability(
       const gradeLevel = this.getGradeLevel(readabilityScore);
       
       if (readabilityScore >= 65) {
+        this.addLog(
+          `ℹ️ Readability already excellent for page ${fix.contentId} (${readabilityScore}/100 - ${gradeLevel})`,
+          "info"
+        );
         return {
           updated: false,
           data: {},
@@ -7792,14 +9504,13 @@ private async improveReadability(
         const originalImages = this.extractImages(contentHtml);
         this.addLog(`Preserving ${originalImages.length} images during readability improvement`, "info");
         
-        // 🆕 FIRST ATTEMPT
         const improvedContent = await this.improveReadabilityWithAI(
           title,
           contentHtml,
           userId,
           readabilityScore,
           currentWordCount,
-          false  // isRetry = false
+          false
         );
         
         const validation = this.validateContentLength(
@@ -7812,7 +9523,6 @@ private async improveReadability(
         if (!validation.valid) {
           this.addLog(`❌ First attempt failed validation: ${validation.reason}`, "error");
           
-          // 🆕 CHECK IF IT'S A CONTENT REDUCTION FAILURE (worth retrying)
           const improvedWordCount = this.extractTextFromHTML(improvedContent)
             .split(/\s+/)
             .filter(w => w.length > 0).length;
@@ -7826,14 +9536,13 @@ private async improveReadability(
             );
             
             try {
-              // 🆕 RETRY WITH STRICTER PRESERVATION RULES
               const retryContent = await this.improveReadabilityWithAI(
                 title,
                 contentHtml,
                 userId,
                 readabilityScore,
                 currentWordCount,
-                true  // isRetry = true
+                true
               );
               
               const retryValidation = this.validateContentLength(
@@ -7844,7 +9553,6 @@ private async improveReadability(
               );
               
               if (retryValidation.valid) {
-                // 🆕 RETRY SUCCEEDED!
                 const finalContent = this.ensureImagesPreserved(retryContent, originalImages);
                 
                 const finalText = this.extractTextFromHTML(finalContent);
@@ -7852,7 +9560,6 @@ private async improveReadability(
                 const finalReadability = this.calculateReadabilityScore(finalText);
                 const finalGrade = this.getGradeLevel(finalReadability);
                 
-                // Check if readability actually improved
                 if (finalReadability <= readabilityScore) {
                   return {
                     updated: false,
@@ -7878,7 +9585,6 @@ private async improveReadability(
                   description: `Improved readability from ${readabilityScore} to ${finalReadability} (+${improvement} points, ${finalGrade}) ${targetStatus} [retry succeeded]`,
                 };
               } else {
-                // 🆕 RETRY ALSO FAILED VALIDATION
                 const retryWordCount = this.extractTextFromHTML(retryContent)
                   .split(/\s+/)
                   .filter(w => w.length > 0).length;
@@ -7910,7 +9616,6 @@ private async improveReadability(
               };
             }
           } else {
-            // Not a reduction error, so don't retry (might be hallucination or other issue)
             return {
               updated: false,
               data: {},
@@ -7919,7 +9624,6 @@ private async improveReadability(
           }
         }
         
-        // 🆕 FIRST ATTEMPT SUCCEEDED
         const finalContent = this.ensureImagesPreserved(improvedContent, originalImages);
         
         const finalText = this.extractTextFromHTML(finalContent);
@@ -7936,7 +9640,6 @@ private async improveReadability(
         }
         
         if (finalWordCount < currentWordCount) {
-          // This shouldn't happen due to validation, but double-check
           return {
             updated: false,
             data: {},

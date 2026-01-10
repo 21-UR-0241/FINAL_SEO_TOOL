@@ -14,7 +14,7 @@ import {
   promoCodeRedemptions,
 } from "../../shared/schema";
 import { stripeService } from "../services/stripe-service";
-import { WebhookHandler } from "../services/webhook-handler";
+import  WebhookHandler  from "../services/webhook-handler";
 import Stripe from "stripe";
 
 const router = Router();
