@@ -94,10 +94,10 @@ export function TermsOfService(): JSX.Element {
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <h1 className="text-base md:text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
                     WordPress AI Manager
                   </h1>
-                  <p className="text-xs text-gray-400 font-medium">Powered by Advanced AI</p>
+                  <p className="text-xs text-gray-400 font-medium hidden sm:block">Powered by Advanced AI</p>
                 </div>
               </div>
             </Link>
@@ -137,12 +137,12 @@ export function TermsOfService(): JSX.Element {
             <Scale className="w-3.5 h-3.5 mr-2 inline" />
             Legal
           </Badge>
-          <h2 className="text-5xl md:text-6xl font-black mb-6 tracking-tight">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight">
             <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
               Terms of Service
             </span>
           </h2>
-          <p className="text-lg text-gray-400 max-w-3xl mx-auto mb-6 leading-relaxed">
+          <p className="text-base md:text-lg text-gray-400 max-w-3xl mx-auto mb-6 leading-relaxed px-4">
             These Terms of Service govern your use of WordPress AI Manager. Please read them carefully before using our service.
           </p>
           <p className="text-sm text-gray-500">
@@ -154,9 +154,9 @@ export function TermsOfService(): JSX.Element {
       {/* Main Content */}
       <section className="relative z-10 py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-4 gap-8">
-            {/* Sidebar Navigation */}
-            <div className="lg:col-span-1">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Sidebar Navigation - Hidden on mobile */}
+            <div className="lg:col-span-1 hidden lg:block">
               <div className="sticky top-24">
                 <div className="relative group">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl"></div>
@@ -189,21 +189,21 @@ export function TermsOfService(): JSX.Element {
             <div className="lg:col-span-3">
               <div className="relative group">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-3xl blur-xl"></div>
-                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 md:p-12 space-y-12">
+                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 md:p-8 lg:p-12 space-y-12">
                   
                   {/* Acceptance of Terms */}
                   <div id="acceptance">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <CheckCircle2 className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Acceptance of Terms</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Acceptance of Terms</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         By accessing or using WordPress AI Manager ("Service," "we," "us," or "our"), you agree to be bound by these Terms of Service. If you do not agree to these terms, you may not access or use the Service.
                       </p>
-                      <p className="text-gray-300 leading-relaxed">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                         These Terms constitute a legally binding agreement between you and WordPress AI Manager. Your continued use of the Service signifies your acceptance of any modifications to these Terms.
                       </p>
                     </div>
@@ -212,23 +212,23 @@ export function TermsOfService(): JSX.Element {
                   {/* Service Description */}
                   <div id="description" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Info className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Service Description</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Service Description</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         WordPress AI Manager is a cloud-based platform that provides AI-powered content creation, SEO optimization, and WordPress management tools. Our Service includes:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>AI content generation and optimization</li>
                         <li>SEO analysis and keyword research</li>
                         <li>WordPress site integration and management</li>
                         <li>Analytics and performance tracking</li>
                         <li>API access for custom integrations</li>
                       </ul>
-                      <p className="text-gray-300 leading-relaxed mt-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mt-4">
                         We reserve the right to modify, suspend, or discontinue any part of the Service at any time with or without notice.
                       </p>
                     </div>
@@ -237,16 +237,16 @@ export function TermsOfService(): JSX.Element {
                   {/* Account Registration */}
                   <div id="registration" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Users className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Account Registration</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Account Registration</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         To use certain features of the Service, you must create an account. You agree to:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>Provide accurate, current, and complete information</li>
                         <li>Maintain and promptly update your account information</li>
                         <li>Maintain the security of your password and account</li>
@@ -254,7 +254,7 @@ export function TermsOfService(): JSX.Element {
                         <li>Notify us immediately of any unauthorized access</li>
                       </ul>
                       <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-4">
-                        <p className="text-red-300 text-sm">
+                        <p className="text-red-300 text-xs md:text-sm">
                           <AlertTriangle className="w-4 h-4 inline mr-2" />
                           You must be at least 18 years old to create an account and use our Service.
                         </p>
@@ -265,21 +265,21 @@ export function TermsOfService(): JSX.Element {
                   {/* Subscription & Billing */}
                   <div id="subscription" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <DollarSign className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Subscription & Billing</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Subscription & Billing</h3>
                     </div>
                     <div className="prose prose-invert max-w-none space-y-4">
                       <div>
-                        <h4 className="text-lg font-bold text-white mb-2">Subscription Plans</h4>
-                        <p className="text-gray-300 leading-relaxed">
+                        <h4 className="text-base md:text-lg font-bold text-white mb-2">Subscription Plans</h4>
+                        <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                           We offer multiple subscription tiers with different features and pricing. Your subscription will automatically renew at the end of each billing cycle unless cancelled.
                         </p>
                       </div>
                       <div>
-                        <h4 className="text-lg font-bold text-white mb-2">Payment</h4>
-                        <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                        <h4 className="text-base md:text-lg font-bold text-white mb-2">Payment</h4>
+                        <ul className="list-disc list-inside space-y-1 text-sm md:text-base text-gray-300 ml-4">
                           <li>All fees are charged in USD and are non-refundable except as required by law</li>
                           <li>You authorize us to charge your payment method for all fees</li>
                           <li>Prices may change with 30 days' notice</li>
@@ -287,8 +287,8 @@ export function TermsOfService(): JSX.Element {
                         </ul>
                       </div>
                       <div>
-                        <h4 className="text-lg font-bold text-white mb-2">Cancellation</h4>
-                        <p className="text-gray-300 leading-relaxed">
+                        <h4 className="text-base md:text-lg font-bold text-white mb-2">Cancellation</h4>
+                        <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                           You may cancel your subscription at any time. Cancellation takes effect at the end of the current billing period. No refunds will be provided for partial periods.
                         </p>
                       </div>
@@ -298,16 +298,16 @@ export function TermsOfService(): JSX.Element {
                   {/* Acceptable Use */}
                   <div id="usage" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <CheckCircle2 className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Acceptable Use</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Acceptable Use</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         You agree to use the Service only for lawful purposes and in accordance with these Terms. You agree not to use the Service:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>In any way that violates applicable laws or regulations</li>
                         <li>To transmit harmful, offensive, or illegal content</li>
                         <li>To impersonate others or misrepresent your affiliation</li>
@@ -320,16 +320,16 @@ export function TermsOfService(): JSX.Element {
                   {/* Prohibited Activities */}
                   <div id="prohibited" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Ban className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Prohibited Activities</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Prohibited Activities</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         The following activities are strictly prohibited:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>Reverse engineering, decompiling, or disassembling the Service</li>
                         <li>Using automated systems to access the Service without authorization</li>
                         <li>Attempting to gain unauthorized access to any systems or networks</li>
@@ -344,19 +344,19 @@ export function TermsOfService(): JSX.Element {
                   {/* Intellectual Property */}
                   <div id="intellectual" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Copyright className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Intellectual Property Rights</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Intellectual Property Rights</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         The Service and its entire contents, features, and functionality are owned by WordPress AI Manager and are protected by copyright, trademark, and other intellectual property laws.
                       </p>
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         You are granted a limited, non-exclusive, non-transferable license to access and use the Service for your internal business purposes. This license does not include:
                       </p>
-                      <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-1 text-sm md:text-base text-gray-300 ml-4">
                         <li>Any right to modify or create derivative works</li>
                         <li>Any right to reverse engineer the Service</li>
                         <li>Any right to use our trademarks or branding</li>
@@ -368,22 +368,22 @@ export function TermsOfService(): JSX.Element {
                   {/* User Content */}
                   <div id="content" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <FileText className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">User Content</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">User Content</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         You retain all rights to the content you create using the Service ("User Content"). By using the Service, you grant us a worldwide, non-exclusive, royalty-free license to:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>Host, store, and process your User Content</li>
                         <li>Make your User Content available to you through the Service</li>
                         <li>Use your User Content to improve our AI models (aggregated and anonymized)</li>
                         <li>Display excerpts for marketing purposes with your permission</li>
                       </ul>
-                      <p className="text-gray-300 leading-relaxed mt-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mt-4">
                         You represent and warrant that you own or have the necessary rights to your User Content and that it does not violate any third-party rights or applicable laws.
                       </p>
                     </div>
@@ -392,19 +392,19 @@ export function TermsOfService(): JSX.Element {
                   {/* Termination */}
                   <div id="termination" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <UserX className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Termination</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Termination</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         We may terminate or suspend your account and access to the Service immediately, without prior notice or liability, for any reason, including if you breach these Terms.
                       </p>
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         Upon termination:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>Your right to use the Service will immediately cease</li>
                         <li>You will lose access to your account and User Content</li>
                         <li>We may delete your data after a reasonable period</li>
@@ -416,24 +416,24 @@ export function TermsOfService(): JSX.Element {
                   {/* Warranties & Disclaimers */}
                   <div id="warranties" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <AlertTriangle className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Warranties & Disclaimers</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Warranties & Disclaimers</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
                       <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-4">
-                        <p className="text-yellow-300 text-sm font-bold uppercase mb-2">
+                        <p className="text-yellow-300 text-xs md:text-sm font-bold uppercase mb-2">
                           Important Disclaimer
                         </p>
-                        <p className="text-yellow-300 text-sm">
+                        <p className="text-yellow-300 text-xs md:text-sm">
                           THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. WE DISCLAIM ALL WARRANTIES, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
                         </p>
                       </div>
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         We do not warrant that:
                       </p>
-                      <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-1 text-sm md:text-base text-gray-300 ml-4">
                         <li>The Service will be uninterrupted, secure, or error-free</li>
                         <li>The results obtained from the Service will be accurate or reliable</li>
                         <li>The quality of any products or services will meet your expectations</li>
@@ -445,19 +445,19 @@ export function TermsOfService(): JSX.Element {
                   {/* Limitation of Liability */}
                   <div id="limitation" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Shield className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Limitation of Liability</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Limitation of Liability</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         TO THE MAXIMUM EXTENT PERMITTED BY LAW, WORDPRESS AI MANAGER SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY.
                       </p>
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         Our total liability to you for all claims arising from your use of the Service shall not exceed the amount you paid us in the 12 months preceding the claim.
                       </p>
-                      <p className="text-gray-300 leading-relaxed">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                         Some jurisdictions do not allow the exclusion of certain warranties or limitation of liability, so these limitations may not apply to you.
                       </p>
                     </div>
@@ -466,16 +466,16 @@ export function TermsOfService(): JSX.Element {
                   {/* Indemnification */}
                   <div id="indemnification" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Scale className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Indemnification</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Indemnification</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         You agree to indemnify, defend, and hold harmless WordPress AI Manager and its officers, directors, employees, and agents from any claims, liabilities, damages, losses, and expenses arising from:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>Your use of the Service</li>
                         <li>Your violation of these Terms</li>
                         <li>Your violation of any rights of another party</li>
@@ -487,27 +487,27 @@ export function TermsOfService(): JSX.Element {
                   {/* Dispute Resolution */}
                   <div id="dispute" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Gavel className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Dispute Resolution</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Dispute Resolution</h3>
                     </div>
                     <div className="prose prose-invert max-w-none space-y-4">
                       <div>
-                        <h4 className="text-lg font-bold text-white mb-2">Governing Law</h4>
-                        <p className="text-gray-300 leading-relaxed">
+                        <h4 className="text-base md:text-lg font-bold text-white mb-2">Governing Law</h4>
+                        <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                           These Terms are governed by the laws of the State of California, United States, without regard to its conflict of law provisions.
                         </p>
                       </div>
                       <div>
-                        <h4 className="text-lg font-bold text-white mb-2">Arbitration</h4>
-                        <p className="text-gray-300 leading-relaxed">
+                        <h4 className="text-base md:text-lg font-bold text-white mb-2">Arbitration</h4>
+                        <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                           Any disputes arising from these Terms or the Service shall be resolved through binding arbitration in accordance with the rules of the American Arbitration Association. The arbitration shall take place in San Francisco, California.
                         </p>
                       </div>
                       <div>
-                        <h4 className="text-lg font-bold text-white mb-2">Class Action Waiver</h4>
-                        <p className="text-gray-300 leading-relaxed">
+                        <h4 className="text-base md:text-lg font-bold text-white mb-2">Class Action Waiver</h4>
+                        <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                           You agree to resolve disputes with us on an individual basis and waive any right to participate in a class action lawsuit or class-wide arbitration.
                         </p>
                       </div>
@@ -517,22 +517,22 @@ export function TermsOfService(): JSX.Element {
                   {/* General Provisions */}
                   <div id="general" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Globe className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">General Provisions</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">General Provisions</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <ul className="list-disc list-inside space-y-3 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-3 text-sm md:text-base text-gray-300 ml-4">
                         <li><strong className="text-white">Entire Agreement:</strong> These Terms constitute the entire agreement between you and WordPress AI Manager</li>
                         <li><strong className="text-white">Severability:</strong> If any provision is found invalid, the remaining provisions will continue in effect</li>
                         <li><strong className="text-white">Waiver:</strong> Our failure to enforce any right does not constitute a waiver</li>
                         <li><strong className="text-white">Assignment:</strong> You may not assign these Terms without our consent</li>
                         <li><strong className="text-white">Changes:</strong> We may modify these Terms at any time with notice</li>
-                        <li><strong className="text-white">Contact:</strong> Questions about these Terms should be sent to legal@wpaimanager.com</li>
+                        <li><strong className="text-white">Contact:</strong> Questions about these Terms should be sent to <a href="mailto:legal@wpaimanager.com" className="text-blue-400 hover:text-blue-300 break-words">legal@wpaimanager.com</a></li>
                       </ul>
                       <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mt-6">
-                        <p className="text-blue-300 text-sm">
+                        <p className="text-blue-300 text-xs md:text-sm">
                           <Info className="w-4 h-4 inline mr-2" />
                           By using WordPress AI Manager, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
                         </p>
@@ -550,7 +550,7 @@ export function TermsOfService(): JSX.Element {
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/10 bg-slate-950/50 backdrop-blur-sm py-12 px-6 mt-20">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-12">
             <div>
               <div className="flex items-center space-x-3 mb-4">
                 <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-700 rounded-lg">

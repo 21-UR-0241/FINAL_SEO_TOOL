@@ -1,3 +1,4 @@
+
 // client/src/pages/subscription.tsx
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -27,6 +28,7 @@ import {
   TrendingUp,
   Users,
   Globe,
+  Wrench,
 } from "lucide-react";
 import { useAuth } from "./authentication";
 
@@ -51,20 +53,21 @@ const pricingPlans: PricingPlan[] = [
     name: "Starter",
     price: 0,
     interval: "month",
-    description: "Perfect for trying out our platform",
+    description: "Perfect for trying out content optimization",
     icon: <Zap className="w-6 h-6" />,
     color: "from-gray-400 to-gray-600",
     features: [
-      "1 website",
-      "10 AI-generated articles per month",
-      "Basic SEO analysis",
+      "1 WordPress site",
+      "50 content optimizations per month",
+      "Basic readability analysis",
+      "SEO score checking",
       "Community support",
-      "Standard content templates",
+      "Content health monitoring",
     ],
     limitations: [
-      "Limited keyword research",
-      "No priority support",
-      "No custom integrations",
+      "No bulk operations",
+      "No API access",
+      "Limited SEO plugin integrations",
     ],
     cta: "Get Started Free",
   },
@@ -73,21 +76,23 @@ const pricingPlans: PricingPlan[] = [
     name: "Professional",
     price: 29,
     interval: "month",
-    description: "For serious content creators and marketers",
+    description: "For serious WordPress site owners",
     icon: <Crown className="w-6 h-6" />,
     popular: true,
     recommended: true,
     color: "from-blue-500 to-purple-600",
     features: [
-      "Up to 10 websites",
-      "Unlimited AI-generated articles",
-      "Advanced SEO analysis & recommendations",
+      "Up to 10 WordPress sites",
+      "Unlimited content optimizations",
+      "Advanced readability improvement",
+      "Complete SEO analysis & auto-fix",
       "Priority email support",
-      "Custom content templates",
-      "Keyword research tools",
-      "Content calendar & scheduling",
-      "Performance analytics",
-      "API access",
+      "Bulk optimization operations",
+      "Content health monitoring",
+      "Performance analytics dashboard",
+      "API access (5,000 requests/month)",
+      "Yoast SEO & Rank Math integration",
+      "Automated link & image fixing",
     ],
     limitations: ["Limited to 10 team members"],
     cta: "Start 14-Day Free Trial",
@@ -97,22 +102,23 @@ const pricingPlans: PricingPlan[] = [
     name: "Enterprise",
     price: 99,
     interval: "month",
-    description: "For agencies and large teams",
+    description: "For agencies and large organizations",
     icon: <Building2 className="w-6 h-6" />,
     color: "from-purple-500 to-pink-600",
     features: [
-      "Unlimited websites",
-      "Unlimited AI-generated articles",
-      "Enterprise SEO suite",
+      "Unlimited WordPress sites",
+      "Unlimited content optimizations",
+      "Enterprise SEO optimization suite",
       "24/7 priority support",
-      "Custom content templates & AI training",
-      "Advanced keyword research",
+      "Advanced bulk operations",
       "Multi-user collaboration",
       "White-label options",
-      "Advanced API access",
+      "Unlimited API access",
       "Dedicated account manager",
-      "Custom integrations",
-      "SLA guarantee",
+      "Custom SEO plugin integrations",
+      "SLA guarantee (99.9% uptime)",
+      "Advanced analytics & reporting",
+      "Custom AI model training",
     ],
     limitations: [],
     cta: "Get Started",
@@ -223,7 +229,7 @@ export function SubscriptionPage() {
             <span className="ml-1">🚀</span>
           </h2>
           <p className="text-base text-gray-600 max-w-2xl mx-auto">
-            Choose the perfect plan to supercharge your content strategy
+            Choose the perfect plan to optimize your WordPress content with AI
           </p>
         </div>
 
@@ -422,22 +428,22 @@ export function SubscriptionPage() {
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg group-hover:shadow-xl transition-shadow">
                 <Users className="w-6 h-6 text-white" />
               </div>
-              <h4 className="font-bold text-gray-900 text-sm mb-0.5">10,000+ Users</h4>
+              <h4 className="font-bold text-gray-900 text-sm mb-0.5">5,000+ Users</h4>
               <p className="text-xs text-gray-600">Trusted worldwide</p>
             </div>
             <div className="group hover:scale-105 transition-transform duration-300">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg group-hover:shadow-xl transition-shadow">
-                <Globe className="w-6 h-6 text-white" />
+                <Wrench className="w-6 h-6 text-white" />
               </div>
-              <h4 className="font-bold text-gray-900 text-sm mb-0.5">Global Coverage</h4>
-              <p className="text-xs text-gray-600">50+ countries</p>
+              <h4 className="font-bold text-gray-900 text-sm mb-0.5">250K+ Optimizations</h4>
+              <p className="text-xs text-gray-600">Content improved</p>
             </div>
             <div className="group hover:scale-105 transition-transform duration-300">
               <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg group-hover:shadow-xl transition-shadow">
-                <Star className="w-6 h-6 text-white" />
+                <Globe className="w-6 h-6 text-white" />
               </div>
-              <h4 className="font-bold text-gray-900 text-sm mb-0.5">4.9/5 Rating</h4>
-              <p className="text-xs text-gray-600">From 500+ reviews</p>
+              <h4 className="font-bold text-gray-900 text-sm mb-0.5">30+ Countries</h4>
+              <p className="text-xs text-gray-600">Global coverage</p>
             </div>
           </div>
         </div>
@@ -445,34 +451,34 @@ export function SubscriptionPage() {
         {/* Features Comparison */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-8 border border-gray-200">
           <h3 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Everything You Need to Succeed
+            Everything You Need to Optimize Your WordPress Content
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center group hover:bg-blue-50/50 p-4 rounded-xl transition-all duration-300">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
                 <Zap className="w-6 h-6 text-white" />
               </div>
-              <h4 className="font-bold text-base mb-2 text-gray-900">AI-Powered Content</h4>
+              <h4 className="font-bold text-base mb-2 text-gray-900">AI-Powered Optimization</h4>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Generate high-quality, SEO-optimized content with advanced AI
+                Improve readability scores and content quality with advanced AI
               </p>
             </div>
             <div className="text-center group hover:bg-purple-50/50 p-4 rounded-xl transition-all duration-300">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
                 <Crown className="w-6 h-6 text-white" />
               </div>
-              <h4 className="font-bold text-base mb-2 text-gray-900">SEO Optimization</h4>
+              <h4 className="font-bold text-base mb-2 text-gray-900">SEO Enhancement</h4>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Built-in SEO tools to help your content rank higher
+                Built-in SEO analysis and auto-fix tools for better rankings
               </p>
             </div>
             <div className="text-center group hover:bg-green-50/50 p-4 rounded-xl transition-all duration-300">
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
-              <h4 className="font-bold text-base mb-2 text-gray-900">Regular Updates</h4>
+              <h4 className="font-bold text-base mb-2 text-gray-900">Content Health</h4>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Continuous improvements and new features added regularly
+                Monitor and fix broken links, images, and formatting issues
               </p>
             </div>
           </div>
@@ -525,10 +531,10 @@ export function SubscriptionPage() {
           <p className="text-sm text-gray-600">
             Have questions? Contact us at{" "}
             <a 
-              href="mailto:support@example.com" 
+              href="mailto:support@wpaimanager.com" 
               className="text-blue-600 hover:text-blue-700 font-semibold underline decoration-2 underline-offset-2 transition-colors"
             >
-              support@example.com
+              support@wpaimanager.com
             </a>
           </p>
         </div>

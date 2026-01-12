@@ -1,22 +1,29 @@
+
+// // client/src/pages/settings.tsx
 // import { useState } from "react";
 // import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+// import { useLocation } from "wouter";
 // import {
 //   Save,
 //   Key,
 //   Globe,
 //   Bot,
-//   Bell,
 //   Shield,
 //   User,
 //   Trash2,
 //   Eye,
 //   EyeOff,
 //   Check,
-//   X,
 //   Loader2,
 //   Plus,
 //   RotateCcw,
 //   AlertTriangle,
+//   CreditCard,
+//   TrendingUp,
+//   Calendar,
+//   DollarSign,
+//   ArrowUpCircle,
+//   XCircle,
 // } from "lucide-react";
 // import { Button } from "@/components/ui/button";
 // import { Input } from "@/components/ui/input";
@@ -40,7 +47,6 @@
 // import { Badge } from "@/components/ui/badge";
 // import { useToast } from "@/hooks/use-toast";
 // import { api } from "@/lib/api";
-// import { toast } from "sonner";
 // import {
 //   AlertDialog,
 //   AlertDialogAction,
@@ -53,31 +59,21 @@
 // } from "@/components/ui/alert-dialog";
 // import { Sanitizer } from "@/utils/inputSanitizer";
 
-// // ✅ Get API URL from environment
-// const API_URL = import.meta.env.VITE_API_URL || '';
+// // ✅ API base URL (for Render / CORS)
+// const API_URL = import.meta.env.VITE_API_URL || "";
 
-// // Helper function for API calls with proper CORS
-// const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-//   const url = `${API_URL}${endpoint}`;
-//   console.log('🔗 API Call:', url);
-  
-//   const response = await fetch(url, {
+// // Helper: fetch with API_URL + credentials
+// const apiFetch = (path: string, options: RequestInit = {}) => {
+//   const url = `${API_URL}${path}`;
+//   console.log("🔗 API Call:", url);
+//   return fetch(url, {
 //     ...options,
-//     credentials: 'include', // ✅ Always include credentials
+//     credentials: "include",
 //     headers: {
-//       'Content-Type': 'application/json',
+//       "Content-Type": "application/json",
 //       ...options.headers,
 //     },
 //   });
-
-//   if (!response.ok) {
-//     const error = await response.json().catch(() => ({ 
-//       message: `HTTP ${response.status}: ${response.statusText}` 
-//     }));
-//     throw new Error(error.message || `Request failed: ${response.status}`);
-//   }
-
-//   return response.json();
 // };
 
 // const timezoneOptions = [
@@ -125,9 +121,24 @@
 
 // interface ApiKeyStatus {
 //   providers: {
-//     openai: { configured: boolean; keyName?: string; lastValidated?: string; status: string };
-//     anthropic: { configured: boolean; keyName?: string; lastValidated?: string; status: string };
-//     google_pagespeed: { configured: boolean; keyName?: string; lastValidated?: string; status: string };
+//     openai: {
+//       configured: boolean;
+//       keyName?: string;
+//       lastValidated?: string;
+//       status: string;
+//     };
+//     anthropic: {
+//       configured: boolean;
+//       keyName?: string;
+//       lastValidated?: string;
+//       status: string;
+//     };
+//     google_pagespeed: {
+//       configured: boolean;
+//       keyName?: string;
+//       lastValidated?: string;
+//       status: string;
+//     };
 //   };
 // }
 
@@ -154,14 +165,27 @@
 
 // interface DeleteConfirmation {
 //   isOpen: boolean;
-//   type: "apiKey" | "website" | null;
+//   type: "apiKey" | "website" | "subscription" | null;
 //   itemId: string;
 //   itemName: string;
+// }
+
+// interface Subscription {
+//   id: string;
+//   planId: string;
+//   planName: string;
+//   status: "active" | "canceled" | "past_due" | "trialing";
+//   interval: "month" | "year";
+//   currentPeriodEnd: string;
+//   cancelAtPeriodEnd: boolean;
+//   amount: number;
 // }
 
 // export default function Settings() {
 //   const { toast } = useToast();
 //   const queryClient = useQueryClient();
+//   const [, setLocation] = useLocation();
+
 //   const [activeTab, setActiveTab] = useState("profile");
 //   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
 //     isOpen: false,
@@ -169,6 +193,7 @@
 //     itemId: "",
 //     itemName: "",
 //   });
+
 //   const [isAddingKey, setIsAddingKey] = useState(false);
 //   const [newKeyForm, setNewKeyForm] = useState<ApiKeyFormData>({
 //     provider: "",
@@ -177,6 +202,7 @@
 //   });
 //   const [validatingKeys, setValidatingKeys] = useState<Set<string>>(new Set());
 //   const [showApiKey, setShowApiKey] = useState(false);
+
 //   const [passwordData, setPasswordData] = useState({
 //     currentPassword: "",
 //     newPassword: "",
@@ -184,11 +210,18 @@
 //   });
 //   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
 
-//   // ✅ Fetch user settings with proper error handling
-//   const { data: settings, isLoading: settingsLoading, error: settingsError } = useQuery<UserSettings>({
+//   // --- SETTINGS ---
+//   const {
+//     data: settings,
+//     isLoading: settingsLoading,
+//     error: settingsError,
+//   } = useQuery<UserSettings>({
 //     queryKey: ["/api/user/settings"],
-//     queryFn: () => apiCall("/api/user/settings"),
-//     retry: 2,
+//     queryFn: async () => {
+//       const response = await apiFetch("/api/user/settings");
+//       if (!response.ok) throw new Error("Failed to fetch settings");
+//       return response.json();
+//     },
 //   });
 
 //   const { data: websites } = useQuery({
@@ -196,22 +229,60 @@
 //     queryFn: api.getWebsites,
 //   });
 
-//   // ✅ Fetch user API keys
+//   // --- API KEYS ---
 //   const { data: userApiKeys, refetch: refetchApiKeys } = useQuery<UserApiKey[]>({
 //     queryKey: ["/api/user/api-keys"],
-//     queryFn: () => apiCall("/api/user/api-keys"),
+//     queryFn: async () => {
+//       const response = await apiFetch("/api/user/api-keys");
+//       if (!response.ok) throw new Error("Failed to fetch API keys");
+//       return response.json();
+//     },
 //   });
 
 //   const { data: apiKeyStatus } = useQuery<ApiKeyStatus>({
 //     queryKey: ["/api/user/api-keys/status"],
-//     queryFn: () => apiCall("/api/user/api-keys/status"),
+//     queryFn: async () => {
+//       const response = await apiFetch("/api/user/api-keys/status");
+//       if (!response.ok) throw new Error("Failed to fetch API key status");
+//       return response.json();
+//     },
 //     refetchInterval: 30000,
 //   });
 
-//   // ✅ Delete website mutation
+//   // --- SUBSCRIPTION ---
+//   const {
+//     data: subscription,
+//     isLoading: subscriptionLoading,
+//   } = useQuery<Subscription | null>({
+//     queryKey: ["/api/billing/subscription"],
+//     queryFn: async () => {
+//       const response = await apiFetch("/api/billing/subscription");
+//       if (!response.ok) {
+//         if (response.status === 404) {
+//           return null; // no active subscription
+//         }
+//         const err = await response.json().catch(() => ({}));
+//         throw new Error(err.message || "Failed to fetch subscription");
+//       }
+//       const data = await response.json();
+//       console.log("Subscription data:", data);
+//       return data;
+//     },
+//   });
+
+//   // --- MUTATIONS ---
+
+//   // Delete website
 //   const deleteWebsite = useMutation({
 //     mutationFn: async (websiteId: string) => {
-//       return apiCall(`/api/user/websites/${websiteId}`, { method: 'DELETE' });
+//       const response = await apiFetch(`/api/user/websites/${websiteId}`, {
+//         method: "DELETE",
+//       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to delete website");
+//       }
+//       return response.json();
 //     },
 //     onSuccess: () => {
 //       queryClient.invalidateQueries({ queryKey: ["/api/user/websites"] });
@@ -230,29 +301,77 @@
 //     },
 //   });
 
-//   const openDeleteConfirmation = (type: "apiKey" | "website", itemId: string, itemName: string) => {
-//     setDeleteConfirmation({ isOpen: true, type, itemId, itemName });
-//   };
+//   // Cancel subscription
+//   const cancelSubscription = useMutation({
+//     mutationFn: async () => {
+//       const response = await apiFetch("/api/billing/subscription/cancel", {
+//         method: "POST",
+//         body: JSON.stringify({ immediate: false }), // cancel at period end
+//       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to cancel subscription");
+//       }
+//       return response.json();
+//     },
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
+//       toast({
+//         title: "Subscription Canceled",
+//         description:
+//           "Your subscription will remain active until the end of the billing period.",
+//       });
+//       closeDeleteConfirmation();
+//     },
+//     onError: (error: Error) => {
+//       toast({
+//         title: "Failed to Cancel Subscription",
+//         description: error.message,
+//         variant: "destructive",
+//       });
+//     },
+//   });
 
-//   const closeDeleteConfirmation = () => {
-//     setDeleteConfirmation({ isOpen: false, type: null, itemId: "", itemName: "" });
-//   };
+//   // Resume subscription
+//   const resumeSubscription = useMutation({
+//     mutationFn: async () => {
+//       const response = await apiFetch("/api/billing/subscription/resume", {
+//         method: "POST",
+//       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to resume subscription");
+//       }
+//       return response.json();
+//     },
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
+//       toast({
+//         title: "Subscription Resumed",
+//         description: "Your subscription will continue automatically.",
+//       });
+//     },
+//     onError: (error: Error) => {
+//       toast({
+//         title: "Failed to Resume Subscription",
+//         description: error.message,
+//         variant: "destructive",
+//       });
+//     },
+//   });
 
-//   const handleConfirmDelete = () => {
-//     if (deleteConfirmation.type === "apiKey" && deleteConfirmation.itemId) {
-//       deleteApiKey.mutate(deleteConfirmation.itemId);
-//     } else if (deleteConfirmation.type === "website" && deleteConfirmation.itemId) {
-//       deleteWebsite.mutate(deleteConfirmation.itemId);
-//     }
-//   };
-
-//   // ✅ Update settings mutation
+//   // Settings update
 //   const updateSettings = useMutation({
 //     mutationFn: async (newSettings: UserSettings) => {
-//       return apiCall("/api/user/settings", {
+//       const response = await apiFetch("/api/user/settings", {
 //         method: "PUT",
 //         body: JSON.stringify(newSettings),
 //       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to update settings");
+//       }
+//       return response.json();
 //     },
 //     onSuccess: (updatedSettings) => {
 //       queryClient.setQueryData(["/api/user/settings"], updatedSettings);
@@ -270,10 +389,17 @@
 //     },
 //   });
 
-//   // ✅ Reset settings mutation
+//   // Settings reset
 //   const resetSettings = useMutation({
 //     mutationFn: async () => {
-//       return apiCall("/api/user/settings", { method: "DELETE" });
+//       const response = await apiFetch("/api/user/settings", {
+//         method: "DELETE",
+//       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to reset settings");
+//       }
+//       return response.json();
 //     },
 //     onSuccess: (result) => {
 //       queryClient.setQueryData(["/api/user/settings"], result.settings);
@@ -291,13 +417,18 @@
 //     },
 //   });
 
-//   // ✅ API key mutations
+//   // API key mutations
 //   const addApiKey = useMutation({
 //     mutationFn: async (keyData: ApiKeyFormData) => {
-//       return apiCall("/api/user/api-keys", {
+//       const response = await apiFetch("/api/user/api-keys", {
 //         method: "POST",
 //         body: JSON.stringify(keyData),
 //       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to add API key");
+//       }
+//       return response.json();
 //     },
 //     onSuccess: () => {
 //       toast({
@@ -307,7 +438,9 @@
 //       setIsAddingKey(false);
 //       setNewKeyForm({ provider: "", keyName: "", apiKey: "" });
 //       refetchApiKeys();
-//       queryClient.invalidateQueries({ queryKey: ["/api/user/api-keys/status"] });
+//       queryClient.invalidateQueries({
+//         queryKey: ["/api/user/api-keys/status"],
+//       });
 //     },
 //     onError: (error: Error) => {
 //       toast({
@@ -320,7 +453,14 @@
 
 //   const validateApiKey = useMutation({
 //     mutationFn: async (keyId: string) => {
-//       return apiCall(`/api/user/api-keys/${keyId}/validate`, { method: "POST" });
+//       const response = await apiFetch(`/api/user/api-keys/${keyId}/validate`, {
+//         method: "POST",
+//       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to validate API key");
+//       }
+//       return response.json();
 //     },
 //     onSuccess: (data) => {
 //       toast({
@@ -329,13 +469,22 @@
 //         variant: data.isValid ? "default" : "destructive",
 //       });
 //       refetchApiKeys();
-//       queryClient.invalidateQueries({ queryKey: ["/api/user/api-keys/status"] });
+//       queryClient.invalidateQueries({
+//         queryKey: ["/api/user/api-keys/status"],
+//       });
 //     },
 //   });
 
 //   const deleteApiKey = useMutation({
 //     mutationFn: async (keyId: string) => {
-//       return apiCall(`/api/user/api-keys/${keyId}`, { method: "DELETE" });
+//       const response = await apiFetch(`/api/user/api-keys/${keyId}`, {
+//         method: "DELETE",
+//       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to delete API key");
+//       }
+//       return response.json().catch(() => ({}));
 //     },
 //     onSuccess: () => {
 //       toast({
@@ -343,8 +492,9 @@
 //         description: "The API key has been removed from your account.",
 //       });
 //       refetchApiKeys();
-//       queryClient.invalidateQueries({ queryKey: ["/api/user/api-keys/status"] });
-//       closeDeleteConfirmation();
+//       queryClient.invalidateQueries({
+//         queryKey: ["/api/user/api-keys/status"],
+//       });
 //     },
 //     onError: (error: Error) => {
 //       toast({
@@ -362,7 +512,11 @@
 //         title: "Password Changed",
 //         description: "Your password has been successfully updated.",
 //       });
-//       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+//       setPasswordData({
+//         currentPassword: "",
+//         newPassword: "",
+//         confirmPassword: "",
+//       });
 //       setPasswordErrors([]);
 //     },
 //     onError: (error: Error) => {
@@ -374,25 +528,67 @@
 //     },
 //   });
 
-//   const handleSave = () => {
-//     if (settings) {
-//       const sanitizedSettings = {
-//         profile: {
-//           name: Sanitizer.sanitizeText(settings.profile.name),
-//           email: settings.profile.email,
-//           company: Sanitizer.sanitizeText(settings.profile.company),
-//           timezone: settings.profile.timezone,
-//         },
-//         notifications: settings.notifications,
-//         automation: settings.automation,
-//         security: {
-//           twoFactorAuth: settings.security.twoFactorAuth,
-//           sessionTimeout: Math.min(168, Math.max(1, settings.security.sessionTimeout)),
-//           allowApiAccess: settings.security.allowApiAccess,
-//         },
-//       };
-//       updateSettings.mutate(sanitizedSettings);
+//   // --- DELETE CONFIRMATION ---
+
+//   const openDeleteConfirmation = (
+//     type: "apiKey" | "website" | "subscription",
+//     itemId: string,
+//     itemName: string,
+//   ) => {
+//     setDeleteConfirmation({
+//       isOpen: true,
+//       type,
+//       itemId,
+//       itemName,
+//     });
+//   };
+
+//   const closeDeleteConfirmation = () => {
+//     setDeleteConfirmation({
+//       isOpen: false,
+//       type: null,
+//       itemId: "",
+//       itemName: "",
+//     });
+//   };
+
+//   const handleConfirmDelete = () => {
+//     if (deleteConfirmation.type === "apiKey" && deleteConfirmation.itemId) {
+//       deleteApiKey.mutate(deleteConfirmation.itemId, {
+//         onSuccess: () => closeDeleteConfirmation(),
+//       });
+//     } else if (
+//       deleteConfirmation.type === "website" &&
+//       deleteConfirmation.itemId
+//     ) {
+//       deleteWebsite.mutate(deleteConfirmation.itemId, {
+//         onSuccess: () => closeDeleteConfirmation(),
+//       });
+//     } else if (deleteConfirmation.type === "subscription") {
+//       cancelSubscription.mutate();
 //     }
+//   };
+
+//   // --- SETTINGS HELPERS ---
+
+//   const handleSave = () => {
+//     if (!settings) return;
+//     const sanitizedSettings: UserSettings = {
+//       profile: {
+//         name: Sanitizer.sanitizeText(settings.profile.name),
+//         email: settings.profile.email,
+//         company: Sanitizer.sanitizeText(settings.profile.company),
+//         timezone: settings.profile.timezone,
+//       },
+//       notifications: settings.notifications,
+//       automation: settings.automation,
+//       security: {
+//         twoFactorAuth: settings.security.twoFactorAuth,
+//         sessionTimeout: Math.min(168, Math.max(1, settings.security.sessionTimeout)),
+//         allowApiAccess: settings.security.allowApiAccess,
+//       },
+//     };
+//     updateSettings.mutate(sanitizedSettings);
 //   };
 
 //   const handleReset = () => {
@@ -410,18 +606,20 @@
 //         case "company":
 //           sanitizedValue = Sanitizer.sanitizeText(value);
 //           break;
-//         case "email":
+//         case "email": {
 //           const emailValidation = Sanitizer.validateEmail(value);
 //           if (!emailValidation.isValid && value !== "") {
 //             toast({
 //               title: "Invalid Email",
-//               description: emailValidation.error || "Please enter a valid email address",
+//               description:
+//                 emailValidation.error || "Please enter a valid email address",
 //               variant: "destructive",
 //             });
 //             return;
 //           }
 //           sanitizedValue = emailValidation.sanitized;
 //           break;
+//         }
 //       }
 //     } else if (section === "security" && key === "sessionTimeout") {
 //       const numValue = parseInt(value);
@@ -432,133 +630,54 @@
 
 //     queryClient.setQueryData(["/api/user/settings"], {
 //       ...settings,
-//       [section]: { ...settings[section], [key]: sanitizedValue },
+//       [section]: {
+//         ...settings[section],
+//         [key]: sanitizedValue,
+//       },
 //     });
 //   };
 
-//   // const handleAddApiKey = () => {
-//   //   const sanitizedKeyName = Sanitizer.sanitizeText(newKeyForm.keyName);
-
-//   //   if (!newKeyForm.provider || !sanitizedKeyName || !newKeyForm.apiKey) {
-//   //     toast({
-//   //       title: "Missing Information",
-//   //       description: "Please fill in all fields.",
-//   //       variant: "destructive",
-//   //     });
-//   //     return;
-//   //   }
-
-//   //   if (sanitizedKeyName.length < 2 || sanitizedKeyName.length > 100) {
-//   //     toast({
-//   //       title: "Invalid Key Name",
-//   //       description: "Key name must be between 2 and 100 characters.",
-//   //       variant: "destructive",
-//   //     });
-//   //     return;
-//   //   }
-
-//   //   const apiKey = newKeyForm.apiKey.trim();
-//   //   if (newKeyForm.provider === "openai" && !apiKey.startsWith("sk-")) {
-//   //     toast({
-//   //       title: "Invalid API Key Format",
-//   //       description: "OpenAI API keys should start with 'sk-'",
-//   //       variant: "destructive",
-//   //     });
-//   //     return;
-//   //   }
-
-//   //   if (newKeyForm.provider === "anthropic" && !apiKey.startsWith("sk-ant-")) {
-//   //     toast({
-//   //       title: "Invalid API Key Format",
-//   //       description: "Anthropic API keys should start with 'sk-ant-'",
-//   //       variant: "destructive",
-//   //     });
-//   //     return;
-//   //   }
-
-//   //   addApiKey.mutate({
-//   //     provider: newKeyForm.provider,
-//   //     keyName: sanitizedKeyName,
-//   //     apiKey: apiKey,
-//   //   });
-//   // };
-
-
 //   const handleAddApiKey = () => {
-//   // Trim and sanitize
-//   const apiKey = newKeyForm.apiKey.trim();
-//   const sanitizedKeyName = Sanitizer.sanitizeText(newKeyForm.keyName.trim());
-  
-//   // Debug log
-//   console.log('🔑 Submitting API Key:', {
-//     provider: newKeyForm.provider,
-//     keyName: sanitizedKeyName,
-//     apiKey: apiKey.substring(0, 10) + '...' // Don't log full key
-//   });
-
-//   // Validate all fields exist
-//   if (!newKeyForm.provider) {
-//     toast({
-//       title: "Missing Information",
-//       description: "Please select a provider.",
-//       variant: "destructive",
+//     const sanitizedKeyName = Sanitizer.sanitizeText(newKeyForm.keyName);
+//     if (!newKeyForm.provider || !sanitizedKeyName || !newKeyForm.apiKey) {
+//       toast({
+//         title: "Missing Information",
+//         description: "Please fill in all fields.",
+//         variant: "destructive",
+//       });
+//       return;
+//     }
+//     if (sanitizedKeyName.length < 2 || sanitizedKeyName.length > 100) {
+//       toast({
+//         title: "Invalid Key Name",
+//         description: "Key name must be between 2 and 100 characters.",
+//         variant: "destructive",
+//       });
+//       return;
+//     }
+//     const apiKey = newKeyForm.apiKey.trim();
+//     if (newKeyForm.provider === "openai" && !apiKey.startsWith("sk-")) {
+//       toast({
+//         title: "Invalid API Key Format",
+//         description: "OpenAI API keys should start with 'sk-'",
+//         variant: "destructive",
+//       });
+//       return;
+//     }
+//     if (newKeyForm.provider === "anthropic" && !apiKey.startsWith("sk-ant-")) {
+//       toast({
+//         title: "Invalid API Key Format",
+//         description: "Anthropic API keys should start with 'sk-ant-'",
+//         variant: "destructive",
+//       });
+//       return;
+//     }
+//     addApiKey.mutate({
+//       provider: newKeyForm.provider,
+//       keyName: sanitizedKeyName,
+//       apiKey,
 //     });
-//     return;
-//   }
-
-//   if (!sanitizedKeyName || sanitizedKeyName.length === 0) {
-//     toast({
-//       title: "Invalid Key Name",
-//       description: "Key name cannot be empty after sanitization.",
-//       variant: "destructive",
-//     });
-//     return;
-//   }
-
-//   if (!apiKey || apiKey.length === 0) {
-//     toast({
-//       title: "Missing Information",
-//       description: "API key cannot be empty.",
-//       variant: "destructive",
-//     });
-//     return;
-//   }
-
-//   if (sanitizedKeyName.length < 2 || sanitizedKeyName.length > 100) {
-//     toast({
-//       title: "Invalid Key Name",
-//       description: "Key name must be between 2 and 100 characters.",
-//       variant: "destructive",
-//     });
-//     return;
-//   }
-
-//   if (newKeyForm.provider === "openai" && !apiKey.startsWith("sk-")) {
-//     toast({
-//       title: "Invalid API Key Format",
-//       description: "OpenAI API keys should start with 'sk-'",
-//       variant: "destructive",
-//     });
-//     return;
-//   }
-
-//   if (newKeyForm.provider === "anthropic" && !apiKey.startsWith("sk-ant-")) {
-//     toast({
-//       title: "Invalid API Key Format",
-//       description: "Anthropic API keys should start with 'sk-ant-'",
-//       variant: "destructive",
-//     });
-//     return;
-//   }
-
-//   addApiKey.mutate({
-//     provider: newKeyForm.provider,
-//     keyName: sanitizedKeyName,
-//     apiKey: apiKey,
-//   });
-// };
-
-
+//   };
 
 //   const handleValidateKey = (keyId: string) => {
 //     setValidatingKeys((prev) => new Set(prev).add(keyId));
@@ -576,26 +695,42 @@
 //   const validatePasswordForm = (): boolean => {
 //     const errors: string[] = [];
 
-//     if (!passwordData.currentPassword) errors.push("Current password is required");
+//     if (!passwordData.currentPassword)
+//       errors.push("Current password is required");
 //     if (!passwordData.newPassword) errors.push("New password is required");
-//     if (!passwordData.confirmPassword) errors.push("Password confirmation is required");
+//     if (!passwordData.confirmPassword)
+//       errors.push("Password confirmation is required");
 //     if (passwordData.newPassword && passwordData.newPassword.length > 200) {
 //       errors.push("Password is too long (maximum 200 characters)");
 //     }
-//     if (passwordData.newPassword && passwordData.confirmPassword && 
-//         passwordData.newPassword !== passwordData.confirmPassword) {
+//     if (
+//       passwordData.newPassword &&
+//       passwordData.confirmPassword &&
+//       passwordData.newPassword !== passwordData.confirmPassword
+//     ) {
 //       errors.push("New password and confirmation do not match");
 //     }
 //     if (passwordData.newPassword && passwordData.newPassword.length < 8) {
 //       errors.push("New password must be at least 8 characters long");
 //     }
-//     if (passwordData.newPassword && passwordData.currentPassword && 
-//         passwordData.newPassword === passwordData.currentPassword) {
+//     if (
+//       passwordData.newPassword &&
+//       passwordData.currentPassword &&
+//       passwordData.newPassword === passwordData.currentPassword
+//     ) {
 //       errors.push("New password must be different from current password");
 //     }
-
-//     const weakPasswords = ["password", "12345678", "qwerty", "abc12345", "password123"];
-//     if (passwordData.newPassword && weakPasswords.includes(passwordData.newPassword.toLowerCase())) {
+//     const weakPasswords = [
+//       "password",
+//       "12345678",
+//       "qwerty",
+//       "abc12345",
+//       "password123",
+//     ];
+//     if (
+//       passwordData.newPassword &&
+//       weakPasswords.includes(passwordData.newPassword.toLowerCase())
+//     ) {
 //       errors.push("This password is too common. Please choose a stronger password");
 //     }
 
@@ -616,10 +751,14 @@
 //   };
 
 //   const getStatusBadge = (status: string, provider: string) => {
-//     const providerStatus = apiKeyStatus?.providers?.[provider as keyof typeof apiKeyStatus.providers];
-
+//     const providerStatus =
+//       apiKeyStatus?.providers?.[
+//         provider as keyof typeof apiKeyStatus.providers
+//       ];
 //     if (!providerStatus?.configured) {
-//       return <Badge className="bg-gray-100 text-gray-800">Not Configured</Badge>;
+//       return (
+//         <Badge className="bg-gray-100 text-gray-800">Not Configured</Badge>
+//       );
 //     }
 //     if (status === "valid") {
 //       return <Badge className="bg-green-100 text-green-800">✓ Active</Badge>;
@@ -632,21 +771,50 @@
 
 //   const getProviderIcon = (provider: string) => {
 //     switch (provider) {
-//       case "openai": return <Bot className="w-6 h-6 text-green-600" />;
-//       case "anthropic": return <Bot className="w-6 h-6 text-blue-600" />;
-//       case "google_pagespeed": return <Globe className="w-6 h-6 text-orange-600" />;
-//       default: return <Key className="w-6 h-6 text-gray-400" />;
+//       case "openai":
+//         return <Bot className="w-6 h-6 text-green-600" />;
+//       case "anthropic":
+//         return <Bot className="w-6 h-6 text-blue-600" />;
+//       case "google_pagespeed":
+//         return <Globe className="w-6 h-6 text-orange-600" />;
+//       default:
+//         return <Key className="w-6 h-6 text-gray-400" />;
 //     }
 //   };
 
 //   const getProviderName = (provider: string) => {
 //     switch (provider) {
-//       case "openai": return "OpenAI GPT-4";
-//       case "anthropic": return "Anthropic Claude";
-//       case "google_pagespeed": return "Google PageSpeed Insights";
-//       default: return provider;
+//       case "openai":
+//         return "OpenAI GPT-4";
+//       case "anthropic":
+//         return "Anthropic Claude";
+//       case "google_pagespeed":
+//         return "Google PageSpeed Insights";
+//       default:
+//         return provider;
 //     }
 //   };
+
+//   const getSubscriptionStatusBadge = (status: string) => {
+//     switch (status) {
+//       case "active":
+//         return <Badge className="bg-green-100 text-green-800">Active</Badge>;
+//       case "canceled":
+//         return <Badge className="bg-red-100 text-red-800">Canceled</Badge>;
+//       case "past_due":
+//         return <Badge className="bg-yellow-100 text-yellow-800">Past Due</Badge>;
+//       case "trialing":
+//         return <Badge className="bg-blue-100 text-blue-800">Trial</Badge>;
+//       default:
+//         return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
+//     }
+//   };
+
+//   const handleUpgrade = () => {
+//     setLocation("/subscription");
+//   };
+
+//   // --- LOADING / ERROR STATES ---
 
 //   if (settingsLoading) {
 //     return (
@@ -667,28 +835,28 @@
 //         <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8">
 //           <div className="text-center py-12">
 //             <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-//             <p className="text-red-600 font-medium">Failed to load settings</p>
-//             <p className="text-gray-600 mt-2">Please refresh the page or try again later.</p>
-//             <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] })} className="mt-4">
-//               Retry
-//             </Button>
+//             <p className="text-red-600 font-medium">
+//               Failed to load settings. Please refresh the page.
+//             </p>
 //           </div>
 //         </div>
 //       </div>
 //     );
 //   }
-  
+
+//   // --- MAIN RENDER ---
+
 //   return (
 //     <div className="py-6">
 //       <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8">
-//         {/* Page Header */}
+//         {/* Header */}
 //         <div className="md:flex md:items-center md:justify-between mb-8">
 //           <div className="flex-1 min-w-0">
 //             <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
 //               Settings
 //             </h2>
 //             <p className="mt-1 text-sm text-gray-500">
-//               Manage your account, integrations, and automation preferences
+//               Manage your account, subscription, integrations, and automation preferences
 //             </p>
 //           </div>
 //           <div className="mt-4 flex gap-2 md:mt-0 md:ml-4">
@@ -712,14 +880,15 @@
 //         </div>
 
 //         <Tabs value={activeTab} onValueChange={setActiveTab}>
-//           <TabsList className="grid w-full grid-cols-4">
+//           <TabsList className="grid w-full grid-cols-5">
 //             <TabsTrigger value="profile">Profile</TabsTrigger>
+//             <TabsTrigger value="subscription">Subscription</TabsTrigger>
 //             <TabsTrigger value="integrations">API Keys</TabsTrigger>
 //             <TabsTrigger value="automation">Automation</TabsTrigger>
 //             <TabsTrigger value="security">Security</TabsTrigger>
 //           </TabsList>
 
-//           {/* Profile Settings */}
+//           {/* PROFILE */}
 //           <TabsContent value="profile" className="space-y-6">
 //             <Card>
 //               <CardHeader>
@@ -759,7 +928,6 @@
 //                     />
 //                   </div>
 //                 </div>
-
 //                 <div>
 //                   <Label htmlFor="company">Company</Label>
 //                   <Input
@@ -772,7 +940,6 @@
 //                     placeholder="Your company name"
 //                   />
 //                 </div>
-
 //                 <div>
 //                   <Label htmlFor="timezone">Timezone</Label>
 //                   <Select
@@ -785,7 +952,6 @@
 //                       <SelectValue placeholder="Select your timezone" />
 //                     </SelectTrigger>
 //                     <SelectContent className="max-h-[300px]">
-//                       {/* Group by region for better organization */}
 //                       <SelectItem
 //                         value="auto"
 //                         className="font-semibold text-blue-600"
@@ -793,7 +959,6 @@
 //                         🌍 Auto-detect:{" "}
 //                         {Intl.DateTimeFormat().resolvedOptions().timeZone}
 //                       </SelectItem>
-
 //                       <div className="text-xs text-gray-500 px-2 py-1 font-semibold">
 //                         Americas
 //                       </div>
@@ -801,14 +966,13 @@
 //                         .filter(
 //                           (tz) =>
 //                             tz.value.startsWith("America/") ||
-//                             tz.value.startsWith("Pacific/H")
+//                             tz.value.startsWith("Pacific/H"),
 //                         )
 //                         .map((tz) => (
 //                           <SelectItem key={tz.value} value={tz.value}>
 //                             {tz.label} ({tz.offset})
 //                           </SelectItem>
 //                         ))}
-
 //                       <div className="text-xs text-gray-500 px-2 py-1 font-semibold">
 //                         Europe
 //                       </div>
@@ -819,7 +983,6 @@
 //                             {tz.label} ({tz.offset})
 //                           </SelectItem>
 //                         ))}
-
 //                       <div className="text-xs text-gray-500 px-2 py-1 font-semibold">
 //                         Asia
 //                       </div>
@@ -830,7 +993,6 @@
 //                             {tz.label} ({tz.offset})
 //                           </SelectItem>
 //                         ))}
-
 //                       <div className="text-xs text-gray-500 px-2 py-1 font-semibold">
 //                         Oceania
 //                       </div>
@@ -838,14 +1000,13 @@
 //                         .filter(
 //                           (tz) =>
 //                             tz.value.startsWith("Australia/") ||
-//                             tz.value.startsWith("Pacific/Auckland")
+//                             tz.value.startsWith("Pacific/Auckland"),
 //                         )
 //                         .map((tz) => (
 //                           <SelectItem key={tz.value} value={tz.value}>
 //                             {tz.label} ({tz.offset})
 //                           </SelectItem>
 //                         ))}
-
 //                       <div className="text-xs text-gray-500 px-2 py-1 font-semibold">
 //                         UTC
 //                       </div>
@@ -868,7 +1029,155 @@
 //             </Card>
 //           </TabsContent>
 
-//           {/* API Keys (Integrations) */}
+//           {/* SUBSCRIPTION */}
+//           <TabsContent value="subscription" className="space-y-6">
+//             <Card>
+//               <CardHeader>
+//                 <CardTitle className="flex items-center">
+//                   <CreditCard className="w-5 h-5 mr-2" />
+//                   Current Subscription
+//                 </CardTitle>
+//                 <CardDescription>Manage your subscription and billing</CardDescription>
+//               </CardHeader>
+//               <CardContent className="space-y-6">
+//                 {subscriptionLoading ? (
+//                   <div className="flex items-center justify-center py-8">
+//                     <Loader2 className="w-6 h-6 animate-spin mr-2" />
+//                     <span>Loading subscription...</span>
+//                   </div>
+//                 ) : !subscription ? (
+//                   <div className="text-center py-8">
+//                     <CreditCard className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+//                     <h3 className="text-lg font-medium text-gray-900 mb-2">
+//                       No Active Subscription
+//                     </h3>
+//                     <p className="text-gray-500 mb-4">
+//                       You don't have an active subscription. Upgrade to unlock premium
+//                       features.
+//                     </p>
+//                     <Button
+//                       onClick={handleUpgrade}
+//                       className="bg-primary-500 hover:bg-primary-600"
+//                     >
+//                       <TrendingUp className="w-4 h-4 mr-2" />
+//                       View Plans
+//                     </Button>
+//                   </div>
+//                 ) : (
+//                   <>
+//                     {/* Current Plan Card */}
+//                     <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-200">
+//                       <div className="flex items-center justify-between mb-4">
+//                         <div>
+//                           <h3 className="text-2xl font-bold text-gray-900">
+//                             {subscription.planName}
+//                           </h3>
+//                           <p className="text-sm text-gray-600">
+//                             Billed{" "}
+//                             {subscription.interval === "year" ? "annually" : "monthly"}
+//                           </p>
+//                         </div>
+//                         {getSubscriptionStatusBadge(subscription.status)}
+//                       </div>
+//                       <div className="flex items-baseline mb-4">
+//                         <DollarSign className="w-6 h-6 text-gray-700" />
+//                         <span className="text-4xl font-bold text-gray-900">
+//                           {subscription.amount}
+//                         </span>
+//                         <span className="text-gray-600 ml-2">
+//                           / {subscription.interval === "year" ? "year" : "month"}
+//                         </span>
+//                       </div>
+//                       <div className="flex items-center text-sm text-gray-600">
+//                         <Calendar className="w-4 h-4 mr-2" />
+//                         {subscription.cancelAtPeriodEnd ? (
+//                           <span className="text-red-600 font-medium">
+//                             Cancels on{" "}
+//                             {new Date(
+//                               subscription.currentPeriodEnd,
+//                             ).toLocaleDateString()}
+//                           </span>
+//                         ) : (
+//                           <span>
+//                             Renews on{" "}
+//                             {new Date(
+//                               subscription.currentPeriodEnd,
+//                             ).toLocaleDateString()}
+//                           </span>
+//                         )}
+//                       </div>
+//                     </div>
+
+//                     {/* Actions */}
+//                     <div className="flex gap-3">
+//                       {subscription.planId !== "enterprise" && (
+//                         <Button
+//                           onClick={handleUpgrade}
+//                           className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+//                         >
+//                           <ArrowUpCircle className="w-4 h-4 mr-2" />
+//                           Upgrade Plan
+//                         </Button>
+//                       )}
+//                       {subscription.cancelAtPeriodEnd ? (
+//                         <Button
+//                           onClick={() => resumeSubscription.mutate()}
+//                           disabled={resumeSubscription.isPending}
+//                           variant="outline"
+//                           className="flex-1"
+//                         >
+//                           {resumeSubscription.isPending ? (
+//                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+//                           ) : (
+//                             <Check className="w-4 h-4 mr-2" />
+//                           )}
+//                           Resume Subscription
+//                         </Button>
+//                       ) : (
+//                         <Button
+//                           onClick={() =>
+//                             openDeleteConfirmation(
+//                               "subscription",
+//                               subscription.id,
+//                               subscription.planName,
+//                             )
+//                           }
+//                           disabled={cancelSubscription.isPending}
+//                           variant="outline"
+//                           className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+//                         >
+//                           <XCircle className="w-4 h-4 mr-2" />
+//                           Cancel Subscription
+//                         </Button>
+//                       )}
+//                     </div>
+
+//                     {subscription.cancelAtPeriodEnd && (
+//                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+//                         <div className="flex items-start">
+//                           <AlertTriangle className="w-5 h-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
+//                           <div>
+//                             <p className="text-sm font-medium text-yellow-900">
+//                               Subscription Ending
+//                             </p>
+//                             <p className="text-sm text-yellow-700 mt-1">
+//                               Your subscription will remain active until{" "}
+//                               {new Date(
+//                                 subscription.currentPeriodEnd,
+//                               ).toLocaleDateString()}
+//                               . You can resume it at any time before then.
+//                             </p>
+//                           </div>
+//                         </div>
+//                       </div>
+//                     )}
+//                   </>
+//                 )}
+//               </CardContent>
+//             </Card>
+//           </TabsContent>
+
+//           {/* INTEGRATIONS (API Keys) */}
 //           <TabsContent value="integrations" className="space-y-6">
 //             <Card>
 //               <CardHeader>
@@ -887,12 +1196,12 @@
 //                   </Button>
 //                 </CardTitle>
 //                 <CardDescription>
-//                   Securely store and manage your AI service API keys. Keys are
-//                   encrypted and never visible in full.
+//                   Securely store and manage your AI service API keys. Keys are encrypted
+//                   and never visible in full.
 //                 </CardDescription>
 //               </CardHeader>
 //               <CardContent className="space-y-6">
-//                 {/* Add New API Key Form */}
+//                 {/* Add API key form */}
 //                 {isAddingKey && (
 //                   <div className="border rounded-lg p-4 bg-gray-50">
 //                     <h4 className="font-medium mb-4">Add New API Key</h4>
@@ -902,29 +1211,21 @@
 //                         <Select
 //                           value={newKeyForm.provider}
 //                           onValueChange={(value) =>
-//                             setNewKeyForm((prev) => ({
-//                               ...prev,
-//                               provider: value,
-//                             }))
+//                             setNewKeyForm((prev) => ({ ...prev, provider: value }))
 //                           }
 //                         >
 //                           <SelectTrigger>
 //                             <SelectValue placeholder="Select provider" />
 //                           </SelectTrigger>
 //                           <SelectContent>
-//                             <SelectItem value="openai">
-//                               OpenAI (GPT-4)
-//                             </SelectItem>
-//                             <SelectItem value="anthropic">
-//                               Anthropic (Claude)
-//                             </SelectItem>
+//                             <SelectItem value="openai">OpenAI (GPT-4)</SelectItem>
+//                             <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
 //                             <SelectItem value="google_pagespeed">
 //                               Google PageSpeed Insights
 //                             </SelectItem>
 //                           </SelectContent>
 //                         </Select>
 //                       </div>
-
 //                       <div>
 //                         <Label htmlFor="keyName">Key Name</Label>
 //                         <Input
@@ -932,9 +1233,7 @@
 //                           placeholder="e.g., My OpenAI Key"
 //                           value={newKeyForm.keyName}
 //                           onChange={(e) => {
-//                             const sanitized = Sanitizer.sanitizeText(
-//                               e.target.value
-//                             );
+//                             const sanitized = Sanitizer.sanitizeText(e.target.value);
 //                             setNewKeyForm((prev) => ({
 //                               ...prev,
 //                               keyName: sanitized,
@@ -943,11 +1242,9 @@
 //                           maxLength={100}
 //                         />
 //                         <p className="text-xs text-gray-400 mt-1">
-//                           A friendly name to identify this key (2-100
-//                           characters)
+//                           A friendly name to identify this key (2-100 characters)
 //                         </p>
 //                       </div>
-
 //                       <div>
 //                         <Label htmlFor="apiKey">API Key</Label>
 //                         <div className="flex items-center space-x-2">
@@ -996,7 +1293,6 @@
 //                           </p>
 //                         )}
 //                       </div>
-
 //                       <div className="flex items-center space-x-2">
 //                         <Button
 //                           onClick={handleAddApiKey}
@@ -1013,11 +1309,7 @@
 //                           variant="outline"
 //                           onClick={() => {
 //                             setIsAddingKey(false);
-//                             setNewKeyForm({
-//                               provider: "",
-//                               keyName: "",
-//                               apiKey: "",
-//                             });
+//                             setNewKeyForm({ provider: "", keyName: "", apiKey: "" });
 //                           }}
 //                         >
 //                           Cancel
@@ -1027,7 +1319,7 @@
 //                   </div>
 //                 )}
 
-//                 {/* Existing API Keys */}
+//                 {/* Existing keys */}
 //                 <div className="space-y-3">
 //                   {userApiKeys?.map((apiKey: UserApiKey) => (
 //                     <div
@@ -1052,17 +1344,14 @@
 //                             <p className="text-xs text-gray-400">
 //                               Last validated:{" "}
 //                               {new Date(
-//                                 apiKey.lastValidated
+//                                 apiKey.lastValidated,
 //                               ).toLocaleDateString()}
 //                             </p>
 //                           )}
 //                         </div>
 //                       </div>
 //                       <div className="flex items-center space-x-2">
-//                         {getStatusBadge(
-//                           apiKey.validationStatus,
-//                           apiKey.provider
-//                         )}
+//                         {getStatusBadge(apiKey.validationStatus, apiKey.provider)}
 //                         <Button
 //                           size="sm"
 //                           variant="outline"
@@ -1082,7 +1371,7 @@
 //                             openDeleteConfirmation(
 //                               "apiKey",
 //                               apiKey.id,
-//                               apiKey.keyName
+//                               apiKey.keyName,
 //                             )
 //                           }
 //                           disabled={deleteApiKey.isPending}
@@ -1093,23 +1382,21 @@
 //                     </div>
 //                   ))}
 
-//                   {(!userApiKeys || userApiKeys.length === 0) &&
-//                     !isAddingKey && (
-//                       <div className="text-center py-8 text-gray-500">
-//                         <Key className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-//                         <p>No API keys configured yet.</p>
-//                         <p className="text-sm">
-//                           Add your first API key to get started with AI content
-//                           generation.
-//                         </p>
-//                       </div>
-//                     )}
+//                   {(!userApiKeys || userApiKeys.length === 0) && !isAddingKey && (
+//                     <div className="text-center py-8 text-gray-500">
+//                       <Key className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+//                       <p>No API keys configured yet.</p>
+//                       <p className="text-sm">
+//                         Add your first API key to get started with AI content generation.
+//                       </p>
+//                     </div>
+//                   )}
 //                 </div>
 //               </CardContent>
 //             </Card>
 //           </TabsContent>
 
-//           {/* Automation Settings */}
+//           {/* AUTOMATION */}
 //           <TabsContent value="automation" className="space-y-6">
 //             <Card>
 //               <CardHeader>
@@ -1134,40 +1421,16 @@
 //                       <SelectValue />
 //                     </SelectTrigger>
 //                     <SelectContent>
-//                       <SelectItem value="gpt-4o">
-//                         GPT-4 (Recommended)
-//                       </SelectItem>
+//                       <SelectItem value="gpt-4o">GPT-4 (Recommended)</SelectItem>
 //                       <SelectItem value="claude-3">Claude-3</SelectItem>
 //                       <SelectItem value="gemini-1.5-pro">Gemini Pro</SelectItem>
-//                       <SelectItem value="auto-select">
-//                         Auto-Select Best
-//                       </SelectItem>
+//                       <SelectItem value="auto-select">Auto-Select Best</SelectItem>
 //                     </SelectContent>
 //                   </Select>
 //                   <p className="text-xs text-gray-500 mt-1">
 //                     This will be used as the default for new content generation
 //                   </p>
 //                 </div>
-
-//                 {/* <div>
-//                   <Label htmlFor="frequency">Content Generation Frequency</Label>
-//                   <Select
-//                     value={settings.automation.contentGenerationFrequency}
-//                     onValueChange={(value) => updateSetting("automation", "contentGenerationFrequency", value)}
-//                   >
-//                     <SelectTrigger>
-//                       <SelectValue />
-//                     </SelectTrigger>
-//                     <SelectContent>
-//                       <SelectItem value="daily">Daily</SelectItem>
-//                       <SelectItem value="twice-weekly">Twice Weekly</SelectItem>
-//                       <SelectItem value="weekly">Weekly</SelectItem>
-//                       <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-//                       <SelectItem value="monthly">Monthly</SelectItem>
-//                     </SelectContent>
-//                   </Select>
-//                 </div> */}
-
 //                 <div>
 //                   <Label htmlFor="reports">Report Generation</Label>
 //                   <Select
@@ -1187,25 +1450,11 @@
 //                     </SelectContent>
 //                   </Select>
 //                 </div>
-
-//                 {/* <div className="flex items-center justify-between">
-//                   <div>
-//                     <Label htmlFor="autoFix">Auto-fix SEO Issues</Label>
-//                     <p className="text-sm text-gray-500">
-//                       Automatically apply fixes for common SEO issues
-//                     </p>
-//                   </div>
-//                   <Switch
-//                     id="autoFix"
-//                     checked={settings.automation.autoFixSeoIssues}
-//                     onCheckedChange={(checked) => updateSetting("automation", "autoFixSeoIssues", checked)}
-//                   />
-//                 </div> */}
 //               </CardContent>
 //             </Card>
 //           </TabsContent>
 
-//           {/* Security */}
+//           {/* SECURITY */}
 //           <TabsContent value="security" className="space-y-6">
 //             <Card>
 //               <CardHeader>
@@ -1233,11 +1482,8 @@
 //                     }
 //                   />
 //                 </div>
-
 //                 <div>
-//                   <Label htmlFor="sessionTimeout">
-//                     Session Timeout (hours)
-//                   </Label>
+//                   <Label htmlFor="sessionTimeout">Session Timeout (hours)</Label>
 //                   <Input
 //                     id="sessionTimeout"
 //                     type="number"
@@ -1248,7 +1494,7 @@
 //                       updateSetting(
 //                         "security",
 //                         "sessionTimeout",
-//                         parseInt(e.target.value)
+//                         parseInt(e.target.value),
 //                       )
 //                     }
 //                     onBlur={(e) => {
@@ -1261,11 +1507,10 @@
 //                     }}
 //                   />
 //                   <p className="text-xs text-gray-500 mt-1">
-//                     Automatically log out after this many hours of inactivity
-//                     (1-168 hours)
+//                     Automatically log out after this many hours of inactivity (1-168
+//                     hours)
 //                   </p>
 //                 </div>
-
 //                 <div className="flex items-center justify-between">
 //                   <div>
 //                     <Label htmlFor="apiAccess">API Access</Label>
@@ -1281,16 +1526,12 @@
 //                     }
 //                   />
 //                 </div>
-
 //                 <div className="pt-4 border-t">
-//                   <h4 className="font-medium text-gray-900 mb-2">
-//                     Change Password
-//                   </h4>
+//                   <h4 className="font-medium text-gray-900 mb-2">Change Password</h4>
 //                   <p className="text-sm text-gray-500 mb-4">
-//                     Update your password to keep your account secure. Use a
-//                     strong password with at least 8 characters.
+//                     Update your password to keep your account secure. Use a strong
+//                     password with at least 8 characters.
 //                   </p>
-
 //                   {passwordErrors.length > 0 && (
 //                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
 //                       <div className="text-sm text-red-600">
@@ -1302,7 +1543,6 @@
 //                       </div>
 //                     </div>
 //                   )}
-
 //                   <div className="space-y-3">
 //                     <div>
 //                       <Label htmlFor="currentPassword">Current Password</Label>
@@ -1326,7 +1566,6 @@
 //                         }
 //                       />
 //                     </div>
-
 //                     <div>
 //                       <Label htmlFor="newPassword">New Password</Label>
 //                       <Input
@@ -1345,7 +1584,7 @@
 //                         className={
 //                           passwordErrors.some(
 //                             (e) =>
-//                               e.includes("new") || e.includes("8 characters")
+//                               e.includes("new") || e.includes("8 characters"),
 //                           )
 //                             ? "border-red-500"
 //                             : ""
@@ -1355,11 +1594,8 @@
 //                         Must be at least 8 characters. Avoid common passwords.
 //                       </p>
 //                     </div>
-
 //                     <div>
-//                       <Label htmlFor="confirmPassword">
-//                         Confirm New Password
-//                       </Label>
+//                       <Label htmlFor="confirmPassword">Confirm New Password</Label>
 //                       <Input
 //                         id="confirmPassword"
 //                         type="password"
@@ -1376,14 +1612,13 @@
 //                         className={
 //                           passwordErrors.some(
 //                             (e) =>
-//                               e.includes("confirmation") || e.includes("match")
+//                               e.includes("confirmation") || e.includes("match"),
 //                           )
 //                             ? "border-red-500"
 //                             : ""
 //                         }
 //                       />
 //                     </div>
-
 //                     {passwordData.newPassword && (
 //                       <div className="text-xs">
 //                         Password strength:
@@ -1404,7 +1639,6 @@
 //                         </span>
 //                       </div>
 //                     )}
-
 //                     <Button
 //                       onClick={handlePasswordChange}
 //                       disabled={changePassword.isPending}
@@ -1429,7 +1663,7 @@
 //         </Tabs>
 //       </div>
 
-//       {/* Delete Confirmation Dialog */}
+//       {/* Delete / Cancel Confirmation */}
 //       <AlertDialog
 //         open={deleteConfirmation.isOpen}
 //         onOpenChange={closeDeleteConfirmation}
@@ -1439,7 +1673,12 @@
 //             <AlertDialogTitle>
 //               <div className="flex items-center space-x-2">
 //                 <AlertTriangle className="w-5 h-5 text-red-500" />
-//                 <span>Confirm Deletion</span>
+//                 <span>
+//                   Confirm{" "}
+//                   {deleteConfirmation.type === "subscription"
+//                     ? "Cancellation"
+//                     : "Deletion"}
+//                 </span>
 //               </div>
 //             </AlertDialogTitle>
 //             <AlertDialogDescription>
@@ -1449,8 +1688,17 @@
 //                   <strong>"{deleteConfirmation.itemName}"</strong>?
 //                   <br />
 //                   <br />
-//                   This action cannot be undone. You will need to add the key
-//                   again if you want to use it in the future.
+//                   This action cannot be undone. You will need to add the key again if
+//                   you want to use it in the future.
+//                 </>
+//               ) : deleteConfirmation.type === "subscription" ? (
+//                 <>
+//                   Are you sure you want to cancel your{" "}
+//                   <strong>{deleteConfirmation.itemName}</strong> subscription?
+//                   <br />
+//                   <br />
+//                   Your subscription will remain active until the end of your current
+//                   billing period. You can reactivate it at any time before then.
 //                 </>
 //               ) : (
 //                 <>
@@ -1458,9 +1706,8 @@
 //                   <strong>"{deleteConfirmation.itemName}"</strong>?
 //                   <br />
 //                   <br />
-//                   This will remove the website from your account. You can
-//                   reconnect it later, but you will need to re-enter your
-//                   WordPress credentials.
+//                   This will remove the website from your account. You can reconnect it
+//                   later, but you will need to re-enter your WordPress credentials.
 //                 </>
 //               )}
 //             </AlertDialogDescription>
@@ -1471,7 +1718,9 @@
 //               onClick={handleConfirmDelete}
 //               className="bg-red-600 hover:bg-red-700 text-white"
 //             >
-//               Delete
+//               {deleteConfirmation.type === "subscription"
+//                 ? "Cancel Subscription"
+//                 : "Delete"}
 //             </AlertDialogAction>
 //           </AlertDialogFooter>
 //         </AlertDialogContent>
@@ -1479,6 +1728,16 @@
 //     </div>
 //   );
 // }
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2342,28 +2601,72 @@ export default function Settings() {
               Manage your account, subscription, integrations, and automation preferences
             </p>
           </div>
-          <div className="mt-4 flex gap-2 md:mt-0 md:ml-4">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              disabled={resetSettings.isPending}
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              {resetSettings.isPending ? "Resetting..." : "Reset to Defaults"}
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={updateSettings.isPending}
-              className="bg-primary-500 hover:bg-primary-600"
-            >
+              <div className="mt-4 flex flex-col sm:flex-row gap-2 md:mt-0 md:ml-4 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={handleReset}
+                  disabled={resetSettings.isPending}
+                  className="w-full sm:w-auto"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">{resetSettings.isPending ? "Resetting..." : "Reset to Defaults"}</span>
+                  <span className="sm:hidden">{resetSettings.isPending ? "Resetting..." : "Reset"}</span>
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={updateSettings.isPending}
+                  className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600"
+                >
               <Save className="w-4 h-4 mr-2" />
               {updateSettings.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>
 
+        {/* Mobile: Dropdown Select */}
+        <div className="md:hidden mb-6">
+          <Select value={activeTab} onValueChange={setActiveTab}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="profile">
+                <div className="flex items-center">
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                </div>
+              </SelectItem>
+              <SelectItem value="subscription">
+                <div className="flex items-center">
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Subscription
+                </div>
+              </SelectItem>
+              <SelectItem value="integrations">
+                <div className="flex items-center">
+                  <Key className="w-4 h-4 mr-2" />
+                  API Keys
+                </div>
+              </SelectItem>
+              <SelectItem value="automation">
+                <div className="flex items-center">
+                  <Bot className="w-4 h-4 mr-2" />
+                  Automation
+                </div>
+              </SelectItem>
+              <SelectItem value="security">
+                <div className="flex items-center">
+                  <Shield className="w-4 h-4 mr-2" />
+                  Security
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: Traditional Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="hidden md:grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="subscription">Subscription</TabsTrigger>
             <TabsTrigger value="integrations">API Keys</TabsTrigger>
@@ -2384,9 +2687,9 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="name">Full Name</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Full Name</Label>
                     <Input
                       id="name"
                       value={settings.profile.name}
@@ -2538,13 +2841,13 @@ export default function Settings() {
                       You don't have an active subscription. Upgrade to unlock premium
                       features.
                     </p>
-                    <Button
-                      onClick={handleUpgrade}
-                      className="bg-primary-500 hover:bg-primary-600"
-                    >
-                      <TrendingUp className="w-4 h-4 mr-2" />
-                      View Plans
-                    </Button>
+                      <Button
+                        onClick={handleUpgrade}
+                        className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600"
+                      >
+                        <TrendingUp className="w-4 h-4 mr-2" />
+                        View Plans
+                      </Button>
                   </div>
                 ) : (
                   <>
@@ -2591,24 +2894,24 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-3">
-                      {subscription.planId !== "enterprise" && (
-                        <Button
-                          onClick={handleUpgrade}
-                          className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                        >
+                  {/* Actions */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {subscription.planId !== "enterprise" && (
+                      <Button
+                        onClick={handleUpgrade}
+                        className="flex-1 w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      >
                           <ArrowUpCircle className="w-4 h-4 mr-2" />
                           Upgrade Plan
                         </Button>
                       )}
-                      {subscription.cancelAtPeriodEnd ? (
-                        <Button
-                          onClick={() => resumeSubscription.mutate()}
-                          disabled={resumeSubscription.isPending}
-                          variant="outline"
-                          className="flex-1"
-                        >
+                        {subscription.cancelAtPeriodEnd ? (
+                          <Button
+                            onClick={() => resumeSubscription.mutate()}
+                            disabled={resumeSubscription.isPending}
+                            variant="outline"
+                            className="flex-1 w-full sm:w-auto"
+                          >
                           {resumeSubscription.isPending ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           ) : (
@@ -2616,19 +2919,19 @@ export default function Settings() {
                           )}
                           Resume Subscription
                         </Button>
-                      ) : (
-                        <Button
-                          onClick={() =>
-                            openDeleteConfirmation(
-                              "subscription",
-                              subscription.id,
-                              subscription.planName,
-                            )
-                          }
-                          disabled={cancelSubscription.isPending}
-                          variant="outline"
-                          className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
+                          ) : (
+                            <Button
+                              onClick={() =>
+                                openDeleteConfirmation(
+                                  "subscription",
+                                  subscription.id,
+                                  subscription.planName,
+                                )
+                              }
+                              disabled={cancelSubscription.isPending}
+                              variant="outline"
+                              className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
                           <XCircle className="w-4 h-4 mr-2" />
                           Cancel Subscription
                         </Button>
@@ -2664,16 +2967,17 @@ export default function Settings() {
           <TabsContent value="integrations" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span className="flex items-center">
-                    <Key className="w-5 h-5 mr-2" />
-                    Your API Keys
-                  </span>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsAddingKey(true)}
-                    disabled={isAddingKey}
-                  >
+                  <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <span className="flex items-center">
+                      <Key className="w-5 h-5 mr-2" />
+                      Your API Keys
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsAddingKey(true)}
+                      disabled={isAddingKey}
+                      className="w-full sm:w-auto"
+                    >
                     <Plus className="w-4 h-4 mr-2" />
                     Add API Key
                   </Button>
@@ -2776,11 +3080,12 @@ export default function Settings() {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          onClick={handleAddApiKey}
-                          disabled={addApiKey.isPending}
-                        >
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <Button
+                              onClick={handleAddApiKey}
+                              disabled={addApiKey.isPending}
+                              className="w-full sm:w-auto"
+                            >
                           {addApiKey.isPending ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           ) : (
@@ -2788,13 +3093,14 @@ export default function Settings() {
                           )}
                           {addApiKey.isPending ? "Validating..." : "Add Key"}
                         </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsAddingKey(false);
-                            setNewKeyForm({ provider: "", keyName: "", apiKey: "" });
-                          }}
-                        >
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsAddingKey(false);
+                              setNewKeyForm({ provider: "", keyName: "", apiKey: "" });
+                            }}
+                            className="w-full sm:w-auto"
+                          >
                           Cancel
                         </Button>
                       </div>
@@ -2805,22 +3111,22 @@ export default function Settings() {
                 {/* Existing keys */}
                 <div className="space-y-3">
                   {userApiKeys?.map((apiKey: UserApiKey) => (
-                    <div
-                      key={apiKey.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                          {getProviderIcon(apiKey.provider)}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {Sanitizer.escapeHtml(apiKey.keyName)}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {getProviderName(apiKey.provider)}
-                          </p>
-                          <p className="text-xs text-gray-400 font-mono">
+                      <div
+                        key={apiKey.id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg gap-4"
+                      >
+                        <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        {getProviderIcon(apiKey.provider)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 text-sm sm:text-base break-words">
+                        {Sanitizer.escapeHtml(apiKey.keyName)}
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-500">
+                        {getProviderName(apiKey.provider)}
+                      </p>
+                      <p className="text-xs text-gray-400 font-mono break-all">
                             {apiKey.maskedKey}
                           </p>
                           {apiKey.lastValidated && (
@@ -2831,34 +3137,36 @@ export default function Settings() {
                               ).toLocaleDateString()}
                             </p>
                           )}
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {getStatusBadge(apiKey.validationStatus, apiKey.provider)}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleValidateKey(apiKey.id)}
-                          disabled={validatingKeys.has(apiKey.id)}
-                        >
+                            </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 justify-end sm:justify-start">
+                              {getStatusBadge(apiKey.validationStatus, apiKey.provider)}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleValidateKey(apiKey.id)}
+                                disabled={validatingKeys.has(apiKey.id)}
+                                className="touch-manipulation"
+                              >
                           {validatingKeys.has(apiKey.id) ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                           ) : (
                             <Check className="w-3 h-3" />
                           )}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            openDeleteConfirmation(
-                              "apiKey",
-                              apiKey.id,
-                              apiKey.keyName,
-                            )
-                          }
-                          disabled={deleteApiKey.isPending}
-                        >
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                openDeleteConfirmation(
+                                  "apiKey",
+                                  apiKey.id,
+                                  apiKey.keyName,
+                                )
+                              }
+                              disabled={deleteApiKey.isPending}
+                              className="touch-manipulation"
+                            >
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>

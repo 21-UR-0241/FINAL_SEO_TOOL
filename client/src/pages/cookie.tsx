@@ -187,10 +187,10 @@ export function CookiePolicy(): JSX.Element {
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <h1 className="text-base md:text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
                     WordPress AI Manager
                   </h1>
-                  <p className="text-xs text-gray-400 font-medium">Powered by Advanced AI</p>
+                  <p className="text-xs text-gray-400 font-medium hidden sm:block">Powered by Advanced AI</p>
                 </div>
               </div>
             </Link>
@@ -230,12 +230,12 @@ export function CookiePolicy(): JSX.Element {
             <Cookie className="w-3.5 h-3.5 mr-2 inline" />
             Legal
           </Badge>
-          <h2 className="text-5xl md:text-6xl font-black mb-6 tracking-tight">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight">
             <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
               Cookie Policy
             </span>
           </h2>
-          <p className="text-lg text-gray-400 max-w-3xl mx-auto mb-6 leading-relaxed">
+          <p className="text-base md:text-lg text-gray-400 max-w-3xl mx-auto mb-6 leading-relaxed px-4">
             This Cookie Policy explains how WordPress AI Manager uses cookies and similar tracking technologies.
           </p>
           <p className="text-sm text-gray-500">
@@ -247,9 +247,9 @@ export function CookiePolicy(): JSX.Element {
       {/* Main Content */}
       <section className="relative z-10 py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-4 gap-8">
-            {/* Sidebar Navigation */}
-            <div className="lg:col-span-1">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Sidebar Navigation - Hidden on mobile */}
+            <div className="lg:col-span-1 hidden lg:block">
               <div className="sticky top-24">
                 <div className="relative group">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl"></div>
@@ -282,25 +282,25 @@ export function CookiePolicy(): JSX.Element {
             <div className="lg:col-span-3">
               <div className="relative group">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-3xl blur-xl"></div>
-                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 md:p-12 space-y-12">
+                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 md:p-8 lg:p-12 space-y-12">
                   
                   {/* What Are Cookies */}
                   <div id="introduction">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Info className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">What Are Cookies?</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">What Are Cookies?</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         Cookies are small text files that are placed on your device when you visit a website. They are widely used to make websites work more efficiently and provide information to website owners.
                       </p>
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         Cookies allow us to recognize your device and remember information about your visit, including your preferences and actions. This helps us improve your experience on our website and provide personalized content.
                       </p>
                       <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                        <p className="text-blue-300 text-sm">
+                        <p className="text-blue-300 text-xs md:text-sm">
                           <Info className="w-4 h-4 inline mr-2" />
                           Cookies do not contain any information that personally identifies you, but personal information we store about you may be linked to information stored in and obtained from cookies.
                         </p>
@@ -311,49 +311,49 @@ export function CookiePolicy(): JSX.Element {
                   {/* Types of Cookies */}
                   <div id="types" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Cookie className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Types of Cookies We Use</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Types of Cookies We Use</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-6">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-6">
                         We use several different types of cookies on our website:
                       </p>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6">
                           <div className="flex items-center gap-3 mb-3">
-                            <CheckCircle2 className="w-5 h-5 text-green-400" />
-                            <h4 className="font-bold text-white">Essential Cookies</h4>
+                            <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+                            <h4 className="font-bold text-white text-sm md:text-base">Essential Cookies</h4>
                           </div>
-                          <p className="text-sm text-gray-400">
+                          <p className="text-xs md:text-sm text-gray-400">
                             Required for the website to function properly. Cannot be disabled.
                           </p>
                         </div>
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6">
                           <div className="flex items-center gap-3 mb-3">
-                            <BarChart className="w-5 h-5 text-blue-400" />
-                            <h4 className="font-bold text-white">Analytics Cookies</h4>
+                            <BarChart className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                            <h4 className="font-bold text-white text-sm md:text-base">Analytics Cookies</h4>
                           </div>
-                          <p className="text-sm text-gray-400">
+                          <p className="text-xs md:text-sm text-gray-400">
                             Help us understand how visitors interact with our website.
                           </p>
                         </div>
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6">
                           <div className="flex items-center gap-3 mb-3">
-                            <Settings className="w-5 h-5 text-purple-400" />
-                            <h4 className="font-bold text-white">Functional Cookies</h4>
+                            <Settings className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                            <h4 className="font-bold text-white text-sm md:text-base">Functional Cookies</h4>
                           </div>
-                          <p className="text-sm text-gray-400">
+                          <p className="text-xs md:text-sm text-gray-400">
                             Remember your preferences and settings for improved experience.
                           </p>
                         </div>
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6">
                           <div className="flex items-center gap-3 mb-3">
-                            <Target className="w-5 h-5 text-orange-400" />
-                            <h4 className="font-bold text-white">Marketing Cookies</h4>
+                            <Target className="w-5 h-5 text-orange-400 flex-shrink-0" />
+                            <h4 className="font-bold text-white text-sm md:text-base">Marketing Cookies</h4>
                           </div>
-                          <p className="text-sm text-gray-400">
+                          <p className="text-xs md:text-sm text-gray-400">
                             Track your visits to deliver relevant advertisements.
                           </p>
                         </div>
@@ -364,16 +364,16 @@ export function CookiePolicy(): JSX.Element {
                   {/* How We Use Cookies */}
                   <div id="usage" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Settings className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">How We Use Cookies</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">How We Use Cookies</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         We use cookies for various purposes, including:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>Keeping you signed in to your account</li>
                         <li>Understanding how you use our service</li>
                         <li>Remembering your preferences and settings</li>
@@ -388,34 +388,36 @@ export function CookiePolicy(): JSX.Element {
                   {/* Essential Cookies */}
                   <div id="essential" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <CheckCircle2 className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Essential Cookies</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Essential Cookies</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         These cookies are necessary for the website to function and cannot be switched off. They are usually only set in response to actions made by you, such as logging in or filling in forms.
                       </p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-white/10">
-                              <th className="text-left py-3 px-4 text-white font-bold">Cookie Name</th>
-                              <th className="text-left py-3 px-4 text-white font-bold">Purpose</th>
-                              <th className="text-left py-3 px-4 text-white font-bold">Duration</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {essentialCookies.map((cookie, index) => (
-                              <tr key={index} className="border-b border-white/5">
-                                <td className="py-3 px-4 text-blue-400 font-mono">{cookie.name}</td>
-                                <td className="py-3 px-4 text-gray-300">{cookie.purpose}</td>
-                                <td className="py-3 px-4 text-gray-400">{cookie.duration}</td>
+                      <div className="overflow-x-auto -mx-6 md:mx-0">
+                        <div className="inline-block min-w-full align-middle px-6 md:px-0">
+                          <table className="w-full text-xs md:text-sm min-w-[600px]">
+                            <thead>
+                              <tr className="border-b border-white/10">
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Cookie Name</th>
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Purpose</th>
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Duration</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {essentialCookies.map((cookie, index) => (
+                                <tr key={index} className="border-b border-white/5">
+                                  <td className="py-3 px-2 md:px-4 text-blue-400 font-mono break-words">{cookie.name}</td>
+                                  <td className="py-3 px-2 md:px-4 text-gray-300">{cookie.purpose}</td>
+                                  <td className="py-3 px-2 md:px-4 text-gray-400">{cookie.duration}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -423,34 +425,36 @@ export function CookiePolicy(): JSX.Element {
                   {/* Analytics Cookies */}
                   <div id="analytics" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <BarChart className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Analytics Cookies</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Analytics Cookies</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         These cookies allow us to count visits and traffic sources so we can measure and improve the performance of our site. They help us understand which pages are popular and how visitors move around the site.
                       </p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-white/10">
-                              <th className="text-left py-3 px-4 text-white font-bold">Cookie Name</th>
-                              <th className="text-left py-3 px-4 text-white font-bold">Purpose</th>
-                              <th className="text-left py-3 px-4 text-white font-bold">Duration</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {analyticsCookies.map((cookie, index) => (
-                              <tr key={index} className="border-b border-white/5">
-                                <td className="py-3 px-4 text-blue-400 font-mono">{cookie.name}</td>
-                                <td className="py-3 px-4 text-gray-300">{cookie.purpose}</td>
-                                <td className="py-3 px-4 text-gray-400">{cookie.duration}</td>
+                      <div className="overflow-x-auto -mx-6 md:mx-0">
+                        <div className="inline-block min-w-full align-middle px-6 md:px-0">
+                          <table className="w-full text-xs md:text-sm min-w-[600px]">
+                            <thead>
+                              <tr className="border-b border-white/10">
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Cookie Name</th>
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Purpose</th>
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Duration</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {analyticsCookies.map((cookie, index) => (
+                                <tr key={index} className="border-b border-white/5">
+                                  <td className="py-3 px-2 md:px-4 text-blue-400 font-mono break-words">{cookie.name}</td>
+                                  <td className="py-3 px-2 md:px-4 text-gray-300">{cookie.purpose}</td>
+                                  <td className="py-3 px-2 md:px-4 text-gray-400">{cookie.duration}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -458,34 +462,36 @@ export function CookiePolicy(): JSX.Element {
                   {/* Functional Cookies */}
                   <div id="functional" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Settings className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Functional Cookies</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Functional Cookies</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         These cookies enable enhanced functionality and personalization. They may be set by us or by third-party providers whose services we use on our pages.
                       </p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-white/10">
-                              <th className="text-left py-3 px-4 text-white font-bold">Cookie Name</th>
-                              <th className="text-left py-3 px-4 text-white font-bold">Purpose</th>
-                              <th className="text-left py-3 px-4 text-white font-bold">Duration</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {functionalCookies.map((cookie, index) => (
-                              <tr key={index} className="border-b border-white/5">
-                                <td className="py-3 px-4 text-blue-400 font-mono">{cookie.name}</td>
-                                <td className="py-3 px-4 text-gray-300">{cookie.purpose}</td>
-                                <td className="py-3 px-4 text-gray-400">{cookie.duration}</td>
+                      <div className="overflow-x-auto -mx-6 md:mx-0">
+                        <div className="inline-block min-w-full align-middle px-6 md:px-0">
+                          <table className="w-full text-xs md:text-sm min-w-[600px]">
+                            <thead>
+                              <tr className="border-b border-white/10">
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Cookie Name</th>
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Purpose</th>
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Duration</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {functionalCookies.map((cookie, index) => (
+                                <tr key={index} className="border-b border-white/5">
+                                  <td className="py-3 px-2 md:px-4 text-blue-400 font-mono break-words">{cookie.name}</td>
+                                  <td className="py-3 px-2 md:px-4 text-gray-300">{cookie.purpose}</td>
+                                  <td className="py-3 px-2 md:px-4 text-gray-400">{cookie.duration}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -493,34 +499,36 @@ export function CookiePolicy(): JSX.Element {
                   {/* Marketing Cookies */}
                   <div id="marketing" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Target className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Marketing Cookies</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Marketing Cookies</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         These cookies track your online activity to help advertisers deliver more relevant advertising or to limit how many times you see an ad. These cookies can share that information with other organizations or advertisers.
                       </p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-white/10">
-                              <th className="text-left py-3 px-4 text-white font-bold">Cookie Name</th>
-                              <th className="text-left py-3 px-4 text-white font-bold">Purpose</th>
-                              <th className="text-left py-3 px-4 text-white font-bold">Duration</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {marketingCookies.map((cookie, index) => (
-                              <tr key={index} className="border-b border-white/5">
-                                <td className="py-3 px-4 text-blue-400 font-mono">{cookie.name}</td>
-                                <td className="py-3 px-4 text-gray-300">{cookie.purpose}</td>
-                                <td className="py-3 px-4 text-gray-400">{cookie.duration}</td>
+                      <div className="overflow-x-auto -mx-6 md:mx-0">
+                        <div className="inline-block min-w-full align-middle px-6 md:px-0">
+                          <table className="w-full text-xs md:text-sm min-w-[600px]">
+                            <thead>
+                              <tr className="border-b border-white/10">
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Cookie Name</th>
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Purpose</th>
+                                <th className="text-left py-3 px-2 md:px-4 text-white font-bold">Duration</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {marketingCookies.map((cookie, index) => (
+                                <tr key={index} className="border-b border-white/5">
+                                  <td className="py-3 px-2 md:px-4 text-blue-400 font-mono break-words">{cookie.name}</td>
+                                  <td className="py-3 px-2 md:px-4 text-gray-300">{cookie.purpose}</td>
+                                  <td className="py-3 px-2 md:px-4 text-gray-400">{cookie.duration}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -528,37 +536,37 @@ export function CookiePolicy(): JSX.Element {
                   {/* Third-Party Cookies */}
                   <div id="thirdparty" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Globe className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Third-Party Cookies</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Third-Party Cookies</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         In addition to our own cookies, we may also use various third-party cookies to report usage statistics and deliver advertisements on and through the Service.
                       </p>
                       <div className="space-y-4">
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-                          <h4 className="font-bold text-white mb-2 flex items-center gap-2">
-                            <Eye className="w-4 h-4 text-blue-400" />
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6">
+                          <h4 className="font-bold text-white mb-2 flex items-center gap-2 text-sm md:text-base">
+                            <Eye className="w-4 h-4 text-blue-400 flex-shrink-0" />
                             Google Analytics
                           </h4>
-                          <p className="text-sm text-gray-400 mb-2">
+                          <p className="text-xs md:text-sm text-gray-400 mb-2">
                             We use Google Analytics to understand how visitors interact with our website.
                           </p>
-                          <a href="https://policies.google.com/privacy" className="text-sm text-blue-400 hover:text-blue-300">
+                          <a href="https://policies.google.com/privacy" className="text-xs md:text-sm text-blue-400 hover:text-blue-300 break-words">
                             View Google Privacy Policy →
                           </a>
                         </div>
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-                          <h4 className="font-bold text-white mb-2 flex items-center gap-2">
-                            <Target className="w-4 h-4 text-orange-400" />
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6">
+                          <h4 className="font-bold text-white mb-2 flex items-center gap-2 text-sm md:text-base">
+                            <Target className="w-4 h-4 text-orange-400 flex-shrink-0" />
                             Advertising Partners
                           </h4>
-                          <p className="text-sm text-gray-400 mb-2">
+                          <p className="text-xs md:text-sm text-gray-400 mb-2">
                             We work with advertising partners including Facebook and Google Ads to deliver relevant advertisements.
                           </p>
-                          <p className="text-sm text-gray-400">
+                          <p className="text-xs md:text-sm text-gray-400">
                             These partners may use cookies to track your activity across different websites.
                           </p>
                         </div>
@@ -569,22 +577,22 @@ export function CookiePolicy(): JSX.Element {
                   {/* Managing Cookies */}
                   <div id="management" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Settings className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Managing Cookies</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Managing Cookies</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         Most web browsers allow you to control cookies through their settings. However, if you limit the ability of websites to set cookies, you may impact your overall user experience.
                       </p>
                       <div className="space-y-3">
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                          <h4 className="font-bold text-white mb-2">Browser Settings</h4>
-                          <p className="text-sm text-gray-400">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-4 md:p-5">
+                          <h4 className="font-bold text-white mb-2 text-sm md:text-base">Browser Settings</h4>
+                          <p className="text-xs md:text-sm text-gray-400 mb-2">
                             You can manage cookies through your browser settings. Here are links to cookie management guides for popular browsers:
                           </p>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-gray-400 mt-2 ml-4">
+                          <ul className="list-disc list-inside space-y-1 text-xs md:text-sm text-gray-400 ml-4">
                             <li>Chrome: Settings → Privacy and Security → Cookies</li>
                             <li>Firefox: Options → Privacy & Security → Cookies</li>
                             <li>Safari: Preferences → Privacy → Cookies</li>
@@ -598,41 +606,41 @@ export function CookiePolicy(): JSX.Element {
                   {/* Your Choices */}
                   <div id="choices" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <CheckCircle2 className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Your Choices</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Your Choices</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         You have several options for managing cookies:
                       </p>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-5 md:p-6">
                           <CheckCircle2 className="w-6 h-6 text-green-400 mb-3" />
-                          <h4 className="font-bold text-white mb-2">Accept All Cookies</h4>
-                          <p className="text-sm text-gray-400">
+                          <h4 className="font-bold text-white mb-2 text-sm md:text-base">Accept All Cookies</h4>
+                          <p className="text-xs md:text-sm text-gray-400">
                             Get the full experience with all features enabled.
                           </p>
                         </div>
-                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6">
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5 md:p-6">
                           <Settings className="w-6 h-6 text-blue-400 mb-3" />
-                          <h4 className="font-bold text-white mb-2">Manage Preferences</h4>
-                          <p className="text-sm text-gray-400">
+                          <h4 className="font-bold text-white mb-2 text-sm md:text-base">Manage Preferences</h4>
+                          <p className="text-xs md:text-sm text-gray-400">
                             Choose which types of cookies you want to allow.
                           </p>
                         </div>
-                        <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-6">
+                        <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-5 md:p-6">
                           <AlertCircle className="w-6 h-6 text-orange-400 mb-3" />
-                          <h4 className="font-bold text-white mb-2">Essential Only</h4>
-                          <p className="text-sm text-gray-400">
+                          <h4 className="font-bold text-white mb-2 text-sm md:text-base">Essential Only</h4>
+                          <p className="text-xs md:text-sm text-gray-400">
                             Allow only cookies required for basic functionality.
                           </p>
                         </div>
-                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5 md:p-6">
                           <XCircle className="w-6 h-6 text-red-400 mb-3" />
-                          <h4 className="font-bold text-white mb-2">Decline All</h4>
-                          <p className="text-sm text-gray-400">
+                          <h4 className="font-bold text-white mb-2 text-sm md:text-base">Decline All</h4>
+                          <p className="text-xs md:text-sm text-gray-400">
                             Block all non-essential cookies (may limit features).
                           </p>
                         </div>
@@ -643,22 +651,22 @@ export function CookiePolicy(): JSX.Element {
                   {/* Policy Updates */}
                   <div id="updates" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <FileText className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Changes to This Cookie Policy</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Changes to This Cookie Policy</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         We may update our Cookie Policy from time to time to reflect changes in technology, legislation, our operations, or for other reasons. We will notify you of any significant changes by:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
+                      <ul className="list-disc list-inside space-y-2 text-sm md:text-base text-gray-300 ml-4">
                         <li>Posting the new Cookie Policy on this page</li>
                         <li>Updating the "Last Updated" date at the top of this policy</li>
                         <li>Sending you an email notification for material changes</li>
                         <li>Displaying a prominent notice on our website</li>
                       </ul>
-                      <p className="text-gray-300 leading-relaxed mt-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mt-4">
                         We encourage you to review this Cookie Policy periodically to stay informed about how we use cookies.
                       </p>
                     </div>
@@ -667,30 +675,30 @@ export function CookiePolicy(): JSX.Element {
                   {/* Contact Us */}
                   <div id="contact" className="pt-8 border-t border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Users className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-2xl font-black text-white">Contact Us</h3>
+                      <h3 className="text-xl md:text-2xl font-black text-white">Contact Us</h3>
                     </div>
                     <div className="prose prose-invert max-w-none">
-                      <p className="text-gray-300 leading-relaxed mb-4">
+                      <p className="text-sm md:text-base text-gray-300 leading-relaxed mb-4">
                         If you have any questions about our use of cookies or this Cookie Policy, please contact us:
                       </p>
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-3">
-                        <div className="flex items-center gap-3">
-                          <Shield className="w-5 h-5 text-blue-400" />
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-4 md:p-6 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <Shield className="w-5 h-5 text-blue-400 flex-shrink-0 mt-1" />
                           <div>
                             <div className="text-sm font-bold text-white">Email</div>
-                            <a href="mailto:privacy@wpaimanager.com" className="text-blue-400 hover:text-blue-300">
+                            <a href="mailto:privacy@wpaimanager.com" className="text-blue-400 hover:text-blue-300 text-sm break-words">
                               privacy@wpaimanager.com
                             </a>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Globe className="w-5 h-5 text-blue-400" />
+                        <div className="flex items-start gap-3">
+                          <Globe className="w-5 h-5 text-blue-400 flex-shrink-0 mt-1" />
                           <div>
                             <div className="text-sm font-bold text-white">Address</div>
-                            <div className="text-gray-400 text-sm">
+                            <div className="text-gray-400 text-xs md:text-sm">
                               123 Market Street, Suite 400<br />
                               San Francisco, CA 94102<br />
                               United States
@@ -711,7 +719,7 @@ export function CookiePolicy(): JSX.Element {
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/10 bg-slate-950/50 backdrop-blur-sm py-12 px-6 mt-20">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-12">
             <div>
               <div className="flex items-center space-x-3 mb-4">
                 <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-700 rounded-lg">

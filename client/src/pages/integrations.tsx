@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -8,33 +9,23 @@ import {
   Zap,
   CheckCircle2,
   Globe,
-  Users,
-  TrendingUp,
   Link2,
   Settings,
   Puzzle,
-  Share2,
   BarChart3,
-  Mail,
-  MessageSquare,
-  Calendar,
-  FileText,
-  Database,
-  Code,
-  Smartphone,
-  Layers,
-  GitBranch,
-  Cloud,
-  Lock,
-  Workflow,
-  Cpu,
   Search,
-  ShoppingCart,
-  DollarSign,
-  Camera,
-  Video,
-  Headphones,
-  BookOpen,
+  Code,
+  Layers,
+  Workflow,
+  Brain,
+  Database,
+  Lock,
+  Cloud,
+  FileText,
+  Activity,
+  TrendingUp,
+  Wrench,
+  Shield,
 } from "lucide-react";
 
 interface Integration {
@@ -75,339 +66,153 @@ export function Integrations(): JSX.Element {
   }, []);
 
   const categories: Category[] = [
-    { id: "all", label: "All Integrations", icon: <Layers className="w-4 h-4" />, count: 24 },
-    { id: "cms", label: "CMS & Publishing", icon: <FileText className="w-4 h-4" />, count: 5 },
-    { id: "marketing", label: "Marketing", icon: <TrendingUp className="w-4 h-4" />, count: 6 },
-    { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-4 h-4" />, count: 4 },
-    { id: "social", label: "Social Media", icon: <Share2 className="w-4 h-4" />, count: 5 },
-    { id: "automation", label: "Automation", icon: <Workflow className="w-4 h-4" />, count: 4 },
+    { id: "all", label: "All Integrations", icon: <Layers className="w-4 h-4" />, count: 10 },
+    { id: "wordpress", label: "WordPress", icon: <Globe className="w-4 h-4" />, count: 4 },
+    { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-4 h-4" />, count: 3 },
+    { id: "automation", label: "Automation", icon: <Workflow className="w-4 h-4" />, count: 2 },
+    { id: "ai", label: "AI Models", icon: <Brain className="w-4 h-4" />, count: 1 },
   ];
 
   const integrations: Integration[] = [
-    // CMS & Publishing
+    // WordPress Core
     {
-      name: "WordPress",
-      description: "Direct integration with WordPress for seamless content publishing",
-      category: "cms",
+      name: "WordPress REST API",
+      description: "Direct integration with WordPress via REST API for seamless content optimization",
+      category: "wordpress",
       icon: <Globe className="w-8 h-8" />,
       color: "from-blue-500 to-blue-700",
       popular: true,
       features: [
-        "One-click publishing",
-        "Auto-scheduling",
-        "Multi-site support",
-        "Custom fields sync"
-      ]
-    },
-    {
-      name: "Elementor",
-      description: "Build beautiful pages with Elementor integration",
-      category: "cms",
-      icon: <Layers className="w-8 h-8" />,
-      color: "from-pink-500 to-red-600",
-      features: [
-        "Visual editing",
-        "Template library",
-        "Responsive design",
-        "Widget support"
-      ]
-    },
-    {
-      name: "WooCommerce",
-      description: "Manage eCommerce content and product descriptions",
-      category: "cms",
-      icon: <ShoppingCart className="w-8 h-8" />,
-      color: "from-purple-500 to-purple-700",
-      features: [
-        "Product content",
-        "SEO optimization",
-        "Bulk updates",
-        "Category management"
+        "Secure connection via application passwords",
+        "Real-time content sync",
+        "Bulk post/page operations",
+        "Multi-site support"
       ]
     },
     {
       name: "Yoast SEO",
-      description: "Enhanced SEO optimization with Yoast integration",
-      category: "cms",
+      description: "Enhanced SEO optimization with Yoast SEO metadata integration",
+      category: "wordpress",
       icon: <Search className="w-8 h-8" />,
       color: "from-green-500 to-green-700",
-      features: [
-        "SEO scoring",
-        "Meta optimization",
-        "Readability analysis",
-        "Schema markup"
-      ]
-    },
-    {
-      name: "Medium",
-      description: "Cross-post your content to Medium automatically",
-      category: "cms",
-      icon: <BookOpen className="w-8 h-8" />,
-      color: "from-gray-600 to-gray-800",
-      features: [
-        "Auto cross-posting",
-        "Canonical URLs",
-        "Tag syncing",
-        "Draft management"
-      ]
-    },
-
-    // Marketing
-    {
-      name: "Mailchimp",
-      description: "Sync your content with email marketing campaigns",
-      category: "marketing",
-      icon: <Mail className="w-8 h-8" />,
-      color: "from-yellow-500 to-yellow-700",
       popular: true,
       features: [
-        "Email automation",
-        "Subscriber lists",
-        "Campaign templates",
-        "Analytics tracking"
+        "SEO score integration",
+        "Meta description optimization",
+        "Focus keyword analysis",
+        "Readability compatibility"
       ]
     },
     {
-      name: "HubSpot",
-      description: "Connect with HubSpot CRM and marketing tools",
-      category: "marketing",
-      icon: <DollarSign className="w-8 h-8" />,
-      color: "from-orange-500 to-orange-700",
-      features: [
-        "CRM integration",
-        "Lead tracking",
-        "Marketing automation",
-        "Pipeline management"
-      ]
-    },
-    {
-      name: "ConvertKit",
-      description: "Build your email list with ConvertKit integration",
-      category: "marketing",
-      icon: <Users className="w-8 h-8" />,
-      color: "from-red-500 to-pink-600",
-      features: [
-        "Email sequences",
-        "Landing pages",
-        "Subscriber tagging",
-        "Form embedding"
-      ]
-    },
-    {
-      name: "ActiveCampaign",
-      description: "Automate your marketing with ActiveCampaign",
-      category: "marketing",
-      icon: <Workflow className="w-8 h-8" />,
-      color: "from-blue-600 to-indigo-700",
-      features: [
-        "Marketing automation",
-        "CRM tools",
-        "Email campaigns",
-        "Sales automation"
-      ]
-    },
-    {
-      name: "Klaviyo",
-      description: "eCommerce email marketing platform integration",
-      category: "marketing",
-      icon: <ShoppingCart className="w-8 h-8" />,
-      color: "from-green-600 to-teal-700",
-      features: [
-        "eCommerce focus",
-        "SMS marketing",
-        "Segmentation",
-        "Personalization"
-      ]
-    },
-    {
-      name: "Drip",
-      description: "Ecommerce CRM and email marketing automation",
-      category: "marketing",
+      name: "Rank Math",
+      description: "Comprehensive SEO plugin integration for advanced optimization",
+      category: "wordpress",
       icon: <TrendingUp className="w-8 h-8" />,
-      color: "from-purple-600 to-pink-700",
+      color: "from-purple-500 to-purple-700",
       features: [
-        "Visual workflows",
-        "Revenue tracking",
-        "Behavior tracking",
-        "Multi-channel"
+        "Schema markup support",
+        "Advanced SEO analysis",
+        "Content AI integration",
+        "Performance tracking"
+      ]
+    },
+    {
+      name: "All in One SEO",
+      description: "Compatible with AIOSEO for comprehensive WordPress SEO",
+      category: "wordpress",
+      icon: <Wrench className="w-8 h-8" />,
+      color: "from-orange-500 to-red-600",
+      features: [
+        "Smart SEO suggestions",
+        "XML sitemap integration",
+        "Social media optimization",
+        "Local SEO support"
       ]
     },
 
     // Analytics
     {
       name: "Google Analytics",
-      description: "Track content performance with Google Analytics",
+      description: "Track content optimization impact on traffic and engagement",
       category: "analytics",
       icon: <BarChart3 className="w-8 h-8" />,
       color: "from-yellow-600 to-orange-600",
       popular: true,
       features: [
-        "Traffic tracking",
-        "Conversion tracking",
-        "Custom events",
-        "Real-time data"
+        "Performance tracking",
+        "Before/after analytics",
+        "Conversion monitoring",
+        "Custom event tracking"
       ]
     },
     {
       name: "Google Search Console",
-      description: "Monitor SEO performance and search rankings",
+      description: "Monitor SEO improvements and search rankings in real-time",
       category: "analytics",
       icon: <Search className="w-8 h-8" />,
       color: "from-blue-500 to-blue-700",
       features: [
-        "Search analytics",
-        "Keyword tracking",
-        "Index monitoring",
-        "Performance reports"
+        "Search performance data",
+        "Keyword ranking tracking",
+        "Index status monitoring",
+        "Click-through rate analysis"
       ]
     },
     {
-      name: "Hotjar",
-      description: "Understand user behavior with heatmaps and recordings",
+      name: "WordPress Analytics",
+      description: "Native WordPress analytics integration for content insights",
       category: "analytics",
-      icon: <Camera className="w-8 h-8" />,
-      color: "from-red-500 to-red-700",
+      icon: <Activity className="w-8 h-8" />,
+      color: "from-indigo-500 to-purple-600",
       features: [
-        "Heatmaps",
-        "Session recordings",
-        "Feedback polls",
-        "User surveys"
-      ]
-    },
-    {
-      name: "Mixpanel",
-      description: "Advanced product analytics and user tracking",
-      category: "analytics",
-      icon: <Cpu className="w-8 h-8" />,
-      color: "from-purple-500 to-purple-700",
-      features: [
-        "Event tracking",
-        "User analytics",
-        "Funnel analysis",
-        "Retention reports"
-      ]
-    },
-
-    // Social Media
-    {
-      name: "Facebook",
-      description: "Share content automatically to Facebook pages",
-      category: "social",
-      icon: <Share2 className="w-8 h-8" />,
-      color: "from-blue-600 to-blue-800",
-      features: [
-        "Auto-posting",
-        "Page management",
-        "Engagement tracking",
-        "Image optimization"
-      ]
-    },
-    {
-      name: "Twitter / X",
-      description: "Post updates and threads to Twitter automatically",
-      category: "social",
-      icon: <MessageSquare className="w-8 h-8" />,
-      color: "from-sky-500 to-sky-700",
-      popular: true,
-      features: [
-        "Auto-tweeting",
-        "Thread creation",
-        "Hashtag suggestions",
-        "Scheduling"
-      ]
-    },
-    {
-      name: "LinkedIn",
-      description: "Share professional content on LinkedIn",
-      category: "social",
-      icon: <Users className="w-8 h-8" />,
-      color: "from-blue-700 to-blue-900",
-      features: [
-        "Profile posting",
-        "Company pages",
-        "Article publishing",
-        "Analytics"
-      ]
-    },
-    {
-      name: "Instagram",
-      description: "Create and schedule Instagram posts with captions",
-      category: "social",
-      icon: <Camera className="w-8 h-8" />,
-      color: "from-pink-500 to-purple-600",
-      features: [
-        "Post scheduling",
-        "Caption generation",
-        "Hashtag research",
-        "Story support"
-      ]
-    },
-    {
-      name: "Pinterest",
-      description: "Pin your content to Pinterest boards automatically",
-      category: "social",
-      icon: <Globe className="w-8 h-8" />,
-      color: "from-red-600 to-red-800",
-      features: [
-        "Pin creation",
-        "Board management",
-        "Rich pins",
-        "Analytics"
+        "Post performance metrics",
+        "Readability score trends",
+        "SEO improvement tracking",
+        "Health score history"
       ]
     },
 
     // Automation
     {
       name: "Zapier",
-      description: "Connect with 5000+ apps through Zapier integration",
+      description: "Automate workflows and connect with 5000+ apps",
       category: "automation",
       icon: <Zap className="w-8 h-8" />,
       color: "from-orange-500 to-orange-700",
       popular: true,
       features: [
-        "Multi-step zaps",
-        "Custom workflows",
-        "5000+ app connections",
-        "Filters and paths"
+        "Trigger on optimization complete",
+        "Auto-notify team members",
+        "Custom workflow automation",
+        "Multi-step integrations"
       ]
     },
     {
-      name: "Make (Integromat)",
-      description: "Build complex automation scenarios with Make",
-      category: "automation",
-      icon: <GitBranch className="w-8 h-8" />,
-      color: "from-indigo-500 to-indigo-700",
-      features: [
-        "Visual workflows",
-        "Advanced logic",
-        "Data transformation",
-        "Error handling"
-      ]
-    },
-    {
-      name: "IFTTT",
-      description: "Simple automation with IFTTT applets",
+      name: "Webhooks",
+      description: "Custom webhooks for real-time event notifications",
       category: "automation",
       icon: <Link2 className="w-8 h-8" />,
-      color: "from-gray-700 to-gray-900",
+      color: "from-cyan-500 to-blue-600",
       features: [
-        "Simple applets",
-        "Multi-device",
-        "Smart home",
-        "Mobile apps"
+        "Real-time event triggers",
+        "Custom payload configuration",
+        "Retry logic",
+        "Event filtering"
       ]
     },
+
+    // AI Models
     {
-      name: "n8n",
-      description: "Self-hosted workflow automation platform",
-      category: "automation",
-      icon: <Workflow className="w-8 h-8" />,
-      color: "from-pink-600 to-rose-700",
+      name: "Multi-AI Provider",
+      description: "Choose from multiple AI models for content optimization",
+      category: "ai",
+      icon: <Brain className="w-8 h-8" />,
+      color: "from-pink-500 to-purple-600",
       features: [
-        "Self-hosted option",
-        "Open source",
-        "Custom nodes",
-        "Advanced workflows"
+        "OpenAI GPT-4 & GPT-4 Turbo",
+        "Anthropic Claude 3",
+        "Google Gemini Pro",
+        "Custom model selection"
       ]
     },
   ];
@@ -415,20 +220,20 @@ export function Integrations(): JSX.Element {
   const howItWorks: HowItWorksStep[] = [
     {
       step: 1,
-      title: "Connect Your Account",
-      description: "Link your preferred platforms with one-click authentication",
-      icon: <Link2 className="w-8 h-8" />
+      title: "Connect WordPress",
+      description: "Securely connect your WordPress site using application passwords",
+      icon: <Globe className="w-8 h-8" />
     },
     {
       step: 2,
-      title: "Configure Settings",
-      description: "Customize how content flows between WordPress AI Manager and your tools",
+      title: "Configure Integrations",
+      description: "Enable analytics, SEO plugins, and automation tools you use",
       icon: <Settings className="w-8 h-8" />
     },
     {
       step: 3,
-      title: "Automate Everything",
-      description: "Sit back and let the integrations handle content distribution automatically",
+      title: "Start Optimizing",
+      description: "AI-powered optimizations sync automatically with all your tools",
       icon: <Zap className="w-8 h-8" />
     }
   ];
@@ -436,23 +241,23 @@ export function Integrations(): JSX.Element {
   const benefits = [
     {
       icon: <Workflow className="w-6 h-6" />,
-      title: "Seamless Automation",
-      description: "Set it and forget it - content flows automatically"
+      title: "Seamless WordPress Integration",
+      description: "Native REST API connection for reliable syncing"
     },
     {
       icon: <Lock className="w-6 h-6" />,
       title: "Secure Connections",
-      description: "Enterprise-grade security with OAuth 2.0"
+      description: "Application passwords and encrypted data transfer"
     },
     {
       icon: <Cloud className="w-6 h-6" />,
-      title: "Real-Time Sync",
-      description: "Changes sync instantly across all platforms"
+      title: "Real-Time Updates",
+      description: "Instant synchronization across all platforms"
     },
     {
       icon: <Code className="w-6 h-6" />,
-      title: "Custom APIs",
-      description: "Build your own integrations with our API"
+      title: "API Access",
+      description: "Build custom integrations with our REST API"
     }
   ];
 
@@ -489,10 +294,10 @@ export function Integrations(): JSX.Element {
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <h1 className="text-base md:text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
                     WordPress AI Manager
                   </h1>
-                  <p className="text-xs text-gray-400 font-medium">Powered by Advanced AI</p>
+                  <p className="text-xs text-gray-400 font-medium hidden sm:block">Powered by Advanced AI</p>
                 </div>
               </div>
             </Link>
@@ -535,20 +340,20 @@ export function Integrations(): JSX.Element {
         <div className="max-w-7xl mx-auto text-center">
           <Badge className="mb-6 bg-blue-500/10 text-blue-300 border border-blue-500/20 px-4 py-1.5 text-sm font-semibold hover:bg-blue-500/20 transition-colors">
             <Puzzle className="w-3.5 h-3.5 mr-2 inline" />
-            {integrations.length}+ Powerful Integrations
+            {integrations.length}+ Essential Integrations
           </Badge>
-          <h2 className="text-5xl md:text-6xl font-black mb-6 tracking-tight">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight">
             <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
-              Connect Your
+              Works With Your
             </span>
             <br />
             <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Favorite Tools
+              WordPress Stack
             </span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed font-light">
-            Seamlessly integrate WordPress AI Manager with the tools you already use.
-            Automate your workflow and boost productivity.
+          <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed font-light px-4">
+            Seamlessly integrate with WordPress, popular SEO plugins, analytics tools,
+            and automation platforms to streamline your content optimization workflow.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/subscription">
@@ -574,7 +379,7 @@ export function Integrations(): JSX.Element {
       {/* Benefits Grid */}
       <section className="relative z-10 py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {benefits.map((benefit, index) => (
               <div
                 key={index}
@@ -602,7 +407,7 @@ export function Integrations(): JSX.Element {
             <Badge className="mb-4 bg-green-500/10 text-green-300 border border-green-500/20 px-3 py-1 text-sm font-semibold">
               How It Works
             </Badge>
-            <h3 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+            <h3 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent px-4">
               Get Started in 3 Steps
             </h3>
             <p className="text-lg text-gray-400 max-w-2xl mx-auto">
@@ -610,7 +415,7 @@ export function Integrations(): JSX.Element {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             {howItWorks.map((step, index) => (
               <div key={index} className="relative group">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
@@ -635,20 +440,20 @@ export function Integrations(): JSX.Element {
             <Badge className="mb-4 bg-purple-500/10 text-purple-300 border border-purple-500/20 px-3 py-1 text-sm font-semibold">
               All Integrations
             </Badge>
-            <h3 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              Connect Everything
+            <h3 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent px-4">
+              Compatible Platforms
             </h3>
             <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-8">
-              Browse our extensive library of integrations
+              Connect with the tools that power your WordPress workflow
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
+          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 mb-12 px-4">
             {categories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                className={`flex items-center gap-2 px-3 md:px-5 py-2 md:py-2.5 rounded-xl font-medium text-sm transition-all duration-300 ${
                   activeCategory === category.id
                     ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
                     : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
@@ -664,7 +469,7 @@ export function Integrations(): JSX.Element {
           </div>
 
           {/* Integrations Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredIntegrations.map((integration, index) => (
               <div
                 key={index}
@@ -672,7 +477,7 @@ export function Integrations(): JSX.Element {
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
-                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all duration-300 h-full flex flex-col">
+                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 md:p-6 hover:border-white/20 transition-all duration-300 h-full flex flex-col">
                   <div className="flex items-start justify-between mb-4">
                     <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${integration.color} flex items-center justify-center shadow-lg`}>
                       <div className="text-white">{integration.icon}</div>
@@ -701,14 +506,16 @@ export function Integrations(): JSX.Element {
                       </div>
                     ))}
                   </div>
-                  <Button
-                    variant="ghost"
-                    className="w-full mt-4 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
-                    disabled={integration.comingSoon}
-                  >
-                    {integration.comingSoon ? "Coming Soon" : "Connect"}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  {!integration.comingSoon && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <div className="text-xs text-gray-400">
+                        {integration.category === 'wordpress' && '✓ Auto-configured with WordPress connection'}
+                        {integration.category === 'analytics' && '✓ Available in analytics dashboard'}
+                        {integration.category === 'automation' && '✓ Configure in automation settings'}
+                        {integration.category === 'ai' && '✓ Select in optimization settings'}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -721,18 +528,20 @@ export function Integrations(): JSX.Element {
         <div className="max-w-4xl mx-auto">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-3xl blur-2xl"></div>
-            <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-12 text-center">
+            <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 md:p-12 text-center">
               <Puzzle className="w-16 h-16 text-blue-400 mx-auto mb-6" />
-              <h3 className="text-3xl font-black text-white mb-4">
-                Don't See Your Tool?
+              <h3 className="text-2xl md:text-3xl font-black text-white mb-4">
+                Need a Custom Integration?
               </h3>
-              <p className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
-                We're constantly adding new integrations. Let us know which tools you'd like to see next.
+              <p className="text-base md:text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
+                We're constantly adding new integrations. Use our API to build custom connections
+                or request a specific integration.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-base font-bold px-8 py-6"
+                  onClick={() => window.location.href = 'mailto:support@wpaimanager.com?subject=Integration Request'}
                 >
                   Request Integration
                   <ArrowRight className="w-5 h-5 ml-2" />
@@ -756,18 +565,18 @@ export function Integrations(): JSX.Element {
         <div className="max-w-4xl mx-auto">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 to-purple-500/30 rounded-3xl blur-3xl"></div>
-            <div className="relative bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-12 md:p-16 text-center overflow-hidden">
+            <div className="relative bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-8 md:p-12 lg:p-16 text-center overflow-hidden">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-50"></div>
               <div className="relative z-10">
                 <Badge className="mb-6 bg-white/20 text-white border-0 px-4 py-1.5 text-sm font-semibold">
                   <Sparkles className="w-3.5 h-3.5 mr-2 inline" />
                   Ready to Connect?
                 </Badge>
-                <h3 className="text-4xl md:text-5xl font-black text-white mb-4">
-                  Start Integrating Today
+                <h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-white mb-4">
+                  Start Optimizing Today
                 </h3>
-                <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-                  Connect all your favorite tools and automate your content workflow
+                <p className="text-lg md:text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+                  Connect your WordPress site and start optimizing content with AI
                 </p>
                 <Link href="/subscription">
                   <Button
@@ -790,7 +599,7 @@ export function Integrations(): JSX.Element {
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/10 bg-slate-950/50 backdrop-blur-sm py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-12">
             <div>
               <div className="flex items-center space-x-3 mb-4">
                 <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-700 rounded-lg">
@@ -802,7 +611,7 @@ export function Integrations(): JSX.Element {
                 </div>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">
-                The ultimate AI-powered content creation platform for WordPress.
+                AI-powered content optimization for WordPress sites.
               </p>
             </div>
             <div>
@@ -825,7 +634,7 @@ export function Integrations(): JSX.Element {
                 <li>
                   <Link href="/apidocs">
                     <a className="text-sm text-gray-400 hover:text-white transition-colors">
-                      API
+                      API Docs
                     </a>
                   </Link>
                 </li>
@@ -876,6 +685,7 @@ export function Integrations(): JSX.Element {
                     Cookie Policy
                   </a>
                 </li>
+                
               </ul>
             </div>
           </div>

@@ -1,3 +1,4 @@
+
 // import React, { useState, useEffect } from "react";
 // import { Link } from "wouter";
 // import { Button } from "@/components/ui/button";
@@ -14,6 +15,9 @@
 //   X,
 //   HelpCircle,
 //   Star,
+//   FileText,
+//   BarChart3,
+//   RefreshCw,
 // } from "lucide-react";
 
 // type BillingCycle = "monthly" | "annual";
@@ -65,135 +69,156 @@
 //   const plans: Plan[] = [
 //     {
 //       name: "Starter",
-//       description: "Perfect for individuals getting started",
+//       description: "Perfect for bloggers and small sites",
 //       monthlyPrice: 0,
 //       annualPrice: 0,
 //       popular: false,
 //       gradient: "from-gray-500 to-gray-600",
 //       features: [
-//         { text: "5 AI-generated articles/month", included: true },
-//         { text: "Basic SEO analysis", included: true },
-//         { text: "Content scheduling", included: true },
 //         { text: "1 WordPress site", included: true },
+//         { text: "20 AI content optimizations/month", included: true },
+//         { text: "Readability improvements", included: true },
+//         { text: "Basic SEO analysis", included: true },
+//         { text: "Content health checks", included: true },
+//         { text: "Manual content fixes", included: true },
 //         { text: "Email support", included: true },
-//         { text: "Advanced analytics", included: false },
-//         { text: "Multi-site management", included: false },
+//         { text: "Advanced analytics dashboard", included: false },
+//         { text: "Automated content fixes", included: false },
+//         { text: "Bulk operations", included: false },
+//         { text: "Custom AI prompts", included: false },
 //         { text: "API access", included: false },
-//         { text: "Priority support", included: false },
 //       ],
 //     },
 //     {
 //       name: "Professional",
 //       description: "For serious content creators and marketers",
-//       monthlyPrice: 29,
-//       annualPrice: 290,
+//       monthlyPrice: 49,
+//       annualPrice: 490,
 //       popular: true,
 //       gradient: "from-blue-600 to-purple-600",
 //       features: [
-//         { text: "Unlimited AI-generated articles", included: true },
-//         { text: "Advanced SEO analysis", included: true },
-//         { text: "Content calendar & scheduling", included: true },
 //         { text: "Up to 5 WordPress sites", included: true },
-//         { text: "Priority email support", included: true },
+//         { text: "200 AI optimizations/month", included: true },
+//         { text: "Advanced readability improvements", included: true },
+//         { text: "Advanced SEO analysis & suggestions", included: true },
+//         { text: "Automated content health monitoring", included: true },
+//         { text: "Automated content fixes (AI-powered)", included: true },
+//         { text: "Bulk content operations", included: true },
 //         { text: "Advanced analytics dashboard", included: true },
-//         { text: "Multi-site management", included: true },
-//         { text: "Custom workflows", included: true },
-//         { text: "API access (1000 calls/day)", included: true },
+//         { text: "Custom AI optimization prompts", included: true },
+//         { text: "Content performance tracking", included: true },
+//         { text: "Priority email support", included: true },
+//         { text: "API access (5,000 calls/month)", included: true },
 //       ],
 //     },
 //     {
 //       name: "Enterprise",
-//       description: "For teams and agencies at scale",
-//       monthlyPrice: 99,
-//       annualPrice: 990,
+//       description: "For agencies and large-scale operations",
+//       monthlyPrice: 199,
+//       annualPrice: 1990,
 //       popular: false,
 //       gradient: "from-purple-600 to-pink-600",
 //       features: [
-//         { text: "Everything in Professional", included: true },
 //         { text: "Unlimited WordPress sites", included: true },
-//         { text: "White-label options", included: true },
-//         { text: "Dedicated account manager", included: true },
-//         { text: "Custom AI model training", included: true },
-//         { text: "Unlimited API calls", included: true },
-//         { text: "24/7 phone support", included: true },
+//         { text: "Unlimited AI optimizations", included: true },
+//         { text: "White-label dashboard", included: true },
+//         { text: "Custom AI model fine-tuning", included: true },
+//         { text: "Advanced automation workflows", included: true },
+//         { text: "Multi-site bulk operations", included: true },
 //         { text: "Team collaboration tools", included: true },
-//         { text: "SLA guarantee", included: true },
+//         { text: "Dedicated account manager", included: true },
+//         { text: "Custom integrations", included: true },
+//         { text: "Unlimited API access", included: true },
+//         { text: "24/7 priority support", included: true },
+//         { text: "SLA guarantee (99.9% uptime)", included: true },
 //       ],
 //     },
 //   ];
 
 //   const comparisonFeatures: ComparisonCategory[] = [
 //     {
-//       category: "Content Generation",
-//       features: [
-//         { name: "AI-generated articles", starter: "5/month", pro: "Unlimited", enterprise: "Unlimited" },
-//         { name: "Content rewriting", starter: false, pro: true, enterprise: true },
-//         { name: "Topic suggestions", starter: false, pro: true, enterprise: true },
-//         { name: "Multi-language support", starter: false, pro: "50+ languages", enterprise: "100+ languages" },
-//       ],
-//     },
-//     {
-//       category: "SEO Tools",
-//       features: [
-//         { name: "SEO analysis", starter: "Basic", pro: "Advanced", enterprise: "Advanced" },
-//         { name: "Keyword research", starter: false, pro: true, enterprise: true },
-//         { name: "Competitor analysis", starter: false, pro: true, enterprise: true },
-//         { name: "Rank tracking", starter: false, pro: true, enterprise: true },
-//       ],
-//     },
-//     {
-//       category: "Management",
+//       category: "WordPress Management",
 //       features: [
 //         { name: "WordPress sites", starter: "1", pro: "5", enterprise: "Unlimited" },
-//         { name: "Content scheduling", starter: true, pro: true, enterprise: true },
-//         { name: "Team collaboration", starter: false, pro: false, enterprise: true },
-//         { name: "Custom workflows", starter: false, pro: true, enterprise: true },
+//         { name: "Content health monitoring", starter: "Manual", pro: "Automated", enterprise: "Real-time" },
+//         { name: "Bulk operations", starter: false, pro: true, enterprise: true },
+//         { name: "Multi-site dashboard", starter: false, pro: true, enterprise: true },
 //       ],
 //     },
 //     {
-//       category: "Analytics & Reporting",
+//       category: "AI Content Optimization",
 //       features: [
-//         { name: "Basic analytics", starter: true, pro: true, enterprise: true },
-//         { name: "Advanced dashboard", starter: false, pro: true, enterprise: true },
-//         { name: "Custom reports", starter: false, pro: false, enterprise: true },
-//         { name: "API access", starter: false, pro: "1K calls/day", enterprise: "Unlimited" },
+//         { name: "AI optimizations/month", starter: "20", pro: "200", enterprise: "Unlimited" },
+//         { name: "Readability improvements", starter: true, pro: true, enterprise: true },
+//         { name: "Automated content fixes", starter: false, pro: true, enterprise: true },
+//         { name: "Custom AI prompts", starter: false, pro: true, enterprise: true },
+//         { name: "AI model fine-tuning", starter: false, pro: false, enterprise: true },
 //       ],
 //     },
 //     {
-//       category: "Support",
+//       category: "SEO & Analytics",
 //       features: [
+//         { name: "SEO analysis", starter: "Basic", pro: "Advanced", enterprise: "Enterprise" },
+//         { name: "SEO recommendations", starter: "Manual", pro: "Automated", enterprise: "AI-powered" },
+//         { name: "Content performance tracking", starter: false, pro: true, enterprise: true },
+//         { name: "Advanced analytics", starter: false, pro: true, enterprise: true },
+//         { name: "Custom reporting", starter: false, pro: false, enterprise: true },
+//       ],
+//     },
+//     {
+//       category: "Automation & Integration",
+//       features: [
+//         { name: "Automated workflows", starter: false, pro: "Basic", enterprise: "Advanced" },
+//         { name: "API access", starter: false, pro: "5K calls/mo", enterprise: "Unlimited" },
+//         { name: "Custom integrations", starter: false, pro: false, enterprise: true },
+//         { name: "Webhooks", starter: false, pro: true, enterprise: true },
+//       ],
+//     },
+//     {
+//       category: "Team & Support",
+//       features: [
+//         { name: "Team members", starter: "1", pro: "5", enterprise: "Unlimited" },
+//         { name: "White-label options", starter: false, pro: false, enterprise: true },
 //         { name: "Email support", starter: true, pro: true, enterprise: true },
 //         { name: "Priority support", starter: false, pro: true, enterprise: true },
-//         { name: "24/7 phone support", starter: false, pro: false, enterprise: true },
 //         { name: "Dedicated manager", starter: false, pro: false, enterprise: true },
+//         { name: "SLA guarantee", starter: false, pro: false, enterprise: "99.9%" },
 //       ],
 //     },
 //   ];
 
 //   const faqs: FAQ[] = [
 //     {
-//       question: "Can I change plans later?",
-//       answer: "Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately and we'll prorate any charges.",
+//       question: "What counts as an AI optimization?",
+//       answer: "Each AI optimization includes one action: improving readability, fixing content issues, SEO optimization, or content enhancement for a single post/page. Bulk operations count as one optimization per item.",
 //     },
 //     {
-//       question: "What happens after my free trial ends?",
-//       answer: "After your 14-day free trial, you'll be charged based on the plan you selected. You can cancel anytime before the trial ends with no charges.",
+//       question: "Can I upgrade or downgrade my plan?",
+//       answer: "Yes! You can change plans anytime. Upgrades take effect immediately, and we'll prorate the difference. Downgrades take effect at the next billing cycle.",
 //     },
 //     {
-//       question: "Do you offer refunds?",
-//       answer: "Yes, we offer a 30-day money-back guarantee. If you're not satisfied, contact us within 30 days for a full refund.",
+//       question: "What happens if I exceed my monthly AI optimization limit?",
+//       answer: "On the Starter plan, you'll need to upgrade or wait until next month. Professional users can purchase additional optimization packs. Enterprise plans have unlimited optimizations.",
 //     },
 //     {
-//       question: "Is there a setup fee?",
-//       answer: "No setup fees ever. You only pay the monthly or annual subscription price with no hidden costs.",
+//       question: "Do you offer a free trial?",
+//       answer: "Yes! All paid plans include a 14-day free trial with full access to features. No credit card required to start your trial.",
 //     },
 //     {
-//       question: "Can I use this with multiple WordPress sites?",
-//       answer: "The Starter plan includes 1 site, Professional includes 5 sites, and Enterprise includes unlimited sites.",
+//       question: "How does the WordPress site limit work?",
+//       answer: "You can connect up to the number of WordPress sites allowed by your plan. Each site can be managed independently with its own settings and optimization queue.",
 //     },
 //     {
-//       question: "What payment methods do you accept?",
-//       answer: "We accept all major credit cards (Visa, MasterCard, American Express) and PayPal for your convenience.",
+//       question: "What AI models do you use?",
+//       answer: "We use state-of-the-art language models (including GPT-4, Claude, and Gemini) optimized for content quality, readability, and SEO. Enterprise plans can fine-tune models for their specific needs.",
+//     },
+//     {
+//       question: "Is my WordPress content secure?",
+//       answer: "Absolutely. We use enterprise-grade encryption for all data in transit and at rest. We never store your WordPress credentials, only secure API tokens. Your content is processed securely and never used for AI training.",
+//     },
+//     {
+//       question: "Can I cancel anytime?",
+//       answer: "Yes, you can cancel your subscription at any time with no penalties. Your account remains active until the end of your billing period, and we offer a 30-day money-back guarantee.",
 //     },
 //   ];
 
@@ -396,6 +421,52 @@
 //         </div>
 //       </section>
 
+//       {/* Value Props Section */}
+//       <section className="relative z-10 py-20 px-6">
+//         <div className="max-w-7xl mx-auto">
+//           <div className="grid md:grid-cols-3 gap-8">
+//             <div className="relative group">
+//               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
+//               <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all">
+//                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mb-6">
+//                   <FileText className="w-6 h-6 text-white" />
+//                 </div>
+//                 <h3 className="text-xl font-bold text-white mb-3">AI-Powered Content Optimization</h3>
+//                 <p className="text-gray-400 leading-relaxed">
+//                   Automatically improve readability, fix content issues, and optimize for SEO using advanced AI models.
+//                 </p>
+//               </div>
+//             </div>
+
+//             <div className="relative group">
+//               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
+//               <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all">
+//                 <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mb-6">
+//                   <BarChart3 className="w-6 h-6 text-white" />
+//                 </div>
+//                 <h3 className="text-xl font-bold text-white mb-3">Advanced Analytics</h3>
+//                 <p className="text-gray-400 leading-relaxed">
+//                   Track content performance, monitor health scores, and get actionable insights to improve your WordPress content.
+//                 </p>
+//               </div>
+//             </div>
+
+//             <div className="relative group">
+//               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
+//               <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all">
+//                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mb-6">
+//                   <RefreshCw className="w-6 h-6 text-white" />
+//                 </div>
+//                 <h3 className="text-xl font-bold text-white mb-3">Automated Workflows</h3>
+//                 <p className="text-gray-400 leading-relaxed">
+//                   Set up automated content improvements, bulk operations, and scheduled optimizations to save time.
+//                 </p>
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       </section>
+
 //       {/* Detailed Comparison */}
 //       <section className="relative z-10 py-20 px-6 bg-gradient-to-b from-transparent via-blue-950/10 to-transparent">
 //         <div className="max-w-7xl mx-auto">
@@ -528,8 +599,7 @@
 //           <div className="mt-12 text-center">
 //             <p className="text-gray-400 mb-4">Still have questions?</p>
 //             <Button
-//               variant="outline"
-//               className="border-white/20 text-white hover:bg-white/10"
+//               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
 //             >
 //               Contact Support
 //               <ChevronRight className="w-4 h-4 ml-2" />
@@ -551,10 +621,10 @@
 //                   Start Your Free Trial Today
 //                 </Badge>
 //                 <h3 className="text-4xl md:text-5xl font-black text-white mb-4">
-//                   Ready to Get Started?
+//                   Ready to Optimize Your Content?
 //                 </h3>
 //                 <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-//                   Join thousands of creators scaling their content with AI
+//                   Join content creators using AI to improve their WordPress sites
 //                 </p>
 //                 <Link href="/subscription">
 //                   <Button
@@ -581,7 +651,7 @@
 //             {[
 //               { icon: <Shield />, text: "30-day money-back guarantee" },
 //               { icon: <Zap />, text: "Instant setup, no installation" },
-//               { icon: <Users />, text: "24/7 priority support" },
+//               { icon: <Users />, text: "Enterprise-grade security" },
 //             ].map((item, index) => (
 //               <div
 //                 key={index}
@@ -612,7 +682,7 @@
 //                 </div>
 //               </div>
 //               <p className="text-sm text-gray-400 leading-relaxed">
-//                 The ultimate AI-powered content creation platform for WordPress.
+//                 AI-powered content optimization for WordPress sites.
 //               </p>
 //             </div>
 //             <div>
@@ -635,14 +705,16 @@
 //                 <li>
 //                   <Link href="/apidocs">
 //                     <a className="text-sm text-gray-400 hover:text-white transition-colors">
-//                       API
+//                       API Docs
 //                     </a>
 //                   </Link>
 //                 </li>
 //                 <li>
-//                   <a href="/integrations" className="text-sm text-gray-400 hover:text-white transition-colors">
-//                     Integrations
-//                   </a>
+//                   <Link href="/integrations">
+//                     <a className="text-sm text-gray-400 hover:text-white transition-colors">
+//                       Integrations
+//                     </a>
+//                   </Link>
 //                 </li>
 //               </ul>
 //             </div>
@@ -691,31 +763,6 @@
 //             <p className="text-sm text-gray-400">
 //               © 2024 WordPress AI Manager. All rights reserved.
 //             </p>
-//             {/* <div className="flex items-center gap-6">
-//               <a href="#" className="text-gray-400 hover:text-white transition-colors">
-//                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-//                   <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" />
-//                 </svg>
-//               </a>
-//               <a href="#" className="text-gray-400 hover:text-white transition-colors">
-//                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-//                   <path
-//                     fillRule="evenodd"
-//                     d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-//                     clipRule="evenodd"
-//                   />
-//                 </svg>
-//               </a>
-//               <a href="#" className="text-gray-400 hover:text-white transition-colors">
-//                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-//                   <path
-//                     fillRule="evenodd"
-//                     d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c5.51 0 10-4.48 10-10S17.51 2 12 2zm6.605 4.61a8.502 8.502 0 011.93 5.314c-.281-.054-3.101-.629-5.943-.271-.065-.141-.12-.293-.184-.445a25.416 25.416 0 00-.564-1.236c3.145-1.28 4.577-3.124 4.761-3.362zM12 3.475c2.17 0 4.154.813 5.662 2.148-.152.216-1.443 1.941-4.48 3.08-1.399-2.57-2.95-4.675-3.189-5A8.687 8.687 0 0112 3.475zm-3.633.803a53.896 53.896 0 013.167 4.935c-3.992 1.063-7.517 1.04-7.896 1.04a8.581 8.581 0 014.729-5.975zM3.453 12.01v-.26c.37.01 4.512.065 8.775-1.215.25.477.477.965.694 1.453-.109.033-.228.065-.336.098-4.404 1.42-6.747 5.303-6.942 5.629a8.522 8.522 0 01-2.19-5.705zM12 20.547a8.482 8.482 0 01-5.239-1.8c.152-.315 1.888-3.656 6.703-5.337.022-.01.033-.01.054-.022a35.318 35.318 0 011.823 6.475 8.4 8.4 0 01-3.341.684zm4.761-1.465c-.086-.52-.542-3.015-1.659-6.084 2.679-.423 5.022.271 5.314.369a8.468 8.468 0 01-3.655 5.715z"
-//                     clipRule="evenodd"
-//                   />
-//                 </svg>
-//               </a>
-//             </div> */}
 //           </div>
 //         </div>
 //       </footer>
@@ -770,6 +817,9 @@ import {
   X,
   HelpCircle,
   Star,
+  FileText,
+  BarChart3,
+  RefreshCw,
 } from "lucide-react";
 
 type BillingCycle = "monthly" | "annual";
@@ -821,135 +871,156 @@ export function Pricing(): JSX.Element {
   const plans: Plan[] = [
     {
       name: "Starter",
-      description: "Perfect for individuals getting started",
+      description: "Perfect for bloggers and small sites",
       monthlyPrice: 0,
       annualPrice: 0,
       popular: false,
       gradient: "from-gray-500 to-gray-600",
       features: [
-        { text: "5 AI-generated articles/month", included: true },
-        { text: "Basic SEO analysis", included: true },
-        { text: "Content scheduling", included: true },
         { text: "1 WordPress site", included: true },
+        { text: "20 AI content optimizations/month", included: true },
+        { text: "Readability improvements", included: true },
+        { text: "Basic SEO analysis", included: true },
+        { text: "Content health checks", included: true },
+        { text: "Manual content fixes", included: true },
         { text: "Email support", included: true },
-        { text: "Advanced analytics", included: false },
-        { text: "Multi-site management", included: false },
+        { text: "Advanced analytics dashboard", included: false },
+        { text: "Automated content fixes", included: false },
+        { text: "Bulk operations", included: false },
+        { text: "Custom AI prompts", included: false },
         { text: "API access", included: false },
-        { text: "Priority support", included: false },
       ],
     },
     {
       name: "Professional",
       description: "For serious content creators and marketers",
-      monthlyPrice: 29,
-      annualPrice: 290,
+      monthlyPrice: 49,
+      annualPrice: 490,
       popular: true,
       gradient: "from-blue-600 to-purple-600",
       features: [
-        { text: "Unlimited AI-generated articles", included: true },
-        { text: "Advanced SEO analysis", included: true },
-        { text: "Content calendar & scheduling", included: true },
         { text: "Up to 5 WordPress sites", included: true },
-        { text: "Priority email support", included: true },
+        { text: "200 AI optimizations/month", included: true },
+        { text: "Advanced readability improvements", included: true },
+        { text: "Advanced SEO analysis & suggestions", included: true },
+        { text: "Automated content health monitoring", included: true },
+        { text: "Automated content fixes (AI-powered)", included: true },
+        { text: "Bulk content operations", included: true },
         { text: "Advanced analytics dashboard", included: true },
-        { text: "Multi-site management", included: true },
-        { text: "Custom workflows", included: true },
-        { text: "API access (1000 calls/day)", included: true },
+        { text: "Custom AI optimization prompts", included: true },
+        { text: "Content performance tracking", included: true },
+        { text: "Priority email support", included: true },
+        { text: "API access (5,000 calls/month)", included: true },
       ],
     },
     {
       name: "Enterprise",
-      description: "For teams and agencies at scale",
-      monthlyPrice: 99,
-      annualPrice: 990,
+      description: "For agencies and large-scale operations",
+      monthlyPrice: 199,
+      annualPrice: 1990,
       popular: false,
       gradient: "from-purple-600 to-pink-600",
       features: [
-        { text: "Everything in Professional", included: true },
         { text: "Unlimited WordPress sites", included: true },
-        { text: "White-label options", included: true },
-        { text: "Dedicated account manager", included: true },
-        { text: "Custom AI model training", included: true },
-        { text: "Unlimited API calls", included: true },
-        { text: "24/7 phone support", included: true },
+        { text: "Unlimited AI optimizations", included: true },
+        { text: "White-label dashboard", included: true },
+        { text: "Custom AI model fine-tuning", included: true },
+        { text: "Advanced automation workflows", included: true },
+        { text: "Multi-site bulk operations", included: true },
         { text: "Team collaboration tools", included: true },
-        { text: "SLA guarantee", included: true },
+        { text: "Dedicated account manager", included: true },
+        { text: "Custom integrations", included: true },
+        { text: "Unlimited API access", included: true },
+        { text: "24/7 priority support", included: true },
+        { text: "SLA guarantee (99.9% uptime)", included: true },
       ],
     },
   ];
 
   const comparisonFeatures: ComparisonCategory[] = [
     {
-      category: "Content Generation",
-      features: [
-        { name: "AI-generated articles", starter: "5/month", pro: "Unlimited", enterprise: "Unlimited" },
-        { name: "Content rewriting", starter: false, pro: true, enterprise: true },
-        { name: "Topic suggestions", starter: false, pro: true, enterprise: true },
-        { name: "Multi-language support", starter: false, pro: "50+ languages", enterprise: "100+ languages" },
-      ],
-    },
-    {
-      category: "SEO Tools",
-      features: [
-        { name: "SEO analysis", starter: "Basic", pro: "Advanced", enterprise: "Advanced" },
-        { name: "Keyword research", starter: false, pro: true, enterprise: true },
-        { name: "Competitor analysis", starter: false, pro: true, enterprise: true },
-        { name: "Rank tracking", starter: false, pro: true, enterprise: true },
-      ],
-    },
-    {
-      category: "Management",
+      category: "WordPress Management",
       features: [
         { name: "WordPress sites", starter: "1", pro: "5", enterprise: "Unlimited" },
-        { name: "Content scheduling", starter: true, pro: true, enterprise: true },
-        { name: "Team collaboration", starter: false, pro: false, enterprise: true },
-        { name: "Custom workflows", starter: false, pro: true, enterprise: true },
+        { name: "Content health monitoring", starter: "Manual", pro: "Automated", enterprise: "Real-time" },
+        { name: "Bulk operations", starter: false, pro: true, enterprise: true },
+        { name: "Multi-site dashboard", starter: false, pro: true, enterprise: true },
       ],
     },
     {
-      category: "Analytics & Reporting",
+      category: "AI Content Optimization",
       features: [
-        { name: "Basic analytics", starter: true, pro: true, enterprise: true },
-        { name: "Advanced dashboard", starter: false, pro: true, enterprise: true },
-        { name: "Custom reports", starter: false, pro: false, enterprise: true },
-        { name: "API access", starter: false, pro: "1K calls/day", enterprise: "Unlimited" },
+        { name: "AI optimizations/month", starter: "20", pro: "200", enterprise: "Unlimited" },
+        { name: "Readability improvements", starter: true, pro: true, enterprise: true },
+        { name: "Automated content fixes", starter: false, pro: true, enterprise: true },
+        { name: "Custom AI prompts", starter: false, pro: true, enterprise: true },
+        { name: "AI model fine-tuning", starter: false, pro: false, enterprise: true },
       ],
     },
     {
-      category: "Support",
+      category: "SEO & Analytics",
       features: [
+        { name: "SEO analysis", starter: "Basic", pro: "Advanced", enterprise: "Enterprise" },
+        { name: "SEO recommendations", starter: "Manual", pro: "Automated", enterprise: "AI-powered" },
+        { name: "Content performance tracking", starter: false, pro: true, enterprise: true },
+        { name: "Advanced analytics", starter: false, pro: true, enterprise: true },
+        { name: "Custom reporting", starter: false, pro: false, enterprise: true },
+      ],
+    },
+    {
+      category: "Automation & Integration",
+      features: [
+        { name: "Automated workflows", starter: false, pro: "Basic", enterprise: "Advanced" },
+        { name: "API access", starter: false, pro: "5K calls/mo", enterprise: "Unlimited" },
+        { name: "Custom integrations", starter: false, pro: false, enterprise: true },
+        { name: "Webhooks", starter: false, pro: true, enterprise: true },
+      ],
+    },
+    {
+      category: "Team & Support",
+      features: [
+        { name: "Team members", starter: "1", pro: "5", enterprise: "Unlimited" },
+        { name: "White-label options", starter: false, pro: false, enterprise: true },
         { name: "Email support", starter: true, pro: true, enterprise: true },
         { name: "Priority support", starter: false, pro: true, enterprise: true },
-        { name: "24/7 phone support", starter: false, pro: false, enterprise: true },
         { name: "Dedicated manager", starter: false, pro: false, enterprise: true },
+        { name: "SLA guarantee", starter: false, pro: false, enterprise: "99.9%" },
       ],
     },
   ];
 
   const faqs: FAQ[] = [
     {
-      question: "Can I change plans later?",
-      answer: "Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately and we'll prorate any charges.",
+      question: "What counts as an AI optimization?",
+      answer: "Each AI optimization includes one action: improving readability, fixing content issues, SEO optimization, or content enhancement for a single post/page. Bulk operations count as one optimization per item.",
     },
     {
-      question: "What happens after my free trial ends?",
-      answer: "After your 14-day free trial, you'll be charged based on the plan you selected. You can cancel anytime before the trial ends with no charges.",
+      question: "Can I upgrade or downgrade my plan?",
+      answer: "Yes! You can change plans anytime. Upgrades take effect immediately, and we'll prorate the difference. Downgrades take effect at the next billing cycle.",
     },
     {
-      question: "Do you offer refunds?",
-      answer: "Yes, we offer a 30-day money-back guarantee. If you're not satisfied, contact us within 30 days for a full refund.",
+      question: "What happens if I exceed my monthly AI optimization limit?",
+      answer: "On the Starter plan, you'll need to upgrade or wait until next month. Professional users can purchase additional optimization packs. Enterprise plans have unlimited optimizations.",
     },
     {
-      question: "Is there a setup fee?",
-      answer: "No setup fees ever. You only pay the monthly or annual subscription price with no hidden costs.",
+      question: "Do you offer a free trial?",
+      answer: "Yes! All paid plans include a 14-day free trial with full access to features. No credit card required to start your trial.",
     },
     {
-      question: "Can I use this with multiple WordPress sites?",
-      answer: "The Starter plan includes 1 site, Professional includes 5 sites, and Enterprise includes unlimited sites.",
+      question: "How does the WordPress site limit work?",
+      answer: "You can connect up to the number of WordPress sites allowed by your plan. Each site can be managed independently with its own settings and optimization queue.",
     },
     {
-      question: "What payment methods do you accept?",
-      answer: "We accept all major credit cards (Visa, MasterCard, American Express) and PayPal for your convenience.",
+      question: "What AI models do you use?",
+      answer: "We use state-of-the-art language models (including GPT-4, Claude, and Gemini) optimized for content quality, readability, and SEO. Enterprise plans can fine-tune models for their specific needs.",
+    },
+    {
+      question: "Is my WordPress content secure?",
+      answer: "Absolutely. We use enterprise-grade encryption for all data in transit and at rest. We never store your WordPress credentials, only secure API tokens. Your content is processed securely and never used for AI training.",
+    },
+    {
+      question: "Can I cancel anytime?",
+      answer: "Yes, you can cancel your subscription at any time with no penalties. Your account remains active until the end of your billing period, and we offer a 30-day money-back guarantee.",
     },
   ];
 
@@ -985,11 +1056,11 @@ export function Pricing(): JSX.Element {
                     <Sparkles className="w-6 h-6 text-white" />
                   </div>
                 </div>
-                <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
+<div>
+                  <h1 className="text-base md:text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
                     WordPress AI Manager
                   </h1>
-                  <p className="text-xs text-gray-400 font-medium">Powered by Advanced AI</p>
+                  <p className="text-xs text-gray-400 font-medium hidden sm:block">Powered by Advanced AI</p>
                 </div>
               </div>
             </Link>
@@ -1029,7 +1100,7 @@ export function Pricing(): JSX.Element {
             <Award className="w-3.5 h-3.5 mr-2 inline" />
             Simple, Transparent Pricing
           </Badge>
-          <h2 className="text-5xl md:text-6xl font-black mb-6 tracking-tight">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight">
             <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
               Choose Your Perfect
             </span>
@@ -1038,7 +1109,7 @@ export function Pricing(): JSX.Element {
               Plan
             </span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed font-light">
+          <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed font-light px-4">
             Start with a 14-day free trial. No credit card required. Cancel anytime.
           </p>
 
@@ -1070,9 +1141,9 @@ export function Pricing(): JSX.Element {
       </section>
 
       {/* Pricing Cards */}
-      <section className="relative z-10 pb-20 px-6">
+<section className="relative z-10 pb-20 px-4 md:px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             {plans.map((plan, index) => (
               <div
                 key={index}
@@ -1105,8 +1176,8 @@ export function Pricing(): JSX.Element {
                   </div>
 
                   <div className="mb-8">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-5xl font-black bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+<div className="flex items-baseline gap-2">
+                      <span className="text-4xl md:text-5xl font-black bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                         ${billingCycle === "monthly" ? plan.monthlyPrice : Math.round(plan.annualPrice / 12)}
                       </span>
                       <span className="text-gray-400">/month</span>
@@ -1152,6 +1223,52 @@ export function Pricing(): JSX.Element {
         </div>
       </section>
 
+      {/* Value Props Section */}
+      <section className="relative z-10 py-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
+              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mb-6">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3">AI-Powered Content Optimization</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Automatically improve readability, fix content issues, and optimize for SEO using advanced AI models.
+                </p>
+              </div>
+            </div>
+
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
+              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mb-6">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3">Advanced Analytics</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Track content performance, monitor health scores, and get actionable insights to improve your WordPress content.
+                </p>
+              </div>
+            </div>
+
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
+              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mb-6">
+                  <RefreshCw className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3">Automated Workflows</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Set up automated content improvements, bulk operations, and scheduled optimizations to save time.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Detailed Comparison */}
       <section className="relative z-10 py-20 px-6 bg-gradient-to-b from-transparent via-blue-950/10 to-transparent">
         <div className="max-w-7xl mx-auto">
@@ -1159,7 +1276,7 @@ export function Pricing(): JSX.Element {
             <Badge className="mb-4 bg-purple-500/10 text-purple-300 border border-purple-500/20 px-3 py-1 text-sm font-semibold">
               Detailed Comparison
             </Badge>
-            <h3 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+<h3 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent px-4">
               Compare All Features
             </h3>
             <p className="text-lg text-gray-400 max-w-2xl mx-auto">
@@ -1169,9 +1286,9 @@ export function Pricing(): JSX.Element {
 
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl"></div>
-            <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
+<div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto -mx-4 md:mx-0">
+                <table className="w-full min-w-[640px]">
                   <thead>
                     <tr className="border-b border-white/10">
                       <th className="text-left p-6 text-gray-400 font-semibold">Features</th>
@@ -1252,7 +1369,7 @@ export function Pricing(): JSX.Element {
             <Badge className="mb-4 bg-green-500/10 text-green-300 border border-green-500/20 px-3 py-1 text-sm font-semibold">
               FAQs
             </Badge>
-            <h3 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+<h3 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent px-4">
               Frequently Asked Questions
             </h3>
             <p className="text-lg text-gray-400">
@@ -1298,18 +1415,18 @@ export function Pricing(): JSX.Element {
         <div className="max-w-4xl mx-auto">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 to-purple-500/30 rounded-3xl blur-3xl"></div>
-            <div className="relative bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-12 md:p-16 text-center overflow-hidden">
+            <div className="relative bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-8 md:p-12 lg:p-16 text-center overflow-hidden">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-50"></div>
               <div className="relative z-10">
                 <Badge className="mb-6 bg-white/20 text-white border-0 px-4 py-1.5 text-sm font-semibold">
                   <Sparkles className="w-3.5 h-3.5 mr-2 inline" />
                   Start Your Free Trial Today
                 </Badge>
-                <h3 className="text-4xl md:text-5xl font-black text-white mb-4">
-                  Ready to Get Started?
+<h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-white mb-4">
+                  Ready to Optimize Your Content?
                 </h3>
                 <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-                  Join thousands of creators scaling their content with AI
+                  Join content creators using AI to improve their WordPress sites
                 </p>
                 <Link href="/subscription">
                   <Button
@@ -1332,15 +1449,15 @@ export function Pricing(): JSX.Element {
       {/* Trust Badges */}
       <section className="relative z-10 pb-20 px-6">
         <div className="max-w-5xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-6">
+<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { icon: <Shield />, text: "30-day money-back guarantee" },
               { icon: <Zap />, text: "Instant setup, no installation" },
-              { icon: <Users />, text: "24/7 priority support" },
+              { icon: <Users />, text: "Enterprise-grade security" },
             ].map((item, index) => (
               <div
                 key={index}
-                className="flex items-center gap-3 text-gray-400 justify-center"
+                className="flex items-center gap-3 text-gray-400 justify-center md:justify-center"
               >
                 <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-blue-400">
                   {item.icon}
@@ -1355,7 +1472,7 @@ export function Pricing(): JSX.Element {
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/10 bg-slate-950/50 backdrop-blur-sm py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-12">
             <div>
               <div className="flex items-center space-x-3 mb-4">
                 <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-700 rounded-lg">
@@ -1367,7 +1484,7 @@ export function Pricing(): JSX.Element {
                 </div>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">
-                The ultimate AI-powered content creation platform for WordPress.
+                AI-powered content optimization for WordPress sites.
               </p>
             </div>
             <div>
@@ -1390,14 +1507,16 @@ export function Pricing(): JSX.Element {
                 <li>
                   <Link href="/apidocs">
                     <a className="text-sm text-gray-400 hover:text-white transition-colors">
-                      API
+                      API Docs
                     </a>
                   </Link>
                 </li>
                 <li>
-                  <a href="/integrations" className="text-sm text-gray-400 hover:text-white transition-colors">
-                    Integrations
-                  </a>
+                  <Link href="/integrations">
+                    <a className="text-sm text-gray-400 hover:text-white transition-colors">
+                      Integrations
+                    </a>
+                  </Link>
                 </li>
               </ul>
             </div>
