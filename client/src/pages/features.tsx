@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -331,10 +330,10 @@ export function Features() {
                   </div>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <h1 className="text-base md:text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
                     WordPress AI Manager
                   </h1>
-                  <p className="text-xs text-gray-400 font-medium">Powered by Advanced AI</p>
+                  <p className="text-xs text-gray-400 font-medium hidden sm:block">Powered by Advanced AI</p>
                 </div>
               </div>
             </Link>
@@ -358,7 +357,8 @@ export function Features() {
                 <Button 
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 text-sm font-semibold"
                 >
-                  Get Started Free
+                  <span className="hidden sm:inline">Get Started Free</span>
+                  <span className="sm:hidden">Start</span>
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
@@ -374,7 +374,7 @@ export function Features() {
             <Sparkles className="w-3.5 h-3.5 mr-2 inline" />
             AI-Powered WordPress Optimization
           </Badge>
-          <h2 className="text-5xl md:text-6xl font-black mb-6 tracking-tight">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight">
             <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
               Powerful Features for
             </span>
@@ -383,7 +383,7 @@ export function Features() {
               Better Content
             </span>
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed font-light">
+          <p className="text-base md:text-lg lg:text-xl text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed font-light px-4">
             Everything you need to optimize, fix, and improve your WordPress content with AI-powered automation.
           </p>
         </div>
@@ -392,19 +392,19 @@ export function Features() {
       {/* Category Filter */}
       <section className="relative z-10 pb-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-wrap items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
             {categories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                className={`flex items-center gap-2 px-3 md:px-5 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-medium transition-all duration-300 ${
                   activeCategory === category.id
                     ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
                     : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
                 }`}
               >
                 {category.icon}
-                {category.label}
+                <span className="whitespace-nowrap">{category.label}</span>
               </button>
             ))}
           </div>
@@ -414,7 +414,7 @@ export function Features() {
       {/* Main Features Grid */}
       <section className="relative z-10 py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {filteredFeatures.map((feature, index) => (
               <div
                 key={index}
@@ -422,18 +422,18 @@ export function Features() {
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
-                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all duration-300 h-full flex flex-col">
+                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 md:p-8 hover:border-white/20 transition-all duration-300 h-full flex flex-col">
                   <div
-                    className={`w-14 h-14 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 shadow-lg`}
+                    className={`w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 md:mb-6 shadow-lg flex-shrink-0`}
                   >
                     <div className="text-white">{feature.icon}</div>
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
-                  <p className="text-gray-400 mb-6 leading-relaxed">{feature.description}</p>
+                  <h3 className="text-lg md:text-xl font-bold text-white mb-3">{feature.title}</h3>
+                  <p className="text-sm md:text-base text-gray-400 mb-6 leading-relaxed">{feature.description}</p>
                   <div className="mt-auto space-y-2">
                     {feature.benefits.map((benefit, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                      <div key={idx} className="flex items-start gap-2 text-xs md:text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
                         <span className="text-gray-300">{benefit}</span>
                       </div>
                     ))}
@@ -448,27 +448,27 @@ export function Features() {
       {/* How It Works Section */}
       <section className="relative z-10 py-20 px-6 bg-gradient-to-b from-transparent via-blue-950/10 to-transparent">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 md:mb-16">
             <Badge className="mb-4 bg-purple-500/10 text-purple-300 border border-purple-500/20 px-3 py-1 text-sm font-semibold">
               Simple Process
             </Badge>
-            <h3 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+            <h3 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent px-4">
               How It Works
             </h3>
-            <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+            <p className="text-base md:text-lg text-gray-400 max-w-2xl mx-auto px-4">
               Get started in minutes with our streamlined workflow
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-16">
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl blur-xl"></div>
-              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 md:p-8 text-center">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-xl md:text-2xl font-bold">
                   1
                 </div>
-                <h4 className="text-xl font-bold text-white mb-3">Connect Your Site</h4>
-                <p className="text-gray-400">
+                <h4 className="text-lg md:text-xl font-bold text-white mb-3">Connect Your Site</h4>
+                <p className="text-sm md:text-base text-gray-400">
                   Securely connect your WordPress site with our application key
                 </p>
               </div>
@@ -476,12 +476,12 @@ export function Features() {
 
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl blur-xl"></div>
-              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 md:p-8 text-center">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-xl md:text-2xl font-bold">
                   2
                 </div>
-                <h4 className="text-xl font-bold text-white mb-3">Analyze Content</h4>
-                <p className="text-gray-400">
+                <h4 className="text-lg md:text-xl font-bold text-white mb-3">Analyze Content</h4>
+                <p className="text-sm md:text-base text-gray-400">
                   AI automatically scans and identifies optimization opportunities
                 </p>
               </div>
@@ -489,12 +489,12 @@ export function Features() {
 
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-pink-500/10 to-red-500/10 rounded-2xl blur-xl"></div>
-              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+              <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 md:p-8 text-center">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-pink-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-xl md:text-2xl font-bold">
                   3
                 </div>
-                <h4 className="text-xl font-bold text-white mb-3">Apply Fixes</h4>
-                <p className="text-gray-400">
+                <h4 className="text-lg md:text-xl font-bold text-white mb-3">Apply Fixes</h4>
+                <p className="text-sm md:text-base text-gray-400">
                   Review and apply AI-powered improvements with one click
                 </p>
               </div>
@@ -506,19 +506,19 @@ export function Features() {
       {/* Additional Features */}
       <section className="relative z-10 py-20 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 md:mb-16">
             <Badge className="mb-4 bg-green-500/10 text-green-300 border border-green-500/20 px-3 py-1 text-sm font-semibold">
               And Much More
             </Badge>
-            <h3 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+            <h3 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent px-4">
               Built for Efficiency
             </h3>
-            <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+            <p className="text-base md:text-lg text-gray-400 max-w-2xl mx-auto px-4">
               Additional features to streamline your WordPress content management
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {additionalFeatures.map((feature, index) => (
               <div
                 key={index}
@@ -526,12 +526,12 @@ export function Features() {
                 style={{ animationDelay: `${index * 30}ms` }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-xl blur-lg group-hover:blur-xl transition-all"></div>
-                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:border-white/20 transition-all duration-300">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-4">
+                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-5 md:p-6 hover:border-white/20 transition-all duration-300">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-3 md:mb-4 flex-shrink-0">
                     <div className="text-blue-400">{feature.icon}</div>
                   </div>
-                  <h4 className="text-base font-bold text-white mb-2">{feature.title}</h4>
-                  <p className="text-sm text-gray-400">{feature.description}</p>
+                  <h4 className="text-sm md:text-base font-bold text-white mb-2">{feature.title}</h4>
+                  <p className="text-xs md:text-sm text-gray-400">{feature.description}</p>
                 </div>
               </div>
             ))}
@@ -544,24 +544,24 @@ export function Features() {
         <div className="max-w-4xl mx-auto">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 to-purple-500/30 rounded-3xl blur-3xl"></div>
-            <div className="relative bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-12 md:p-16 text-center overflow-hidden">
+            <div className="relative bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-8 md:p-12 lg:p-16 text-center overflow-hidden">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-50"></div>
               <div className="relative z-10">
                 <Badge className="mb-6 bg-white/20 text-white border-0 px-4 py-1.5 text-sm font-semibold">
                   <Zap className="w-3.5 h-3.5 mr-2 inline" />
                   Start Optimizing Today
                 </Badge>
-                <h3 className="text-4xl md:text-5xl font-black text-white mb-4">
+                <h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-white mb-4">
                   Ready to Improve Your Content?
                 </h3>
-                <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+                <p className="text-base md:text-lg lg:text-xl text-blue-100 mb-8 max-w-2xl mx-auto px-4">
                   Join content creators using AI to optimize their WordPress sites
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <Link href="/subscription">
                     <Button
                       size="lg"
-                      className="bg-white text-blue-700 hover:bg-gray-100 shadow-2xl text-base font-bold px-8 py-6 group"
+                      className="w-full sm:w-auto bg-white text-blue-700 hover:bg-gray-100 shadow-2xl text-base font-bold px-8 py-6 group"
                     >
                       Start Free Trial
                       <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -571,13 +571,13 @@ export function Features() {
                     <Button
                       size="lg"
                       variant="outline"
-                      className="bg-transparent border-2 border-white text-white hover:bg-white/10 text-base font-bold px-8 py-6"
+                      className="w-full sm:w-auto bg-transparent border-2 border-white text-white hover:bg-white/10 text-base font-bold px-8 py-6"
                     >
                       View Pricing
                     </Button>
                   </Link>
                 </div>
-                <p className="text-sm text-blue-100 mt-6">
+                <p className="text-xs md:text-sm text-blue-100 mt-6 px-4">
                   ✓ 14-day free trial • ✓ No credit card required • ✓ Cancel anytime
                 </p>
               </div>
@@ -589,7 +589,7 @@ export function Features() {
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/10 bg-slate-950/50 backdrop-blur-sm py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-12">
             <div>
               <div className="flex items-center space-x-3 mb-4">
                 <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-700 rounded-lg">
