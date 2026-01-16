@@ -3873,7 +3873,7 @@ export default function EnhancedImageMetadata() {
 
           {/* Image Grid */}
           <div className="p-6">
-            {!showBrokenImages && stats.broken > 0 && (
+            {/* {!showBrokenImages && stats.broken > 0 && (
               <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -3890,7 +3890,7 @@ export default function EnhancedImageMetadata() {
                   </button>
                 </div>
               </div>
-            )}
+            )} */}
 
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-16">
