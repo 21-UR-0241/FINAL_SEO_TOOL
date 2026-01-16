@@ -1961,8 +1961,8 @@
 //   );
 // }
 
-
 //client/src/pages/image-metadata.tsx
+// COMPLETE VERSION - ALL SECTIONS INCLUDED
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -2382,7 +2382,7 @@ const ImageCard = ({
   const handleImageError = () => {
     console.error('Failed to load image:', image.url || image.data);
     setImageError(true);
-    onImageError(image.id); // Notify parent component
+    onImageError(image.id);
   };
 
   const handleImageLoad = () => {
@@ -2413,14 +2413,12 @@ const ImageCard = ({
       <div className="aspect-square bg-gray-100 relative">
         {imageSource && !imageError && !hasInvalidUrl ? (
           <>
-            {/* Loading spinner */}
             {!imageLoaded && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
               </div>
             )}
             
-            {/* Actual image */}
             <img
               src={imageSource}
               alt={image.contentTitle}
@@ -2433,7 +2431,6 @@ const ImageCard = ({
             />
           </>
         ) : (
-          // Fallback for broken/missing images
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
             <AlertTriangle className="w-8 h-8 text-red-400 mb-2" />
             <p className="text-xs text-gray-600 px-2 text-center">
@@ -2463,7 +2460,6 @@ const ImageCard = ({
         )}
       </div>
 
-      {/* Hover overlay with info */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
         <div className="absolute bottom-0 left-0 right-0 p-1.5 sm:p-2 text-white">
           <p className="text-[10px] sm:text-xs font-medium truncate">
@@ -2483,13 +2479,9 @@ const ImageCard = ({
         </div>
       </div>
 
-      {/* Status badges */}
       <div className="absolute top-2 right-2 flex flex-col gap-1">
         {image.hasMetadata && (
-          <span
-            className="bg-green-500 text-white p-1 rounded"
-            title="Has metadata"
-          >
+          <span className="bg-green-500 text-white p-1 rounded" title="Has metadata">
             <Shield className="w-3 h-3" />
           </span>
         )}
@@ -2499,24 +2491,17 @@ const ImageCard = ({
           </span>
         )}
         {image.isCrawled && (
-          <span
-            className="bg-indigo-500 text-white p-1 rounded"
-            title="Crawled"
-          >
+          <span className="bg-indigo-500 text-white p-1 rounded" title="Crawled">
             <Globe className="w-3 h-3" />
           </span>
         )}
         {(imageError || hasInvalidUrl) && (
-          <span
-            className="bg-red-500 text-white p-1 rounded"
-            title="Failed to load"
-          >
+          <span className="bg-red-500 text-white p-1 rounded" title="Failed to load">
             <AlertTriangle className="w-3 h-3" />
           </span>
         )}
       </div>
 
-      {/* Selection checkbox */}
       <div className="absolute top-2 left-2">
         <div
           className={`
@@ -2532,7 +2517,6 @@ const ImageCard = ({
         </div>
       </div>
 
-      {/* Processing overlay */}
       {processingItem && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
           {processingItem.status === "processing" && (
@@ -2564,11 +2548,8 @@ export default function EnhancedImageMetadata() {
     "all" | "with-metadata" | "without-metadata" | "ai-generated" | "crawled"
   >("all");
   const [showSettings, setShowSettings] = useState(false);
-  const [showCrawler, setShowCrawler] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus[]>(
-    []
-  );
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus[]>([]);
   const [apiAvailable, setApiAvailable] = useState(true);
   const [activeTab, setActiveTab] = useState<"existing" | "crawl">("existing");
 
@@ -2608,7 +2589,7 @@ export default function EnhancedImageMetadata() {
     timestamp: string;
   } | null>(null);
 
-  // Processing options with SEO fields
+  // Processing options
   const [processOptions, setProcessOptions] = useState<ProcessOptions>({
     action: "add",
     copyright: `© ${new Date().getFullYear()}`,
@@ -2659,12 +2640,10 @@ export default function EnhancedImageMetadata() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Load websites on mount
   useEffect(() => {
     loadWebsites();
   }, []);
 
-  // Load images when website changes
   useEffect(() => {
     if (websites.length > 0 || selectedWebsite === "") {
       loadImages();
@@ -2674,14 +2653,11 @@ export default function EnhancedImageMetadata() {
   const loadWebsites = async () => {
     try {
       const data = await api.getWebsites();
-
       if (Array.isArray(data)) {
         setWebsites(data);
-
         if (data.length > 0 && !selectedWebsite) {
           setSelectedWebsite(data[0].id);
         }
-
         if (data.length === 0) {
           addToast("No websites found. Please add a website first.", "info");
           setApiAvailable(false);
@@ -2694,10 +2670,7 @@ export default function EnhancedImageMetadata() {
       }
     } catch (error: any) {
       setWebsites([]);
-      addToast(
-        "Website API not configured. Please set up your websites first.",
-        "info"
-      );
+      addToast("Website API not configured. Please set up your websites first.", "info");
       setApiAvailable(false);
     }
   };
@@ -2711,15 +2684,12 @@ export default function EnhancedImageMetadata() {
     setIsLoading(true);
     try {
       const data = await api.getContentImages(selectedWebsite || undefined);
-
       if (Array.isArray(data)) {
         const allImages = [...data, ...crawledImages];
         setImages(allImages);
-
         if (data.length > 0) {
           const withMetadata = data.filter((img) => img.hasMetadata).length;
           const withoutMetadata = data.length - withMetadata;
-
           addToast(
             `Loaded ${data.length} images (${withMetadata} protected, ${withoutMetadata} unprotected)`,
             "info"
@@ -2753,18 +2723,13 @@ export default function EnhancedImageMetadata() {
         const crawledData = result.images
           .map((img: any) => ({
             ...img,
-            id:
-              img.id ||
-              `crawled_${Date.now()}_${Math.random()
-                .toString(36)
-                .substr(2, 9)}`,
+            id: img.id || `crawled_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             url: img.url || img.src || img.source || "",
             websiteId: selectedWebsite || "crawled",
             websiteName: "Crawled",
             isCrawled: true,
             hasMetadata: false,
-            contentTitle:
-              img.contentTitle || img.title || img.alt || "Crawled Image",
+            contentTitle: img.contentTitle || img.title || img.alt || "Crawled Image",
             size: img.size || 0,
             createdAt: img.createdAt || new Date().toISOString(),
           }))
@@ -2781,10 +2746,9 @@ export default function EnhancedImageMetadata() {
         setCrawledImages((prev) => [...prev, ...crawledData]);
         setImages((prev) => [...prev, ...crawledData]);
 
-        const message =
-          stats.duplicates > 0
-            ? `🎉 Crawl complete! Found ${stats.imagesFound} unique images from ${stats.pagesVisited} pages (${stats.duplicates} duplicates skipped)`
-            : `🎉 Crawl complete! Found ${stats.imagesFound} images from ${stats.pagesVisited} pages`;
+        const message = stats.duplicates > 0
+          ? `🎉 Crawl complete! Found ${stats.imagesFound} unique images from ${stats.pagesVisited} pages (${stats.duplicates} duplicates skipped)`
+          : `🎉 Crawl complete! Found ${stats.imagesFound} images from ${stats.pagesVisited} pages`;
 
         addToast(message, "success", 7000);
 
@@ -2792,17 +2756,11 @@ export default function EnhancedImageMetadata() {
           console.log("Crawl statistics:", result.stats);
         }
       } else {
-        addToast(
-          "No images found on the website. Try adjusting the crawl settings.",
-          "warning"
-        );
+        addToast("No images found on the website. Try adjusting the crawl settings.", "warning");
       }
     } catch (error: any) {
       console.error("Crawl error:", error);
-      addToast(
-        `Crawl failed: ${error.message || "Unknown error occurred"}`,
-        "error"
-      );
+      addToast(`Crawl failed: ${error.message || "Unknown error occurred"}`, "error");
     } finally {
       setIsCrawling(false);
       setCrawlProgress(null);
@@ -2819,9 +2777,7 @@ export default function EnhancedImageMetadata() {
 
   const handleSelectImage = (imageId: string) => {
     setSelectedImages((prev) =>
-      prev.includes(imageId)
-        ? prev.filter((id) => id !== imageId)
-        : [...prev, imageId]
+      prev.includes(imageId) ? prev.filter((id) => id !== imageId) : [...prev, imageId]
     );
   };
 
@@ -2859,35 +2815,24 @@ export default function EnhancedImageMetadata() {
       );
 
       const imageUrls: Record<string, string> = {};
-      console.log("Building URL mapping for selected images:", selectedImages);
-
+      
       for (const imageId of selectedImages) {
         const image = images.find((img) => img.id === imageId);
-
         if (image && (image.isCrawled || imageId.startsWith("crawled"))) {
           const url = image.url || image.data || "";
           if (url) {
             imageUrls[imageId] = url;
-            console.log(`  ✅ Added URL mapping: ${imageId} -> ${url.substring(0, 50)}...`);
           }
         }
       }
 
-      console.log("Final imageUrls mapping:", imageUrls);
-
-      const result = await api.batchProcessMetadata(
-        selectedImages,
-        processOptions,
-        imageUrls
-      );
+      const result = await api.batchProcessMetadata(selectedImages, processOptions, imageUrls);
 
       if (result.results) {
         setProcessingStatus((prev) =>
           prev.map((s) => ({
             ...s,
-            status: result.results.success.some(
-              (success: any) => success.imageId === s.imageId
-            )
+            status: result.results.success.some((success: any) => success.imageId === s.imageId)
               ? ("success" as const)
               : ("failed" as const),
           }))
@@ -2959,30 +2904,21 @@ export default function EnhancedImageMetadata() {
     a.click();
     URL.revokeObjectURL(url);
 
-    addToast(
-      `Downloaded ${crawledImages.length} crawled image URLs`,
-      "success"
-    );
+    addToast(`Downloaded ${crawledImages.length} crawled image URLs`, "success");
   };
 
-  // URL Fixing Functions
   const handleFixSingleUrl = async (image: ContentImage, newUrl: string) => {
     try {
       setImages(prev => prev.map(img => 
-        img.id === image.id 
-          ? { ...img, url: newUrl, data: undefined }
-          : img
+        img.id === image.id ? { ...img, url: newUrl, data: undefined } : img
       ));
       
       if (image.isCrawled) {
         setCrawledImages(prev => prev.map(img => 
-          img.id === image.id 
-            ? { ...img, url: newUrl, data: undefined }
-            : img
+          img.id === image.id ? { ...img, url: newUrl, data: undefined } : img
         ));
       }
       
-      // Remove from broken images set if fixed
       setBrokenImageIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(image.id);
@@ -3009,7 +2945,6 @@ export default function EnhancedImageMetadata() {
       const validation = validateImageUrl(img.url || '');
       if (!validation.valid && (img.url?.startsWith('/') || img.url?.startsWith('./'))) {
         fixedCount++;
-        // Remove from broken images set
         setBrokenImageIds(prevSet => {
           const newSet = new Set(prevSet);
           newSet.delete(img.id);
@@ -3068,16 +3003,10 @@ export default function EnhancedImageMetadata() {
 
   const filteredImages = useMemo(() => {
     return images.filter((img) => {
-      // Filter by website
-      if (
-        selectedWebsite &&
-        img.websiteId !== selectedWebsite &&
-        img.websiteId !== "crawled"
-      ) {
+      if (selectedWebsite && img.websiteId !== selectedWebsite && img.websiteId !== "crawled") {
         return false;
       }
 
-      // Filter broken images (unless showBrokenImages is true)
       if (!showBrokenImages) {
         const imageSource = img.data || img.url;
         const validation = validateImageUrl(imageSource || '');
@@ -3089,7 +3018,6 @@ export default function EnhancedImageMetadata() {
         }
       }
 
-      // Filter by metadata status
       switch (filter) {
         case "with-metadata":
           return img.hasMetadata;
@@ -3134,18 +3062,15 @@ export default function EnhancedImageMetadata() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`
-              flex items-center justify-between p-4 rounded-lg shadow-lg min-w-[300px]
-              ${
-                toast.type === "error"
-                  ? "bg-red-50 text-red-800 border border-red-200"
-                  : toast.type === "warning"
-                  ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
-                  : toast.type === "info"
-                  ? "bg-blue-50 text-blue-800 border border-blue-200"
-                  : "bg-green-50 text-green-800 border border-green-200"
-              }
-            `}
+            className={`flex items-center justify-between p-4 rounded-lg shadow-lg min-w-[300px] ${
+              toast.type === "error"
+                ? "bg-red-50 text-red-800 border border-red-200"
+                : toast.type === "warning"
+                ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
+                : toast.type === "info"
+                ? "bg-blue-50 text-blue-800 border border-blue-200"
+                : "bg-green-50 text-green-800 border border-green-200"
+            }`}
           >
             <div className="flex items-center">
               {toast.type === "error" || toast.type === "warning" ? (
@@ -3157,10 +3082,7 @@ export default function EnhancedImageMetadata() {
               )}
               <span className="text-sm font-medium">{toast.message}</span>
             </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="ml-4 text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={() => removeToast(toast.id)} className="ml-4 text-gray-400 hover:text-gray-600">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -3185,9 +3107,7 @@ export default function EnhancedImageMetadata() {
               <div>
                 <p className="text-xs sm:text-sm text-gray-600">Total</p>
                 <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
-                <p className="text-xs text-gray-500">
-                  {formatFileSize(stats.totalSize)}
-                </p>
+                <p className="text-xs text-gray-500">{formatFileSize(stats.totalSize)}</p>
               </div>
               <FileImage className="w-8 h-8 text-blue-500" />
             </div>
@@ -3197,13 +3117,9 @@ export default function EnhancedImageMetadata() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Protected</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {stats.withMetadata}
-                </p>
+                <p className="text-2xl font-bold text-green-600">{stats.withMetadata}</p>
                 <p className="text-xs text-gray-500">
-                  {stats.total > 0
-                    ? `${Math.round((stats.withMetadata / stats.total) * 100)}%`
-                    : "0%"}
+                  {stats.total > 0 ? `${Math.round((stats.withMetadata / stats.total) * 100)}%` : "0%"}
                 </p>
               </div>
               <Shield className="w-8 h-8 text-green-500" />
@@ -3214,15 +3130,9 @@ export default function EnhancedImageMetadata() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Unprotected</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {stats.withoutMetadata}
-                </p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.withoutMetadata}</p>
                 <p className="text-xs text-gray-500">
-                  {stats.total > 0
-                    ? `${Math.round(
-                        (stats.withoutMetadata / stats.total) * 100
-                      )}%`
-                    : "0%"}
+                  {stats.total > 0 ? `${Math.round((stats.withoutMetadata / stats.total) * 100)}%` : "0%"}
                 </p>
               </div>
               <AlertTriangle className="w-8 h-8 text-yellow-500" />
@@ -3233,12 +3143,8 @@ export default function EnhancedImageMetadata() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">AI Generated</p>
-                <p className="text-2xl font-bold text-purple-600">
-                  {stats.aiGenerated}
-                </p>
-                <p className="text-xs text-gray-500">
-                  ${(stats.totalCost / 100).toFixed(2)}
-                </p>
+                <p className="text-2xl font-bold text-purple-600">{stats.aiGenerated}</p>
+                <p className="text-xs text-gray-500">${(stats.totalCost / 100).toFixed(2)}</p>
               </div>
               <Zap className="w-8 h-8 text-purple-500" />
             </div>
@@ -3248,9 +3154,7 @@ export default function EnhancedImageMetadata() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Crawled</p>
-                <p className="text-2xl font-bold text-indigo-600">
-                  {stats.crawled}
-                </p>
+                <p className="text-2xl font-bold text-indigo-600">{stats.crawled}</p>
                 <p className="text-xs text-gray-500">External</p>
               </div>
               <Globe className="w-8 h-8 text-indigo-500" />
@@ -3261,9 +3165,7 @@ export default function EnhancedImageMetadata() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Selected</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {selectedImages.length}
-                </p>
+                <p className="text-2xl font-bold text-orange-600">{selectedImages.length}</p>
                 <p className="text-xs text-gray-500">Ready</p>
               </div>
               <CheckCircle className="w-8 h-8 text-orange-500" />
@@ -3274,12 +3176,8 @@ export default function EnhancedImageMetadata() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Broken URLs</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {stats.broken}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {showBrokenImages ? 'Showing' : 'Hidden'}
-                </p>
+                <p className="text-2xl font-bold text-red-600">{stats.broken}</p>
+                <p className="text-xs text-gray-500">{showBrokenImages ? 'Showing' : 'Hidden'}</p>
               </div>
               <AlertTriangle className="w-8 h-8 text-red-500" />
             </div>
@@ -3288,7 +3186,6 @@ export default function EnhancedImageMetadata() {
 
         {/* Tab Navigation - Responsive */}
         <div className="bg-white rounded-t-lg shadow-sm border border-b-0 border-gray-200">
-          {/* Mobile: Dropdown */}
           <div className="block sm:hidden px-4 py-3">
             <select
               value={activeTab}
@@ -3309,14 +3206,11 @@ export default function EnhancedImageMetadata() {
             </select>
           </div>
 
-          {/* Desktop: Tabs */}
           <div className="hidden sm:flex">
             <button
               onClick={() => setActiveTab("existing")}
               className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === "existing"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900"
+                activeTab === "existing" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-600 hover:text-gray-900"
               }`}
             >
               <FileImage className="w-4 h-4 inline mr-2" />
@@ -3326,18 +3220,14 @@ export default function EnhancedImageMetadata() {
               onClick={() => {
                 setActiveTab("crawl");
                 if (selectedWebsite && websites.length > 0) {
-                  const website = websites.find(
-                    (w) => w.id === selectedWebsite
-                  );
+                  const website = websites.find((w) => w.id === selectedWebsite);
                   if (website?.url && !crawlUrl) {
                     setCrawlUrl(website.url);
                   }
                 }
               }}
               className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === "crawl"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900"
+                activeTab === "crawl" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-600 hover:text-gray-900"
               }`}
             >
               <Globe className="w-4 h-4 inline mr-2" />
@@ -3351,12 +3241,9 @@ export default function EnhancedImageMetadata() {
           <div className="bg-white shadow-sm border border-t-0 border-gray-200 mb-6">
             <div className="p-6">
               <h3 className="text-lg font-medium mb-4">Web Image Crawler</h3>
-
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Website URL
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Website URL</label>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="url"
@@ -3389,39 +3276,22 @@ export default function EnhancedImageMetadata() {
                 {crawlProgress && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-blue-900">
-                        Crawling in progress...
-                      </span>
+                      <span className="text-sm font-medium text-blue-900">Crawling in progress...</span>
                     </div>
                     <div className="w-full bg-blue-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full animate-pulse"
-                        style={{
-                          width: "100%",
-                          animation: "slide 2s linear infinite",
-                        }}
-                      />
+                      <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: "100%", animation: "slide 2s linear infinite" }} />
                     </div>
-                    <p className="text-xs text-blue-700 mt-2 truncate">
-                      Scanning: {crawlProgress.currentUrl}
-                    </p>
+                    <p className="text-xs text-blue-700 mt-2 truncate">Scanning: {crawlProgress.currentUrl}</p>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Max Depth
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Depth</label>
                     <input
                       type="number"
                       value={crawlOptions.maxDepth}
-                      onChange={(e) =>
-                        setCrawlOptions({
-                          ...crawlOptions,
-                          maxDepth: parseInt(e.target.value),
-                        })
-                      }
+                      onChange={(e) => setCrawlOptions({ ...crawlOptions, maxDepth: parseInt(e.target.value) })}
                       min="1"
                       max="5"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -3430,18 +3300,11 @@ export default function EnhancedImageMetadata() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Max Images
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Images</label>
                     <input
                       type="number"
                       value={crawlOptions.maxImages}
-                      onChange={(e) =>
-                        setCrawlOptions({
-                          ...crawlOptions,
-                          maxImages: parseInt(e.target.value),
-                        })
-                      }
+                      onChange={(e) => setCrawlOptions({ ...crawlOptions, maxImages: parseInt(e.target.value) })}
                       min="1"
                       max="500"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -3450,18 +3313,11 @@ export default function EnhancedImageMetadata() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Min Width (px)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Width (px)</label>
                     <input
                       type="number"
                       value={crawlOptions.minWidth}
-                      onChange={(e) =>
-                        setCrawlOptions({
-                          ...crawlOptions,
-                          minWidth: parseInt(e.target.value),
-                        })
-                      }
+                      onChange={(e) => setCrawlOptions({ ...crawlOptions, minWidth: parseInt(e.target.value) })}
                       min="0"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       disabled={isCrawling}
@@ -3474,12 +3330,7 @@ export default function EnhancedImageMetadata() {
                     <input
                       type="checkbox"
                       checked={crawlOptions.followExternal}
-                      onChange={(e) =>
-                        setCrawlOptions({
-                          ...crawlOptions,
-                          followExternal: e.target.checked,
-                        })
-                      }
+                      onChange={(e) => setCrawlOptions({ ...crawlOptions, followExternal: e.target.checked })}
                       className="rounded border-gray-300 text-blue-600 mr-2"
                       disabled={isCrawling}
                     />
@@ -3490,12 +3341,7 @@ export default function EnhancedImageMetadata() {
                     <input
                       type="checkbox"
                       checked={crawlOptions.includeSubdomains}
-                      onChange={(e) =>
-                        setCrawlOptions({
-                          ...crawlOptions,
-                          includeSubdomains: e.target.checked,
-                        })
-                      }
+                      onChange={(e) => setCrawlOptions({ ...crawlOptions, includeSubdomains: e.target.checked })}
                       className="rounded border-gray-300 text-blue-600 mr-2"
                       disabled={isCrawling}
                     />
@@ -3522,7 +3368,7 @@ export default function EnhancedImageMetadata() {
           </div>
         )}
 
-        {/* Settings Panel - Truncated for brevity, keeping same structure */}
+        {/* Settings Panel */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <button
             onClick={() => setShowSettings(!showSettings)}
@@ -3533,19 +3379,12 @@ export default function EnhancedImageMetadata() {
               <span className="font-medium">Processing Settings</span>
             </div>
             <svg
-              className={`w-5 h-5 text-gray-400 transition-transform ${
-                showSettings ? "rotate-180" : ""
-              }`}
+              className={`w-5 h-5 text-gray-400 transition-transform ${showSettings ? "rotate-180" : ""}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
 
@@ -3553,37 +3392,359 @@ export default function EnhancedImageMetadata() {
             <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-gray-100">
               <div className="grid grid-cols-1 gap-6 mt-4">
                 {/* Action Selection */}
-                <div className="grid grid-cols-1 gap-4 sm:gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Action
-                    </label>
-                    <select
-                      value={processOptions.action}
-                      onChange={(e) =>
-                        setProcessOptions({
-                          ...processOptions,
-                          action: e.target.value as ProcessOptions["action"],
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="add">Add Metadata</option>
-                      <option value="strip">Strip All Metadata</option>
-                      <option value="update">Update Existing Metadata</option>
-                      <option value="scramble">Scramble Image</option>
-                    </select>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {processOptions.action === "add" && "Add copyright and SEO information"}
-                      {processOptions.action === "strip" && "Remove all metadata from images"}
-                      {processOptions.action === "update" && "Update existing metadata fields"}
-                      {processOptions.action === "scramble" && "Obfuscate image content for privacy"}
-                    </p>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Action</label>
+                  <select
+                    value={processOptions.action}
+                    onChange={(e) => setProcessOptions({ ...processOptions, action: e.target.value as ProcessOptions["action"] })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="add">Add Metadata</option>
+                    <option value="strip">Strip All Metadata</option>
+                    <option value="update">Update Existing Metadata</option>
+                    <option value="scramble">Scramble Image</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {processOptions.action === "add" && "Add copyright and SEO information"}
+                    {processOptions.action === "strip" && "Remove all metadata from images"}
+                    {processOptions.action === "update" && "Update existing metadata fields"}
+                    {processOptions.action === "scramble" && "Obfuscate image content for privacy"}
+                  </p>
                 </div>
 
-                {/* Rest of settings panel - keeping same structure as before */}
-                {/* Note: The full settings panel code is the same as provided earlier */}
+                {/* SEO Optimization Section */}
+                {processOptions.action !== "strip" && processOptions.action !== "scramble" && (
+                  <div className="border-l-4 border-indigo-500 pl-3 sm:pl-6 py-2">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 flex items-center">
+                      🔍 SEO Optimization (Search Engine Visibility)
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Optimize images for search engines. Better descriptions = higher rankings in Google Images!
+                    </p>
+                    
+                    <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Image Description (Alt Text) *
+                          <span className="text-xs text-gray-500 ml-2">Most important for SEO!</span>
+                        </label>
+                        <textarea
+                          value={processOptions.seoDescription}
+                          onChange={(e) => setProcessOptions({ ...processOptions, seoDescription: e.target.value })}
+                          placeholder="Example: Luxury 3-bedroom home with modern kitchen and spacious garden"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                          rows={3}
+                        />
+                        <div className="flex justify-between items-center mt-2">
+                          <span className={`text-sm font-medium ${seoScore.color}`}>{seoScore.text}</span>
+                          <span className="text-xs text-gray-500">
+                            {processOptions.seoDescription?.length || 0}/125 characters (60-125 recommended)
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          💡 Tip: Be descriptive and natural. Include what people might search for.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">SEO Title (Optional)</label>
+                        <input
+                          type="text"
+                          value={processOptions.seoTitle}
+                          onChange={(e) => setProcessOptions({ ...processOptions, seoTitle: e.target.value })}
+                          placeholder="Example: Modern Bervedere Street Home"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Location
+                          <span className="text-xs text-gray-500 ml-2">Helps with local search</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={processOptions.seoLocation}
+                          onChange={(e) => setProcessOptions({ ...processOptions, seoLocation: e.target.value })}
+                          placeholder="Example: Montreal, Quebec"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Keywords (Comma-separated)</label>
+                        <input
+                          type="text"
+                          value={processOptions.seoKeywords}
+                          onChange={(e) => setProcessOptions({ ...processOptions, seoKeywords: e.target.value })}
+                          placeholder="Example: real estate, luxury home, modern architecture"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      {processOptions.seoDescription && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4">
+                          <p className="text-xs font-medium text-gray-700 mb-2">📝 How this will appear in search results:</p>
+                          <div className="bg-white p-3 rounded border border-gray-300">
+                            <div className="text-xs text-gray-500 mb-1">
+                              {processOptions.seoLocation || 'your-website.com'} › images
+                            </div>
+                            <div className="text-sm text-blue-600 mb-1 font-medium">
+                              {processOptions.seoTitle || processOptions.seoDescription}
+                            </div>
+                            <div className="text-xs text-gray-700">
+                              {processOptions.seoDescription}
+                              {processOptions.author && ` - Photo by ${processOptions.author}`}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-2">💡 SEO Best Practices</h4>
+                      <ul className="text-xs text-blue-800 space-y-1">
+                        <li>✅ Write natural descriptions (60-125 characters) that people might search for</li>
+                        <li>✅ Include location for local SEO (e.g., "in Montreal")</li>
+                        <li>✅ Be specific: "3-bedroom luxury home" beats "nice house"</li>
+                        <li>❌ Don't use generic text like "image123" or just "property"</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* EXIF Metadata Section */}
+                {processOptions.action !== "strip" && processOptions.action !== "scramble" && (
+                  <div className="border-l-4 border-purple-500 pl-6 py-2">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center">
+                      © Copyright & Technical Metadata
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      These fields are embedded in the image file's EXIF data
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Copyright</label>
+                        <input
+                          type="text"
+                          value={processOptions.copyright}
+                          onChange={(e) => setProcessOptions({ ...processOptions, copyright: e.target.value })}
+                          placeholder="© 2025 Your Company"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Photographer / Author</label>
+                        <input
+                          type="text"
+                          value={processOptions.author}
+                          onChange={(e) => setProcessOptions({ ...processOptions, author: e.target.value })}
+                          placeholder="Frederic Murray"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Internal Description</label>
+                        <input
+                          type="text"
+                          value={processOptions.imageDescription}
+                          onChange={(e) => setProcessOptions({ ...processOptions, imageDescription: e.target.value })}
+                          placeholder="Property description"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Camera Make</label>
+                        <input
+                          type="text"
+                          value={processOptions.make}
+                          onChange={(e) => setProcessOptions({ ...processOptions, make: e.target.value })}
+                          placeholder="AI Content Manager"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Camera Model</label>
+                        <input
+                          type="text"
+                          value={processOptions.model}
+                          onChange={(e) => setProcessOptions({ ...processOptions, model: e.target.value })}
+                          placeholder="Image Processor v1.0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Software</label>
+                        <input
+                          type="text"
+                          value={processOptions.software}
+                          onChange={(e) => setProcessOptions({ ...processOptions, software: e.target.value })}
+                          placeholder="AI Content Manager - Murray Group"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Host Computer</label>
+                        <input
+                          type="text"
+                          value={processOptions.hostComputer}
+                          onChange={(e) => setProcessOptions({ ...processOptions, hostComputer: e.target.value })}
+                          placeholder="Murray Group Real Estate System"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Scrambling Options */}
+                {processOptions.action === "scramble" && (
+                  <div className="border-l-4 border-orange-500 pl-6 py-2">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">🔀 Image Scrambling Options</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Scramble Type</label>
+                        <select
+                          value={processOptions.scrambleType}
+                          onChange={(e) => setProcessOptions({ ...processOptions, scrambleType: e.target.value as ProcessOptions["scrambleType"] })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        >
+                          <option value="pixel-shift">Pixel Shift</option>
+                          <option value="watermark">Watermark Overlay</option>
+                          <option value="blur-regions">Blur Regions</option>
+                          <option value="color-shift">Color Distortion</option>
+                          <option value="noise">Add Noise</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Intensity (1-100)</label>
+                        <input
+                          type="number"
+                          value={processOptions.scrambleIntensity}
+                          onChange={(e) => setProcessOptions({ ...processOptions, scrambleIntensity: parseInt(e.target.value) })}
+                          min="1"
+                          max="100"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+
+                      {processOptions.scrambleType === "watermark" && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Watermark Text</label>
+                            <input
+                              type="text"
+                              value={processOptions.watermarkText}
+                              onChange={(e) => setProcessOptions({ ...processOptions, watermarkText: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
+                            <select
+                              value={processOptions.watermarkPosition}
+                              onChange={(e) => setProcessOptions({ ...processOptions, watermarkPosition: e.target.value as ProcessOptions["watermarkPosition"] })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            >
+                              <option value="center">Center</option>
+                              <option value="top-left">Top Left</option>
+                              <option value="top-right">Top Right</option>
+                              <option value="bottom-left">Bottom Left</option>
+                              <option value="bottom-right">Bottom Right</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Privacy Options</label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={processOptions.preserveFaces}
+                            onChange={(e) => setProcessOptions({ ...processOptions, preserveFaces: e.target.checked })}
+                            className="rounded border-gray-300 text-orange-600 mr-2"
+                          />
+                          <span className="text-sm">Detect and blur faces</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Image Optimization */}
+                <div className="border-l-4 border-green-500 pl-6 py-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">⚙️ Image Optimization</h3>
+                  
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-4">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={processOptions.removeGPS}
+                          onChange={(e) => setProcessOptions({ ...processOptions, removeGPS: e.target.checked })}
+                          className="rounded border-gray-300 text-green-600 mr-2"
+                        />
+                        <span className="text-sm">Remove GPS Data</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={processOptions.optimize}
+                          onChange={(e) => setProcessOptions({ ...processOptions, optimize: e.target.checked })}
+                          className="rounded border-gray-300 text-green-600 mr-2"
+                        />
+                        <span className="text-sm">Optimize for Web</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={processOptions.keepColorProfile}
+                          onChange={(e) => setProcessOptions({ ...processOptions, keepColorProfile: e.target.checked })}
+                          className="rounded border-gray-300 text-green-600 mr-2"
+                        />
+                        <span className="text-sm">Keep Color Profile</span>
+                      </label>
+                    </div>
+
+                    {processOptions.optimize && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Max Width (px)</label>
+                          <input
+                            type="number"
+                            value={processOptions.maxWidth}
+                            onChange={(e) => setProcessOptions({ ...processOptions, maxWidth: parseInt(e.target.value) })}
+                            min="640"
+                            max="3840"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Quality (1-100)</label>
+                          <input
+                            type="number"
+                            value={processOptions.quality}
+                            onChange={(e) => setProcessOptions({ ...processOptions, quality: parseInt(e.target.value) })}
+                            min="1"
+                            max="100"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -3607,9 +3768,7 @@ export default function EnhancedImageMetadata() {
                       {websites.map((site) => (
                         <option key={site.id} value={site.id}>
                           {site.name}
-                          {site.contentCount
-                            ? ` (${site.contentCount} items)`
-                            : ""}
+                          {site.contentCount ? ` (${site.contentCount} items)` : ""}
                         </option>
                       ))}
                     </>
@@ -3626,15 +3785,9 @@ export default function EnhancedImageMetadata() {
                     className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm"
                   >
                     <option value="all">All Images ({stats.total})</option>
-                    <option value="with-metadata">
-                      With Metadata ({stats.withMetadata})
-                    </option>
-                    <option value="without-metadata">
-                      Without Metadata ({stats.withoutMetadata})
-                    </option>
-                    <option value="ai-generated">
-                      AI Generated ({stats.aiGenerated})
-                    </option>
+                    <option value="with-metadata">With Metadata ({stats.withMetadata})</option>
+                    <option value="without-metadata">Without Metadata ({stats.withoutMetadata})</option>
+                    <option value="ai-generated">AI Generated ({stats.aiGenerated})</option>
                     <option value="crawled">Crawled ({stats.crawled})</option>
                   </select>
                 </div>
@@ -3643,10 +3796,7 @@ export default function EnhancedImageMetadata() {
                   onClick={handleSelectAll}
                   className="px-3 py-1.5 text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
                 >
-                  {selectedImages.length === filteredImages.length &&
-                  filteredImages.length > 0
-                    ? "Deselect All"
-                    : "Select All"}
+                  {selectedImages.length === filteredImages.length && filteredImages.length > 0 ? "Deselect All" : "Select All"}
                 </button>
 
                 {selectedImages.length > 0 && (
@@ -3662,9 +3812,7 @@ export default function EnhancedImageMetadata() {
                   disabled={isLoading}
                   className="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center"
                 >
-                  <RefreshCw
-                    className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
-                  />
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
                 </button>
                 <button
                   onClick={handleBatchProcess}
@@ -3674,13 +3822,7 @@ export default function EnhancedImageMetadata() {
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing{" "}
-                      {
-                        processingStatus.filter(
-                          (s) => s.status === "processing"
-                        ).length
-                      }{" "}
-                      images...
+                      Processing {processingStatus.filter((s) => s.status === "processing").length} images...
                     </>
                   ) : processOptions.action === "scramble" ? (
                     <>
@@ -3729,7 +3871,6 @@ export default function EnhancedImageMetadata() {
 
           {/* Image Grid */}
           <div className="p-6">
-            {/* Broken Images Banner */}
             {!showBrokenImages && stats.broken > 0 && (
               <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
@@ -3757,9 +3898,7 @@ export default function EnhancedImageMetadata() {
             ) : filteredImages.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
                 {filteredImages.map((image) => {
-                  const processingItem = processingStatus.find(
-                    (s) => s.imageId === image.id
-                  );
+                  const processingItem = processingStatus.find((s) => s.imageId === image.id);
                   const isSelected = selectedImages.includes(image.id);
 
                   return (
@@ -3778,9 +3917,7 @@ export default function EnhancedImageMetadata() {
             ) : (
               <div className="flex flex-col items-center justify-center py-16">
                 <Image className="w-12 h-12 text-gray-400 mb-4" />
-                <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
-                  No images found
-                </h3>
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No images found</h3>
                 <p className="text-xs sm:text-sm text-gray-500 text-center max-w-md px-4">
                   {activeTab === "crawl"
                     ? "Start crawling a website to discover images"
@@ -3818,43 +3955,25 @@ export default function EnhancedImageMetadata() {
       {showUrlFixer && urlFixerImage && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
-            <div
-              className="fixed inset-0 bg-gray-500 bg-opacity-75"
-              onClick={() => setShowUrlFixer(false)}
-            ></div>
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowUrlFixer(false)}></div>
             
             <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium">Fix Image URL</h3>
-                <button
-                  onClick={() => setShowUrlFixer(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
+                <button onClick={() => setShowUrlFixer(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-6 h-6" />
                 </button>
               </div>
               
               <div className="space-y-4">
-                {/* Image Info */}
                 <div className="bg-gray-50 p-3 rounded">
-                  <p className="text-sm font-medium text-gray-900 mb-1">
-                    {urlFixerImage.contentTitle}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Website: {urlFixerImage.websiteName}
-                  </p>
-                  {urlFixerImage.source && (
-                    <p className="text-xs text-gray-600">
-                      Source: {urlFixerImage.source}
-                    </p>
-                  )}
+                  <p className="text-sm font-medium text-gray-900 mb-1">{urlFixerImage.contentTitle}</p>
+                  <p className="text-xs text-gray-600">Website: {urlFixerImage.websiteName}</p>
+                  {urlFixerImage.source && <p className="text-xs text-gray-600">Source: {urlFixerImage.source}</p>}
                 </div>
                 
-                {/* Current URL */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Current URL (Broken)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Current URL (Broken)</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -3867,18 +3986,13 @@ export default function EnhancedImageMetadata() {
                   {(() => {
                     const validation = validateImageUrl(urlFixerImage.url || '');
                     return !validation.valid && validation.issue && (
-                      <p className="text-xs text-red-600 mt-1">
-                        Issue: {validation.issue}
-                      </p>
+                      <p className="text-xs text-red-600 mt-1">Issue: {validation.issue}</p>
                     );
                   })()}
                 </div>
                 
-                {/* Fixed URL */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Fixed URL
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fixed URL</label>
                   <input
                     type="text"
                     value={fixedUrl}
@@ -3886,12 +4000,9 @@ export default function EnhancedImageMetadata() {
                     placeholder="Enter the corrected URL"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
-                  <p className="text-xs text-gray-600 mt-1">
-                    Edit the URL above or paste a new one
-                  </p>
+                  <p className="text-xs text-gray-600 mt-1">Edit the URL above or paste a new one</p>
                 </div>
                 
-                {/* Quick Fixes */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm font-medium text-blue-900 mb-2">Quick Fixes:</p>
                   <div className="flex flex-wrap gap-2">
@@ -3910,9 +4021,7 @@ export default function EnhancedImageMetadata() {
                     )}
                     {crawlUrl && (
                       <button
-                        onClick={() => {
-                          setFixedUrl(fixImageUrl(urlFixerImage.url || '', crawlUrl));
-                        }}
+                        onClick={() => setFixedUrl(fixImageUrl(urlFixerImage.url || '', crawlUrl))}
                         className="text-xs px-3 py-1 bg-white border border-blue-300 rounded hover:bg-blue-100"
                       >
                         Use crawl URL
@@ -3932,12 +4041,9 @@ export default function EnhancedImageMetadata() {
                   </div>
                 </div>
                 
-                {/* Preview */}
                 {fixedUrl && fixedUrl !== urlFixerImage.url && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Preview
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Preview</label>
                     <div className="border rounded-lg p-2 bg-gray-50">
                       <img
                         src={fixedUrl}
@@ -3951,7 +4057,6 @@ export default function EnhancedImageMetadata() {
                 )}
               </div>
               
-              {/* Actions */}
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   onClick={() => setShowUrlFixer(false)}
@@ -3976,18 +4081,12 @@ export default function EnhancedImageMetadata() {
       {showBulkFixer && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
-            <div
-              className="fixed inset-0 bg-gray-500 bg-opacity-75"
-              onClick={() => setShowBulkFixer(false)}
-            ></div>
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowBulkFixer(false)}></div>
             
             <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium">Bulk Fix Relative URLs</h3>
-                <button
-                  onClick={() => setShowBulkFixer(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
+                <button onClick={() => setShowBulkFixer(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-6 h-6" />
                 </button>
               </div>
@@ -3998,9 +4097,7 @@ export default function EnhancedImageMetadata() {
                 </p>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Base Domain *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Base Domain *</label>
                   <input
                     type="url"
                     value={bulkFixDomain}
@@ -4014,9 +4111,7 @@ export default function EnhancedImageMetadata() {
                 </div>
                 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Preview:</strong>
-                  </p>
+                  <p className="text-sm text-yellow-800"><strong>Preview:</strong></p>
                   <ul className="text-xs text-yellow-800 mt-2 space-y-1">
                     <li>/images/photo.jpg → {bulkFixDomain || 'https://example.com'}/images/photo.jpg</li>
                     <li>./assets/img.png → {bulkFixDomain || 'https://example.com'}/assets/img.png</li>
