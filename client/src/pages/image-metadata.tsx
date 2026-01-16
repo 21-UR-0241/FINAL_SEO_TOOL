@@ -3844,29 +3844,29 @@ export default function EnhancedImageMetadata() {
                 >
                   <Link className="w-4 h-4 mr-2" />
                   Bulk Fix URLs
-                </button> */}
+                </button>
                 {stats.broken > 0 && (
-                  // <button
-                  //   onClick={() => setShowBrokenImages(!showBrokenImages)}
-                  //   className={`w-full sm:w-auto px-4 py-2 rounded-lg text-xs sm:text-sm font-medium flex items-center justify-center whitespace-nowrap ${
-                  //     showBrokenImages
-                  //       ? 'bg-red-100 text-red-700 border-2 border-red-300 hover:bg-red-200'
-                  //       : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                  //   }`}
-                  // >
-                  //   {showBrokenImages ? (
-                  //     <>
-                  //       <EyeOff className="w-4 h-4 mr-2" />
-                  //       Hide Broken ({stats.broken})
-                  //     </>
-                  //   ) : (
-                  //     <>
-                  //       <Eye className="w-4 h-4 mr-2" />
-                  //       Show Broken ({stats.broken})
-                  //     </>
-                  //   )}
-                  // </button>
-                )}
+                  <button
+                    onClick={() => setShowBrokenImages(!showBrokenImages)}
+                    className={`w-full sm:w-auto px-4 py-2 rounded-lg text-xs sm:text-sm font-medium flex items-center justify-center whitespace-nowrap ${
+                      showBrokenImages
+                        ? 'bg-red-100 text-red-700 border-2 border-red-300 hover:bg-red-200'
+                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {showBrokenImages ? (
+                      <>
+                        <EyeOff className="w-4 h-4 mr-2" />
+                        Hide Broken ({stats.broken})
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-4 h-4 mr-2" />
+                        Show Broken ({stats.broken})
+                      </>
+                    )}
+                  </button>
+                )} */}
               </div>
             </div>
           </div>
