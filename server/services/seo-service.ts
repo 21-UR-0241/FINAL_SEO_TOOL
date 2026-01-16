@@ -2862,7 +2862,7 @@ private async getAIAnalysisResponse(
   if (anthropicResult) {
     try {
       const response = await anthropicResult.client.messages.create({
-        model: "claude-3-5-sonnet-latest",
+        model: "claude-sonnet-4-5-20250929",
         max_tokens: 2000,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,

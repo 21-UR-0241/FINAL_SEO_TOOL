@@ -859,28 +859,72 @@
 //               Manage your account, subscription, integrations, and automation preferences
 //             </p>
 //           </div>
-//           <div className="mt-4 flex gap-2 md:mt-0 md:ml-4">
-//             <Button
-//               variant="outline"
-//               onClick={handleReset}
-//               disabled={resetSettings.isPending}
-//             >
-//               <RotateCcw className="w-4 h-4 mr-2" />
-//               {resetSettings.isPending ? "Resetting..." : "Reset to Defaults"}
-//             </Button>
-//             <Button
-//               onClick={handleSave}
-//               disabled={updateSettings.isPending}
-//               className="bg-primary-500 hover:bg-primary-600"
-//             >
+//               <div className="mt-4 flex flex-col sm:flex-row gap-2 md:mt-0 md:ml-4 w-full sm:w-auto">
+//                 <Button
+//                   variant="outline"
+//                   onClick={handleReset}
+//                   disabled={resetSettings.isPending}
+//                   className="w-full sm:w-auto"
+//                 >
+//                   <RotateCcw className="w-4 h-4 mr-2" />
+//                   <span className="hidden sm:inline">{resetSettings.isPending ? "Resetting..." : "Reset to Defaults"}</span>
+//                   <span className="sm:hidden">{resetSettings.isPending ? "Resetting..." : "Reset"}</span>
+//                 </Button>
+//                 <Button
+//                   onClick={handleSave}
+//                   disabled={updateSettings.isPending}
+//                   className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600"
+//                 >
 //               <Save className="w-4 h-4 mr-2" />
 //               {updateSettings.isPending ? "Saving..." : "Save Changes"}
 //             </Button>
 //           </div>
 //         </div>
 
+//         {/* Mobile: Dropdown Select */}
+//         <div className="md:hidden mb-6">
+//           <Select value={activeTab} onValueChange={setActiveTab}>
+//             <SelectTrigger className="w-full">
+//               <SelectValue />
+//             </SelectTrigger>
+//             <SelectContent>
+//               <SelectItem value="profile">
+//                 <div className="flex items-center">
+//                   <User className="w-4 h-4 mr-2" />
+//                   Profile
+//                 </div>
+//               </SelectItem>
+//               <SelectItem value="subscription">
+//                 <div className="flex items-center">
+//                   <CreditCard className="w-4 h-4 mr-2" />
+//                   Subscription
+//                 </div>
+//               </SelectItem>
+//               <SelectItem value="integrations">
+//                 <div className="flex items-center">
+//                   <Key className="w-4 h-4 mr-2" />
+//                   API Keys
+//                 </div>
+//               </SelectItem>
+//               <SelectItem value="automation">
+//                 <div className="flex items-center">
+//                   <Bot className="w-4 h-4 mr-2" />
+//                   Automation
+//                 </div>
+//               </SelectItem>
+//               <SelectItem value="security">
+//                 <div className="flex items-center">
+//                   <Shield className="w-4 h-4 mr-2" />
+//                   Security
+//                 </div>
+//               </SelectItem>
+//             </SelectContent>
+//           </Select>
+//         </div>
+
+//         {/* Desktop: Traditional Tabs */}
 //         <Tabs value={activeTab} onValueChange={setActiveTab}>
-//           <TabsList className="grid w-full grid-cols-5">
+//           <TabsList className="hidden md:grid w-full grid-cols-5 mb-6">
 //             <TabsTrigger value="profile">Profile</TabsTrigger>
 //             <TabsTrigger value="subscription">Subscription</TabsTrigger>
 //             <TabsTrigger value="integrations">API Keys</TabsTrigger>
@@ -901,9 +945,9 @@
 //                 </CardDescription>
 //               </CardHeader>
 //               <CardContent className="space-y-4">
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div>
-//                     <Label htmlFor="name">Full Name</Label>
+//               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+//                 <div>
+//                   <Label htmlFor="name">Full Name</Label>
 //                     <Input
 //                       id="name"
 //                       value={settings.profile.name}
@@ -1055,13 +1099,13 @@
 //                       You don't have an active subscription. Upgrade to unlock premium
 //                       features.
 //                     </p>
-//                     <Button
-//                       onClick={handleUpgrade}
-//                       className="bg-primary-500 hover:bg-primary-600"
-//                     >
-//                       <TrendingUp className="w-4 h-4 mr-2" />
-//                       View Plans
-//                     </Button>
+//                       <Button
+//                         onClick={handleUpgrade}
+//                         className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600"
+//                       >
+//                         <TrendingUp className="w-4 h-4 mr-2" />
+//                         View Plans
+//                       </Button>
 //                   </div>
 //                 ) : (
 //                   <>
@@ -1108,24 +1152,24 @@
 //                       </div>
 //                     </div>
 
-//                     {/* Actions */}
-//                     <div className="flex gap-3">
-//                       {subscription.planId !== "enterprise" && (
-//                         <Button
-//                           onClick={handleUpgrade}
-//                           className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-//                         >
+//                   {/* Actions */}
+//                   <div className="flex flex-col sm:flex-row gap-3">
+//                     {subscription.planId !== "enterprise" && (
+//                       <Button
+//                         onClick={handleUpgrade}
+//                         className="flex-1 w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+//                       >
 //                           <ArrowUpCircle className="w-4 h-4 mr-2" />
 //                           Upgrade Plan
 //                         </Button>
 //                       )}
-//                       {subscription.cancelAtPeriodEnd ? (
-//                         <Button
-//                           onClick={() => resumeSubscription.mutate()}
-//                           disabled={resumeSubscription.isPending}
-//                           variant="outline"
-//                           className="flex-1"
-//                         >
+//                         {subscription.cancelAtPeriodEnd ? (
+//                           <Button
+//                             onClick={() => resumeSubscription.mutate()}
+//                             disabled={resumeSubscription.isPending}
+//                             variant="outline"
+//                             className="flex-1 w-full sm:w-auto"
+//                           >
 //                           {resumeSubscription.isPending ? (
 //                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
 //                           ) : (
@@ -1133,19 +1177,19 @@
 //                           )}
 //                           Resume Subscription
 //                         </Button>
-//                       ) : (
-//                         <Button
-//                           onClick={() =>
-//                             openDeleteConfirmation(
-//                               "subscription",
-//                               subscription.id,
-//                               subscription.planName,
-//                             )
-//                           }
-//                           disabled={cancelSubscription.isPending}
-//                           variant="outline"
-//                           className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-//                         >
+//                           ) : (
+//                             <Button
+//                               onClick={() =>
+//                                 openDeleteConfirmation(
+//                                   "subscription",
+//                                   subscription.id,
+//                                   subscription.planName,
+//                                 )
+//                               }
+//                               disabled={cancelSubscription.isPending}
+//                               variant="outline"
+//                               className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+//                             >
 //                           <XCircle className="w-4 h-4 mr-2" />
 //                           Cancel Subscription
 //                         </Button>
@@ -1181,16 +1225,17 @@
 //           <TabsContent value="integrations" className="space-y-6">
 //             <Card>
 //               <CardHeader>
-//                 <CardTitle className="flex items-center justify-between">
-//                   <span className="flex items-center">
-//                     <Key className="w-5 h-5 mr-2" />
-//                     Your API Keys
-//                   </span>
-//                   <Button
-//                     size="sm"
-//                     onClick={() => setIsAddingKey(true)}
-//                     disabled={isAddingKey}
-//                   >
+//                   <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+//                     <span className="flex items-center">
+//                       <Key className="w-5 h-5 mr-2" />
+//                       Your API Keys
+//                     </span>
+//                     <Button
+//                       size="sm"
+//                       onClick={() => setIsAddingKey(true)}
+//                       disabled={isAddingKey}
+//                       className="w-full sm:w-auto"
+//                     >
 //                     <Plus className="w-4 h-4 mr-2" />
 //                     Add API Key
 //                   </Button>
@@ -1293,11 +1338,12 @@
 //                           </p>
 //                         )}
 //                       </div>
-//                       <div className="flex items-center space-x-2">
-//                         <Button
-//                           onClick={handleAddApiKey}
-//                           disabled={addApiKey.isPending}
-//                         >
+//                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+//                             <Button
+//                               onClick={handleAddApiKey}
+//                               disabled={addApiKey.isPending}
+//                               className="w-full sm:w-auto"
+//                             >
 //                           {addApiKey.isPending ? (
 //                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
 //                           ) : (
@@ -1305,13 +1351,14 @@
 //                           )}
 //                           {addApiKey.isPending ? "Validating..." : "Add Key"}
 //                         </Button>
-//                         <Button
-//                           variant="outline"
-//                           onClick={() => {
-//                             setIsAddingKey(false);
-//                             setNewKeyForm({ provider: "", keyName: "", apiKey: "" });
-//                           }}
-//                         >
+//                           <Button
+//                             variant="outline"
+//                             onClick={() => {
+//                               setIsAddingKey(false);
+//                               setNewKeyForm({ provider: "", keyName: "", apiKey: "" });
+//                             }}
+//                             className="w-full sm:w-auto"
+//                           >
 //                           Cancel
 //                         </Button>
 //                       </div>
@@ -1322,22 +1369,22 @@
 //                 {/* Existing keys */}
 //                 <div className="space-y-3">
 //                   {userApiKeys?.map((apiKey: UserApiKey) => (
-//                     <div
-//                       key={apiKey.id}
-//                       className="flex items-center justify-between p-4 border rounded-lg"
-//                     >
-//                       <div className="flex items-center space-x-4">
-//                         <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
-//                           {getProviderIcon(apiKey.provider)}
-//                         </div>
-//                         <div>
-//                           <p className="font-medium text-gray-900">
-//                             {Sanitizer.escapeHtml(apiKey.keyName)}
-//                           </p>
-//                           <p className="text-sm text-gray-500">
-//                             {getProviderName(apiKey.provider)}
-//                           </p>
-//                           <p className="text-xs text-gray-400 font-mono">
+//                       <div
+//                         key={apiKey.id}
+//                         className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg gap-4"
+//                       >
+//                         <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
+//                       <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+//                         {getProviderIcon(apiKey.provider)}
+//                       </div>
+//                       <div className="flex-1 min-w-0">
+//                       <p className="font-medium text-gray-900 text-sm sm:text-base break-words">
+//                         {Sanitizer.escapeHtml(apiKey.keyName)}
+//                       </p>
+//                       <p className="text-xs sm:text-sm text-gray-500">
+//                         {getProviderName(apiKey.provider)}
+//                       </p>
+//                       <p className="text-xs text-gray-400 font-mono break-all">
 //                             {apiKey.maskedKey}
 //                           </p>
 //                           {apiKey.lastValidated && (
@@ -1348,34 +1395,36 @@
 //                               ).toLocaleDateString()}
 //                             </p>
 //                           )}
-//                         </div>
-//                       </div>
-//                       <div className="flex items-center space-x-2">
-//                         {getStatusBadge(apiKey.validationStatus, apiKey.provider)}
-//                         <Button
-//                           size="sm"
-//                           variant="outline"
-//                           onClick={() => handleValidateKey(apiKey.id)}
-//                           disabled={validatingKeys.has(apiKey.id)}
-//                         >
+//                             </div>
+//                             </div>
+//                             <div className="flex flex-wrap items-center gap-2 justify-end sm:justify-start">
+//                               {getStatusBadge(apiKey.validationStatus, apiKey.provider)}
+//                               <Button
+//                                 size="sm"
+//                                 variant="outline"
+//                                 onClick={() => handleValidateKey(apiKey.id)}
+//                                 disabled={validatingKeys.has(apiKey.id)}
+//                                 className="touch-manipulation"
+//                               >
 //                           {validatingKeys.has(apiKey.id) ? (
 //                             <Loader2 className="w-3 h-3 animate-spin" />
 //                           ) : (
 //                             <Check className="w-3 h-3" />
 //                           )}
 //                         </Button>
-//                         <Button
-//                           size="sm"
-//                           variant="outline"
-//                           onClick={() =>
-//                             openDeleteConfirmation(
-//                               "apiKey",
-//                               apiKey.id,
-//                               apiKey.keyName,
-//                             )
-//                           }
-//                           disabled={deleteApiKey.isPending}
-//                         >
+//                             <Button
+//                               size="sm"
+//                               variant="outline"
+//                               onClick={() =>
+//                                 openDeleteConfirmation(
+//                                   "apiKey",
+//                                   apiKey.id,
+//                                   apiKey.keyName,
+//                                 )
+//                               }
+//                               disabled={deleteApiKey.isPending}
+//                               className="touch-manipulation"
+//                             >
 //                           <Trash2 className="w-3 h-3" />
 //                         </Button>
 //                       </div>
@@ -1731,16 +1780,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
 // client/src/pages/settings.tsx
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -1766,6 +1805,7 @@ import {
   DollarSign,
   ArrowUpCircle,
   XCircle,
+  Edit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1800,6 +1840,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Sanitizer } from "@/utils/inputSanitizer";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ✅ API base URL (for Render / CORS)
 const API_URL = import.meta.env.VITE_API_URL || "";
@@ -1923,6 +1964,23 @@ interface Subscription {
   amount: number;
 }
 
+// 👇 INSERT HERE
+interface PaymentMethod {
+  id: string;
+  brand: string; // "visa", "mastercard", "amex"
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+}
+
+interface CardUpdateData {
+  cardNumber: string;
+  expMonth: string;
+  expYear: string;
+  cvc: string;
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1951,6 +2009,13 @@ export default function Settings() {
     confirmPassword: "",
   });
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+  const [isEditingCard, setIsEditingCard] = useState(false);
+  const [cardUpdateData, setCardUpdateData] = useState<CardUpdateData>({
+    cardNumber: "",
+    expMonth: "",
+    expYear: "",
+    cvc: "",
+  });
 
   // --- SETTINGS ---
   const {
@@ -2012,6 +2077,26 @@ export default function Settings() {
     },
   });
 
+
+    // --- PAYMENT METHOD ---
+  const {
+    data: paymentMethod,
+    isLoading: paymentMethodLoading,
+  } = useQuery<PaymentMethod | null>({
+    queryKey: ["/api/billing/payment-method"],
+    queryFn: async () => {
+      const response = await apiFetch("/api/billing/payment-method");
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to fetch payment method");
+      }
+      return response.json();
+    },
+    enabled: !!subscription, // Only fetch if user has subscription
+  });
   // --- MUTATIONS ---
 
   // Delete website
@@ -2264,6 +2349,42 @@ export default function Settings() {
     onError: (error: Error) => {
       toast({
         title: "Password Change Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update payment method
+  const updatePaymentMethod = useMutation({
+    mutationFn: async (cardData: CardUpdateData) => {
+      const response = await apiFetch("/api/billing/payment-method", {
+        method: "PUT",
+        body: JSON.stringify(cardData),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to update payment method");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/payment-method"] });
+      toast({
+        title: "Payment Method Updated",
+        description: "Your card has been successfully updated.",
+      });
+      setIsEditingCard(false);
+      setCardUpdateData({
+        cardNumber: "",
+        expMonth: "",
+        expYear: "",
+        cvc: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -2556,6 +2677,63 @@ export default function Settings() {
     setLocation("/subscription");
   };
 
+    const handleUpdateCard = () => {
+    // Validate card data
+    if (!cardUpdateData.cardNumber || !cardUpdateData.expMonth || 
+        !cardUpdateData.expYear || !cardUpdateData.cvc) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all card fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Basic validation
+    const cardNumber = cardUpdateData.cardNumber.replace(/\s/g, "");
+    if (cardNumber.length < 13 || cardNumber.length > 19) {
+      toast({
+        title: "Invalid Card Number",
+        description: "Please enter a valid card number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (parseInt(cardUpdateData.expMonth) < 1 || parseInt(cardUpdateData.expMonth) > 12) {
+      toast({
+        title: "Invalid Expiry Month",
+        description: "Month must be between 01 and 12.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (cardUpdateData.cvc.length < 3 || cardUpdateData.cvc.length > 4) {
+      toast({
+        title: "Invalid CVC",
+        description: "CVC must be 3 or 4 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updatePaymentMethod.mutate(cardUpdateData);
+  };
+
+  const getCardBrandIcon = (brand: string) => {
+    switch (brand.toLowerCase()) {
+      case "visa":
+        return "💳";
+      case "mastercard":
+        return "💳";
+      case "amex":
+        return "💳";
+      default:
+        return "💳";
+    }
+  };
+
   // --- LOADING / ERROR STATES ---
 
   if (settingsLoading) {
@@ -2813,6 +2991,9 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
+
+
+
           </TabsContent>
 
           {/* SUBSCRIPTION */}
@@ -2961,6 +3142,74 @@ export default function Settings() {
                 )}
               </CardContent>
             </Card>
+
+                        {/* 👇 INSERT HERE - Payment Method Card */}
+            {subscription && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center">
+                      <CreditCard className="w-5 h-5 mr-2" />
+                      Payment Method
+                    </span>
+<Button
+  size="sm"
+  variant="outline"
+  onClick={() => {
+    // Pre-fill form with existing card details
+    if (paymentMethod) {
+      setCardUpdateData({
+        cardNumber: "", // We don't have the full number, keep empty
+        expMonth: paymentMethod.expMonth.toString().padStart(2, '0'),
+        expYear: paymentMethod.expYear.toString().slice(-2), // Last 2 digits
+        cvc: "", // Security - don't pre-fill CVC
+      });
+    }
+    setIsEditingCard(true);
+  }}
+  className="flex items-center"
+>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Update Card
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your payment method for subscription billing
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {paymentMethodLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      <span className="text-sm">Loading payment method...</span>
+                    </div>
+                  ) : paymentMethod ? (
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="text-3xl">{getCardBrandIcon(paymentMethod.brand)}</div>
+                        <div>
+                          <p className="font-medium text-gray-900 capitalize">
+                            {paymentMethod.brand} •••• {paymentMethod.last4}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Expires {paymentMethod.expMonth.toString().padStart(2, '0')}/{paymentMethod.expYear}
+                          </p>
+                        </div>
+                      </div>
+                      {paymentMethod.isDefault && (
+                        <Badge className="bg-blue-100 text-blue-800">Default</Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-sm">No payment method on file</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+
           </TabsContent>
 
           {/* INTEGRATIONS (API Keys) */}
@@ -3516,6 +3765,134 @@ export default function Settings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+{/* Edit Card Dialog */}
+<Dialog open={isEditingCard} onOpenChange={setIsEditingCard}>
+  <DialogContent className="sm:max-w-md">
+    <DialogHeader>
+      <DialogTitle className="flex items-center">
+        <CreditCard className="w-5 h-5 mr-2" />
+        Update Payment Method
+      </DialogTitle>
+      <DialogDescription>
+        Enter your new card details. Your card will be charged on the next billing cycle.
+      </DialogDescription>
+    </DialogHeader>
+    <div className="space-y-4 py-4">
+      {/* Current Card Info */}
+      {paymentMethod && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+          <p className="text-xs font-medium text-gray-700 mb-1">Current Card</p>
+          <div className="flex items-center text-sm text-gray-600">
+            <span className="capitalize">{paymentMethod.brand}</span>
+            <span className="mx-2">••••</span>
+            <span>{paymentMethod.last4}</span>
+            <span className="mx-2">|</span>
+            <span>Exp: {paymentMethod.expMonth.toString().padStart(2, '0')}/{paymentMethod.expYear}</span>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <Label htmlFor="cardNumber">Card Number</Label>
+        <Input
+          id="cardNumber"
+          placeholder=""
+          value={cardUpdateData.cardNumber}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, "").substring(0, 19);
+            const formatted = value.match(/.{1,4}/g)?.join(" ") || value;
+            setCardUpdateData((prev) => ({ ...prev, cardNumber: formatted }));
+          }}
+          maxLength={19}
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Enter the full 16-digit card number
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="expMonth">Month</Label>
+          <Input
+            id="expMonth"
+            placeholder="MM"
+            value={cardUpdateData.expMonth}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, "").substring(0, 2);
+              setCardUpdateData((prev) => ({ ...prev, expMonth: value }));
+            }}
+            maxLength={2}
+          />
+        </div>
+        <div>
+          <Label htmlFor="expYear">Year</Label>
+          <Input
+            id="expYear"
+            placeholder="YY"
+            value={cardUpdateData.expYear}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, "").substring(0, 2);
+              setCardUpdateData((prev) => ({ ...prev, expYear: value }));
+            }}
+            maxLength={2}
+          />
+        </div>
+        <div>
+          <Label htmlFor="cvc">CVC</Label>
+          <Input
+            id="cvc"
+            type="password"
+            placeholder=""
+            value={cardUpdateData.cvc}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, "").substring(0, 4);
+              setCardUpdateData((prev) => ({ ...prev, cvc: value }));
+            }}
+            maxLength={4}
+          />
+        </div>
+      </div>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <p className="text-xs text-blue-800">
+          🔒 Your card information is encrypted and secure. We use industry-standard security measures.
+        </p>
+      </div>
+    </div>
+    <DialogFooter className="flex-col sm:flex-row gap-2">
+      <Button
+        variant="outline"
+        onClick={() => {
+          setIsEditingCard(false);
+          setCardUpdateData({
+            cardNumber: "",
+            expMonth: "",
+            expYear: "",
+            cvc: "",
+          });
+        }}
+        className="w-full sm:w-auto"
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={handleUpdateCard}
+        disabled={updatePaymentMethod.isPending}
+        className="w-full sm:w-auto"
+      >
+        {updatePaymentMethod.isPending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Updating...
+          </>
+        ) : (
+          <>
+            <Check className="w-4 h-4 mr-2" />
+            Update Card
+          </>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
     </div>
   );
 }
