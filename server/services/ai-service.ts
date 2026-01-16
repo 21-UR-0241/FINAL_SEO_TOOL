@@ -412,6 +412,15 @@ export class ContentFormatter {
 }
 
 export class AIService {
+
+    private readonly WORD_COUNT_CONFIG = {
+    ABSOLUTE_MINIMUM: 800,
+    MINIMUM_MULTIPLIER: 1.0,
+    TARGET_MULTIPLIER: 1.35,
+    MAX_RETRY_ATTEMPTS: 3,
+    STRICT_ENFORCEMENT: true,
+    CLOSE_ENOUGH_THRESHOLD: 0.95,
+  };
   // Cache for API keys to avoid repeated database queries
   private apiKeyCache: Map<string, { key: string; type: 'user' | 'system'; timestamp: number }> = new Map();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -1986,6 +1995,9 @@ private buildSystemPrompt(
   const languageCode = language.toUpperCase();
   const languageName = this.getLanguageName(language);
 
+  // Calculate word count requirements using config
+  const wordCounts = this.calculateWordCountRequirements(request.wordCount);
+
   // Language enforcement map (used for both custom and system prompts)
   const languageEnforcementMap: Record<string, string> = {
     french: `COMMANDEMENT LINGUISTIQUE ABSOLU:
@@ -2083,21 +2095,26 @@ Toàn bộ câu trả lời của bạn sẽ bằng tiếng Việt.`,
 
   const languageEnforcement = languageEnforcementMap[language] || "";
 
-  // Calculate minimum word count (never less than 800)
-  const minimumWords = Math.max(800, Math.ceil(request.wordCount * 0.95));
-  const targetWords = Math.max(1200, request.wordCount);
-
   // ✅ CUSTOM PROMPT MODE: If user provided their own prompt, use it
   if (request.promptType === "custom" && request.customPrompt && request.customPrompt.trim()) {
     console.log(`🎯 Using CUSTOM PROMPT for content generation in ${languageCode}`);
     
     return `${languageEnforcement}
 
-⚠️ CRITICAL WORD COUNT REQUIREMENT ⚠️
-MINIMUM WORD COUNT: ${minimumWords} WORDS (ABSOLUTE MINIMUM - NOT NEGOTIABLE)
-TARGET WORD COUNT: ${targetWords} WORDS
-This is a STRICT requirement. Content under ${minimumWords} words will be REJECTED.
+🚨🚨🚨 MANDATORY WORD COUNT - READ THIS FIRST 🚨🚨🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ABSOLUTE MINIMUM: ${wordCounts.absoluteMinimum} WORDS (NEVER GO BELOW)
+REQUIRED TARGET: ${wordCounts.requiredMinimum} WORDS (MUST HIT THIS)
+SAFE TARGET: ${wordCounts.targetWords} WORDS (AIM FOR THIS - GUARANTEED SUCCESS!)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+⚠️ WORD COUNT STRATEGY - IMPORTANT:
+- Don't aim for just ${wordCounts.requiredMinimum} - that's the bare minimum!
+- Aim for ${wordCounts.targetWords}+ words to GUARANTEE acceptance
+- Use the structure template below - it gets you ${wordCounts.targetWords}+ words naturally
+- Better to write ${wordCounts.targetWords + 200} than risk being at ${wordCounts.requiredMinimum}
+
+${this.buildContentStructureGuidance(wordCounts.targetWords, retryAttempt + 1)}
 ⚠️ CUSTOM PROMPT MODE ⚠️
 OUTPUT LANGUAGE: ${languageCode} (${languageName})
 ${languagePrompt}
@@ -2108,12 +2125,76 @@ ${request.customPrompt.trim()}
 === ADDITIONAL CONTEXT ===
 Topic: ${request.topic}
 Keywords: ${request.keywords.join(", ")}
-MINIMUM Word Count: ${minimumWords} words (STRICT MINIMUM - write MORE if needed)
-TARGET Word Count: ${targetWords} words
+Absolute Minimum: ${wordCounts.absoluteMinimum} words
+Required Minimum: ${wordCounts.requiredMinimum} words
+SAFE TARGET: ${wordCounts.targetWords} words (AIM FOR THIS!)
+Close Enough: ${wordCounts.closeEnoughThreshold} words (90% threshold)
+Maximum: ${wordCounts.maximumWords} words (don't exceed)
 Tone: ${request.tone}
 ${request.brandVoice ? `Brand Voice: ${request.brandVoice}` : ""}
 ${request.targetAudience ? `Target Audience: ${request.targetAudience}` : ""}
 ${request.niche ? `Niche: ${getNicheContext(request.niche).label}` : ""}
+
+=== HOW TO WRITE ${wordCounts.targetWords}+ WORDS EASILY ===
+
+PROVEN STRUCTURE (gets you ${wordCounts.targetWords}+ words):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Introduction (200-250 words)
+   - Hook with interesting opening
+   - Preview main points
+   - Set context and relevance
+
+2. Background/Context (150-200 words)
+   - Historical perspective
+   - Current situation
+   - Why this matters now
+
+3. Main Content - 3-5 Sections (each 150-200 words = 450-1000 words total)
+   Section A: First major point with examples
+   Section B: Second major point with examples
+   Section C: Third major point with examples
+   Section D: Fourth major point (optional)
+   Section E: Fifth major point (optional)
+
+4. Practical Examples (150-200 words)
+   - Real-world applications
+   - Specific case studies
+   - Concrete illustrations
+
+5. How-To/Implementation (150-200 words)
+   - Step-by-step guidance
+   - Actionable advice
+   - Practical tips
+
+6. Comparison/Analysis (100-150 words - optional)
+   - Compare different approaches
+   - Pros and cons
+   - Trade-offs
+
+7. Common Questions/FAQs (100-150 words - optional)
+   - Address typical concerns
+   - Clarify misconceptions
+   - Additional insights
+
+8. Conclusion (150-200 words)
+   - Summarize key takeaways
+   - Final recommendations
+   - Call to action or next steps
+
+TOTAL FROM STRUCTURE: ${wordCounts.targetWords}+ words EASILY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EXPANSION TECHNIQUES (if you need more words):
+✓ Add 2-3 specific examples per major point
+✓ Include real data, statistics, or figures
+✓ Explain the "why" behind each concept
+✓ Add historical or future context
+✓ Include expert perspectives or quotes
+✓ Discuss benefits AND limitations
+✓ Add implementation challenges and solutions
+✓ Include regional or industry variations
+✓ Add "what not to do" warnings
+✓ Discuss trends and future outlook
 
 === CONTENT DEPTH REQUIREMENTS ===
 Your content MUST be comprehensive and detailed:
@@ -2123,14 +2204,14 @@ Your content MUST be comprehensive and detailed:
 - Include relevant background and context
 - Address common questions and concerns
 - Provide detailed explanations for each point
-- If you finish and are under ${minimumWords} words, ADD MORE VALUABLE SECTIONS
+- If you finish and are under ${wordCounts.targetWords} words, ADD MORE VALUABLE SECTIONS
 - NEVER sacrifice quality for length, but ALWAYS meet the minimum
 
 === RESPONSE FORMAT - MUST BE VALID JSON ===
 You MUST respond with a valid JSON object in this exact format:
 {
   "title": "Article title in ${languageCode} (under 60 characters)",
-  "content": "Full HTML article in ${languageCode} (MINIMUM ${minimumWords} words - aim for ${targetWords}+ words)",
+  "content": "Full HTML article in ${languageCode} (AIM FOR ${wordCounts.targetWords}+ words to be safe)",
   "excerpt": "Summary in ${languageCode} (150-160 characters)",
   "metaDescription": "Meta description in ${languageCode} (150-160 characters)",
   "metaTitle": "SEO title in ${languageCode} (under 60 characters)",
@@ -2139,8 +2220,8 @@ You MUST respond with a valid JSON object in this exact format:
 
 CRITICAL INSTRUCTIONS - READ CAREFULLY:
 1. WRITE EVERYTHING IN ${languageCode} ONLY - NO EXCEPTIONS
-2. MINIMUM ${minimumWords} WORDS IN CONTENT FIELD - THIS IS NON-NEGOTIABLE
-3. TARGET ${targetWords}+ WORDS FOR COMPREHENSIVE COVERAGE
+2. AIM FOR ${wordCounts.targetWords}+ WORDS (not just ${wordCounts.requiredMinimum})
+3. MINIMUM ${wordCounts.requiredMinimum} WORDS IN CONTENT FIELD
 4. EVERY SINGLE WORD MUST BE IN ${languageCode}
 5. NO ENGLISH WORDS ANYWHERE IN THE CONTENT
 6. NO LANGUAGE MIXING
@@ -2149,15 +2230,22 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
 9. Use HTML tags for formatting: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>
 10. Do NOT include metadata like "Created:", "Niche:", "Keywords:" in the content field
 11. Return ONLY valid JSON, nothing before or after
-12. Write COMPREHENSIVE, IN-DEPTH content - if you're under ${minimumWords} words, you haven't covered the topic thoroughly enough
+12. Write COMPREHENSIVE, IN-DEPTH content
 
-WORD COUNT ENFORCEMENT:
-- Before finishing, count your words
-- If under ${minimumWords} words, add more valuable sections
-- If at ${minimumWords}-${targetWords} words, consider adding more depth
-- Comprehensive coverage naturally requires ${targetWords}+ words
+🎯 FINAL CHECK BEFORE SUBMITTING:
+☐ Counted words - at least ${wordCounts.requiredMinimum}?
+☐ Aimed for ${wordCounts.targetWords}+ to be safe?
+☐ All content in ${languageCode} only?
+☐ Followed custom instructions?
+☐ Used HTML formatting?
+☐ Included all required sections?
+☐ Added specific examples and details?
 
-START WRITING IN ${languageCode} - MINIMUM ${minimumWords} WORDS:`;
+WORD COUNT TARGET: ${wordCounts.targetWords}+ WORDS (be safe!)
+MINIMUM ACCEPTED: ${wordCounts.requiredMinimum} WORDS (absolute minimum)
+CLOSE ENOUGH: ${wordCounts.closeEnoughThreshold}+ WORDS (90% threshold)
+
+🚀 START WRITING ${wordCounts.targetWords}+ WORDS IN ${languageCode} NOW:`;
   }
 
   // ✅ SYSTEM PROMPT MODE: Use the default conversational prompt
@@ -2167,11 +2255,18 @@ START WRITING IN ${languageCode} - MINIMUM ${minimumWords} WORDS:`;
 
   return `${languageEnforcement}
 
-⚠️ CRITICAL WORD COUNT REQUIREMENT ⚠️
-MINIMUM WORD COUNT: ${minimumWords} WORDS (ABSOLUTE MINIMUM - NOT NEGOTIABLE)
-TARGET WORD COUNT: ${targetWords} WORDS
-This is a STRICT requirement. Content under ${minimumWords} words will be REJECTED.
-Count your words as you write. If you're finishing and haven't reached ${minimumWords} words, KEEP WRITING.
+🚨🚨🚨 CRITICAL WORD COUNT REQUIREMENTS 🚨🚨🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ABSOLUTE MINIMUM: ${wordCounts.absoluteMinimum} WORDS (NEVER GO BELOW)
+REQUIRED MINIMUM: ${wordCounts.requiredMinimum} WORDS (TARGET THIS)
+SWEET SPOT TARGET: ${wordCounts.targetWords} WORDS (AIM FOR THIS - SAFE!)
+CLOSE ENOUGH THRESHOLD: ${wordCounts.closeEnoughThreshold} WORDS (90% acceptance)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ WORD COUNT STRATEGY ⚠️
+Write ${wordCounts.targetWords}+ words to be SAFE
+Aim HIGH - better to have ${wordCounts.targetWords}+ than risk being short
+Close to ${wordCounts.requiredMinimum} might be accepted, but ${wordCounts.targetWords}+ is GUARANTEED
 
 ⚠️ ABSOLUTE LANGUAGE REQUIREMENT ⚠️
 OUTPUT LANGUAGE: ${languageCode} (${languageName})
@@ -2179,22 +2274,74 @@ ${languagePrompt}
 
 ${conversationalPrompt}
 
-=== CONTENT DEPTH REQUIREMENTS ===
-Your content MUST be comprehensive and detailed (this naturally requires ${minimumWords}+ words):
-- Start with context and background (150-200 words)
-- Include multiple examples and real use cases (200-250 words)
-- Explain concepts thoroughly with supporting details (250-300 words)
-- Add practical advice and actionable steps (150-200 words)
-- Include relevant background and context throughout
-- Address common questions and concerns (100-150 words)
-- Provide detailed explanations for each major point
-- Add a substantial conclusion with key takeaways (100-150 words)
-- If you're under ${minimumWords} words, you haven't covered the topic thoroughly enough
+=== HOW TO REACH ${wordCounts.targetWords}+ WORDS ===
 
-CRITICAL INSTRUCTIONS:
-1. WRITE EVERYTHING IN ${languageCode} ONLY
-2. MINIMUM ${minimumWords} WORDS - COUNT AS YOU WRITE
-3. TARGET ${targetWords}+ WORDS FOR BEST COVERAGE
+PROVEN STRUCTURE (gets you ${wordCounts.targetWords}+ words naturally):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Engaging Introduction (200-250 words)
+   - Hook reader with compelling opening
+   - Preview what they'll learn
+   - Explain relevance
+
+2. Context & Background (150-200 words)
+   - Historical perspective
+   - Current state
+   - Why it matters
+
+3. Main Point 1 with examples (150-200 words)
+   - Detailed explanation
+   - Specific examples
+   - Real-world application
+
+4. Main Point 2 with examples (150-200 words)
+   - In-depth coverage
+   - Use cases
+   - Practical insights
+
+5. Main Point 3 with examples (150-200 words)
+   - Comprehensive details
+   - Concrete illustrations
+   - Supporting evidence
+
+6. Main Point 4 (optional, 150-200 words)
+   - Additional perspective
+   - More examples
+   - Further elaboration
+
+7. Practical Application (150-200 words)
+   - How-to guidance
+   - Step-by-step advice
+   - Implementation tips
+
+8. Common Questions/Concerns (100-150 words)
+   - Address FAQs
+   - Clarify misconceptions
+   - Additional context
+
+9. Conclusion & Takeaways (150-200 words)
+   - Summarize key points
+   - Final recommendations
+   - Next steps
+
+TOTAL: ${wordCounts.targetWords}+ WORDS NATURALLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+=== CONTENT DEPTH REQUIREMENTS ===
+Your content MUST be comprehensive and detailed (this naturally requires ${wordCounts.targetWords}+ words):
+- Start with context and background (200+ words)
+- Include multiple examples and real use cases (300+ words total)
+- Explain concepts thoroughly with supporting details (400+ words)
+- Add practical advice and actionable steps (200+ words)
+- Include relevant background and context throughout
+- Address common questions and concerns (100+ words)
+- Provide detailed explanations for each major point
+- Add a substantial conclusion with key takeaways (150+ words)
+- If you're under ${wordCounts.targetWords} words, you haven't covered the topic thoroughly enough
+
+CRITICAL WRITING GUIDELINES:
+1. WRITE EVERYTHING IN ${languageCode} ONLY - NO EXCEPTIONS
+2. AIM FOR ${wordCounts.targetWords}+ WORDS (not just ${wordCounts.requiredMinimum})
+3. MINIMUM ${wordCounts.requiredMinimum} WORDS - COUNT AS YOU WRITE
 4. EVERY SINGLE WORD MUST BE IN ${languageCode}
 5. NO ENGLISH WORDS ANYWHERE
 6. NO LANGUAGE MIXING
@@ -2203,25 +2350,301 @@ CRITICAL INSTRUCTIONS:
 9. If a term doesn't exist in ${language}, describe it fully in ${language}
 10. Write COMPREHENSIVE content - short content means you haven't explained enough
 
+EXPANSION TACTICS TO REACH ${wordCounts.targetWords}+ WORDS:
+✓ Add 2-3 specific examples per major section
+✓ Explain "why" not just "what"
+✓ Include real numbers, data, timeframes
+✓ Discuss benefits AND drawbacks
+✓ Add historical context when relevant
+✓ Include step-by-step guidance
+✓ Address common misconceptions
+✓ Provide practical tips and advice
+✓ Add real-world case studies
+✓ Include expert perspectives
+✓ Discuss future trends or implications
+
 === RESPONSE FORMAT - MUST BE VALID JSON ===
 {
   "title": "Article title in ${languageCode}",
-  "content": "Full HTML article in ${languageCode} with conversational voice (MINIMUM ${minimumWords} words, target ${targetWords}+ words)",
+  "content": "Full HTML article in ${languageCode} with conversational voice (AIM FOR ${wordCounts.targetWords}+ words)",
   "excerpt": "Summary in ${languageCode}",
   "metaDescription": "Meta description in ${languageCode}",
   "metaTitle": "SEO title in ${languageCode}",
   "keywords": ["keyword_in_${languageCode}", "keyword_in_${languageCode}"]
 }
 
-WORD COUNT CHECKPOINT:
-✅ Introduction and context: ~200 words
-✅ Main sections with examples: ~400-600 words
-✅ Practical applications: ~200 words
-✅ Conclusion and takeaways: ~150 words
-TOTAL: ${minimumWords}+ words MINIMUM
+🎯 PRE-SUBMISSION CHECKLIST:
+☐ At least ${wordCounts.requiredMinimum} words (preferably ${wordCounts.targetWords}+)?
+☐ All content in ${languageCode}?
+☐ Conversational yet comprehensive?
+☐ Included multiple examples and details?
+☐ Proper HTML formatting?
+☐ Each major section 150-200 words minimum?
+☐ Added practical advice and actionable steps?
 
-START WRITING COMPREHENSIVE CONTENT IN ${languageCode} - ${minimumWords} WORDS MINIMUM:`;
+WORD COUNT CHECKPOINT:
+✅ Introduction and context: ~200-250 words
+✅ Main sections (3-5 sections): ~450-1000 words
+✅ Practical applications: ~150-200 words
+✅ Examples and case studies: ~150-200 words
+✅ Conclusion and takeaways: ~150-200 words
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TOTAL: ${wordCounts.targetWords}+ WORDS MINIMUM (AIM FOR THIS!)
+
+TARGET: ${wordCounts.targetWords}+ WORDS (SAFE)
+REQUIRED: ${wordCounts.requiredMinimum}+ WORDS (MINIMUM)
+CLOSE ENOUGH: ${wordCounts.closeEnoughThreshold}+ WORDS (90% threshold)
+
+🚀 START WRITING COMPREHENSIVE ${languageCode} CONTENT - AIM FOR ${wordCounts.targetWords}+ WORDS:`;
 }
+
+// private buildSystemPrompt(
+//   request: ContentGenerationRequest,
+//   language: string,
+//   languagePrompt: string
+// ): string {
+  
+//   const languageCode = language.toUpperCase();
+//   const languageName = this.getLanguageName(language);
+
+//   // Language enforcement map (used for both custom and system prompts)
+//   const languageEnforcementMap: Record<string, string> = {
+//     french: `COMMANDEMENT LINGUISTIQUE ABSOLU:
+// Vous DEVEZ écrire en français et UNIQUEMENT en français.
+// Chaque mot, chaque phrase, chaque paragraphe DOIT être en français.
+// Il est INTERDIT d'utiliser l'anglais ou toute autre langue.
+// Si vous ne connaissez pas un mot en français, décrivez-le en français.
+// Votre réponse COMPLÈTE sera en français.`,
+//     spanish: `MANDATO LINGÜÍSTICO ABSOLUTO:
+// Debes escribir en español y SOLO en español.
+// Cada palabra, cada oración, cada párrafo DEBE estar en español.
+// Está PROHIBIDO usar inglés u otros idiomas.
+// Si no conoces una palabra en español, descríbela en español.
+// Tu respuesta COMPLETA será en español.`,
+//     german: `ABSOLUTES SPRACHGEBOT:
+// Sie MÜSSEN auf Deutsch schreiben und NUR auf Deutsch.
+// Jedes Wort, jeder Satz, jeder Absatz MUSS auf Deutsch sein.
+// Es ist VERBOTEN, Englisch oder andere Sprachen zu verwenden.
+// Wenn Sie ein Wort nicht auf Deutsch kennen, beschreiben Sie es auf Deutsch.
+// Ihre GESAMTE Antwort wird auf Deutsch sein.`,
+//     italian: `MANDATO LINGUISTICO ASSOLUTO:
+// Devi scrivere in italiano e SOLO in italiano.
+// Ogni parola, ogni frase, ogni paragrafo DEVE essere in italiano.
+// È VIETATO usare l'inglese o altre lingue.
+// Se non conosci una parola in italiano, descrivila in italiano.
+// La tua risposta COMPLETA sarà in italiano.`,
+//     portuguese: `MANDATO LINGUÍSTICO ABSOLUTO:
+// Você DEVE escrever em português e SOMENTE em português.
+// Cada palavra, cada frase, cada parágrafo DEVE estar em português.
+// É PROIBIDO usar inglês ou outros idiomas.
+// Se não conhecer uma palavra em português, descreva-a em português.
+// Sua resposta COMPLETA será em português.`,
+//     russian: `АБСОЛЮТНОЕ ЯЗЫКОВОЕ ТРЕБОВАНИЕ:
+// Вы ДОЛЖНЫ писать на русском и ТОЛЬКО на русском.
+// Каждое слово, каждое предложение, каждый абзац ДОЛЖНЫ быть на русском.
+// ЗАПРЕЩЕНО использовать английский или другие языки.
+// Если вы не знаете слово по-русски, опишите его по-русски.
+// Ваш ПОЛНЫЙ ответ будет на русском.`,
+//     japanese: `絶対的な言語要件:
+// あなたは日本語で書く必要があります。日本語のみです。
+// すべての単語、すべての文、すべての段落は日本語である必要があります。
+// 英語または他の言語を使用することは禁止されています。
+// 日本語で知らない単語がある場合は、日本語で説明してください。
+// あなたの完全な応答は日本語になります。`,
+//     chinese: `绝对语言要求:
+// 你必须用中文写作,仅用中文。
+// 每个单词、每个句子、每个段落都必须是中文。
+// 禁止使用英文或其他语言。
+// 如果你不知道一个中文词汇,用中文描述它。
+// 你的完整答复将是中文。`,
+//     korean: `절대적 언어 요구사항:
+// 한국어로 작성해야 합니다. 한국어만 사용합니다.
+// 모든 단어, 모든 문장, 모든 단락은 한국어여야 합니다.
+// 영어 또는 다른 언어 사용은 금지됩니다.
+// 한국어로 모르는 단어가 있으면 한국어로 설명하세요.
+// 완전한 답변은 한국어입니다.`,
+//     dutch: `ABSOLUUT TAALCOMMANDEMENT:
+// Je MOET in het Nederlands schrijven en ALLEEN in het Nederlands.
+// Elk woord, elke zin, elke alinea MOET in het Nederlands zijn.
+// Het is VERBODEN Engels of andere talen te gebruiken.
+// Als je een woord niet in het Nederlands kent, beschrijf het dan in het Nederlands.
+// Je COMPLETE antwoord wordt in het Nederlands.`,
+//     swedish: `ABSOLUT SPRÅKKRAV:
+// Du MÅSTE skriva på svenska och ENDAST på svenska.
+// Varje ord, varje mening, varje stycke MÅSTE vara på svenska.
+// Det är FÖRBJUDET att använda engelska eller andra språk.
+// Om du inte kan ett ord på svenska, beskriv det på svenska.
+// Ditt KOMPLETTA svar kommer att vara på svenska.`,
+//     polish: `ABSOLUTNE WYMAGANIE JĘZYKA:
+// Musisz pisać po polsku i TYLKO po polsku.
+// Każde słowo, każde zdanie, każdy akapit MUSI być po polsku.
+// ZABRANIA się używania angielskiego lub innych języków.
+// Jeśli nie znasz słowa po polsku, opisz je po polsku.
+// Twoja CAŁA odpowiedź będzie po polsku.`,
+//     turkish: `MUTLAK DİL GEREKSİNİMİ:
+// Türkçe yazmalısın ve SADECE Türkçe.
+// Her kelime, her cümle, her paragraf Türkçe OLMALIDIR.
+// İngilizce veya diğer diller YASAKLANMIŞTIR.
+// Türkçe bilmediğin bir kelime varsa, onu Türkçe olarak tanımla.
+// Tüm cevabın Türkçe olması gerekir.`,
+//     thai: `ข้อกำหนดภาษาที่ขาดไม่ได้:
+// คุณต้องเขียนเป็นภาษาไทยและภาษาไทยเท่านั้น
+// ทุกคำ ทุกประโยค ทุกย่อหน้าต้องเป็นภาษาไทย
+// ห้ามใช้ภาษาอังกฤษหรือภาษาอื่น
+// หากคุณไม่รู้คำว่าไทย ให้อธิบายเป็นภาษาไทย
+// คำตอบทั้งหมดของคุณต้องเป็นภาษาไทย`,
+//     vietnamese: `YÊU CẦU NGÔN NGỮ TUYỆT ĐỐI:
+// Bạn PHẢI viết bằng tiếng Việt và CHỈ tiếng Việt.
+// Mỗi từ, mỗi câu, mỗi đoạn phải bằng tiếng Việt.
+// KHÔNG ĐƯỢC phép dùng tiếng Anh hoặc ngôn ngữ khác.
+// Nếu không biết một từ tiếng Việt, hãy mô tả nó bằng tiếng Việt.
+// Toàn bộ câu trả lời của bạn sẽ bằng tiếng Việt.`,
+//     english: "",
+//   };
+
+//   const languageEnforcement = languageEnforcementMap[language] || "";
+
+//   // Calculate minimum word count (never less than 800)
+//   const minimumWords = Math.max(800, Math.ceil(request.wordCount * 0.95));
+//   const targetWords = Math.max(1200, request.wordCount);
+
+//   // ✅ CUSTOM PROMPT MODE: If user provided their own prompt, use it
+//   if (request.promptType === "custom" && request.customPrompt && request.customPrompt.trim()) {
+//     console.log(`🎯 Using CUSTOM PROMPT for content generation in ${languageCode}`);
+    
+//     return `${languageEnforcement}
+
+// ⚠️ CRITICAL WORD COUNT REQUIREMENT ⚠️
+// ABSOLUTE MINIMUM: ${wordCounts.absoluteMinimum} WORDS (NEVER GO BELOW)
+// REQUIRED MINIMUM: ${wordCounts.requiredMinimum} WORDS (TARGET THIS)
+// TARGET WORD COUNT: ${wordCounts.targetWords} WORDS (AIM FOR THIS - SAFE!)
+// CLOSE ENOUGH: ${wordCounts.closeEnoughThreshold}+ WORDS (90% threshold)
+// Note: Aim for ${wordCounts.targetWords}+ words to be safe!
+
+// ⚠️ CUSTOM PROMPT MODE ⚠️
+// OUTPUT LANGUAGE: ${languageCode} (${languageName})
+// ${languagePrompt}
+
+// === USER'S CUSTOM INSTRUCTIONS ===
+// ${request.customPrompt.trim()}
+
+// === ADDITIONAL CONTEXT ===
+// Topic: ${request.topic}
+// Keywords: ${request.keywords.join(", ")}
+// MINIMUM Word Count: ${minimumWords} words (STRICT MINIMUM - write MORE if needed)
+// TARGET Word Count: ${targetWords} words
+// Tone: ${request.tone}
+// ${request.brandVoice ? `Brand Voice: ${request.brandVoice}` : ""}
+// ${request.targetAudience ? `Target Audience: ${request.targetAudience}` : ""}
+// ${request.niche ? `Niche: ${getNicheContext(request.niche).label}` : ""}
+
+// === CONTENT DEPTH REQUIREMENTS ===
+// Your content MUST be comprehensive and detailed:
+// - Include multiple examples and use cases
+// - Explain concepts thoroughly - don't rush
+// - Add practical advice and actionable steps
+// - Include relevant background and context
+// - Address common questions and concerns
+// - Provide detailed explanations for each point
+// - If you finish and are under ${minimumWords} words, ADD MORE VALUABLE SECTIONS
+// - NEVER sacrifice quality for length, but ALWAYS meet the minimum
+
+// === RESPONSE FORMAT - MUST BE VALID JSON ===
+// You MUST respond with a valid JSON object in this exact format:
+// {
+//   "title": "Article title in ${languageCode} (under 60 characters)",
+//   "content": "Full HTML article in ${languageCode} (MINIMUM ${minimumWords} words - aim for ${targetWords}+ words)",
+//   "excerpt": "Summary in ${languageCode} (150-160 characters)",
+//   "metaDescription": "Meta description in ${languageCode} (150-160 characters)",
+//   "metaTitle": "SEO title in ${languageCode} (under 60 characters)",
+//   "keywords": ["keyword_in_${languageCode}", "keyword_in_${languageCode}", "keyword_in_${languageCode}"]
+// }
+
+// CRITICAL INSTRUCTIONS - READ CAREFULLY:
+// 1. WRITE EVERYTHING IN ${languageCode} ONLY - NO EXCEPTIONS
+// 2. MINIMUM ${minimumWords} WORDS IN CONTENT FIELD - THIS IS NON-NEGOTIABLE
+// 3. TARGET ${targetWords}+ WORDS FOR COMPREHENSIVE COVERAGE
+// 4. EVERY SINGLE WORD MUST BE IN ${languageCode}
+// 5. NO ENGLISH WORDS ANYWHERE IN THE CONTENT
+// 6. NO LANGUAGE MIXING
+// 7. NO SECTION HEADERS IN ENGLISH
+// 8. Follow the user's custom instructions above
+// 9. Use HTML tags for formatting: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>
+// 10. Do NOT include metadata like "Created:", "Niche:", "Keywords:" in the content field
+// 11. Return ONLY valid JSON, nothing before or after
+// 12. Write COMPREHENSIVE, IN-DEPTH content - if you're under ${minimumWords} words, you haven't covered the topic thoroughly enough
+
+// WORD COUNT ENFORCEMENT:
+// - Before finishing, count your words
+// - If under ${minimumWords} words, add more valuable sections
+// - If at ${minimumWords}-${targetWords} words, consider adding more depth
+// - Comprehensive coverage naturally requires ${targetWords}+ words
+
+// START WRITING IN ${languageCode} - MINIMUM ${minimumWords} WORDS:`;
+//   }
+
+//   // ✅ SYSTEM PROMPT MODE: Use the default conversational prompt
+//   console.log(`🤖 Using SYSTEM PROMPT for content generation in ${languageCode}`);
+  
+//   const conversationalPrompt = this.CONVERSATIONAL_SYSTEM_PROMPT.replace('{TOPIC}', request.topic);
+
+//   return `${languageEnforcement}
+
+// ⚠️ CRITICAL WORD COUNT REQUIREMENT ⚠️
+// MINIMUM WORD COUNT: ${minimumWords} WORDS (ABSOLUTE MINIMUM - NOT NEGOTIABLE)
+// TARGET WORD COUNT: ${targetWords} WORDS
+// This is a STRICT requirement. Content under ${minimumWords} words will be REJECTED.
+// Count your words as you write. If you're finishing and haven't reached ${minimumWords} words, KEEP WRITING.
+
+// ⚠️ ABSOLUTE LANGUAGE REQUIREMENT ⚠️
+// OUTPUT LANGUAGE: ${languageCode} (${languageName})
+// ${languagePrompt}
+
+// ${conversationalPrompt}
+
+// === CONTENT DEPTH REQUIREMENTS ===
+// Your content MUST be comprehensive and detailed (this naturally requires ${minimumWords}+ words):
+// - Start with context and background (150-200 words)
+// - Include multiple examples and real use cases (200-250 words)
+// - Explain concepts thoroughly with supporting details (250-300 words)
+// - Add practical advice and actionable steps (150-200 words)
+// - Include relevant background and context throughout
+// - Address common questions and concerns (100-150 words)
+// - Provide detailed explanations for each major point
+// - Add a substantial conclusion with key takeaways (100-150 words)
+// - If you're under ${minimumWords} words, you haven't covered the topic thoroughly enough
+
+// CRITICAL INSTRUCTIONS:
+// 1. WRITE EVERYTHING IN ${languageCode} ONLY
+// 2. MINIMUM ${minimumWords} WORDS - COUNT AS YOU WRITE
+// 3. TARGET ${targetWords}+ WORDS FOR BEST COVERAGE
+// 4. EVERY SINGLE WORD MUST BE IN ${languageCode}
+// 5. NO ENGLISH WORDS ANYWHERE
+// 6. NO LANGUAGE MIXING
+// 7. NO SECTION HEADERS IN ENGLISH
+// 8. Use the conversational voice style defined above in ${languageCode}
+// 9. If a term doesn't exist in ${language}, describe it fully in ${language}
+// 10. Write COMPREHENSIVE content - short content means you haven't explained enough
+
+// === RESPONSE FORMAT - MUST BE VALID JSON ===
+// {
+//   "title": "Article title in ${languageCode}",
+//   "content": "Full HTML article in ${languageCode} with conversational voice (MINIMUM ${minimumWords} words, target ${targetWords}+ words)",
+//   "excerpt": "Summary in ${languageCode}",
+//   "metaDescription": "Meta description in ${languageCode}",
+//   "metaTitle": "SEO title in ${languageCode}",
+//   "keywords": ["keyword_in_${languageCode}", "keyword_in_${languageCode}"]
+// }
+
+// WORD COUNT CHECKPOINT:
+// ✅ Introduction and context: ~200 words
+// ✅ Main sections with examples: ~400-600 words
+// ✅ Practical applications: ~200 words
+// ✅ Conclusion and takeaways: ~150 words
+// TOTAL: ${minimumWords}+ words MINIMUM
+
+// START WRITING COMPREHENSIVE CONTENT IN ${languageCode} - ${minimumWords} WORDS MINIMUM:`;
+// }
 
 
   private getLanguageName(language: string): string {
@@ -2313,10 +2736,12 @@ private buildContentPrompt(request: ContentGenerationRequest): string {
   const language = this.lastLanguage || "english";
   const languageCode = language.toUpperCase();
 
-  // Calculate strict minimums
-  const absoluteMinimum = 800;
-  const requestedMinimum = Math.max(absoluteMinimum, Math.ceil(request.wordCount * 0.95));
-  const targetWords = Math.max(1200, request.wordCount);
+  // // Calculate strict minimums
+  // const absoluteMinimum = 800;
+  // const requestedMinimum = Math.max(absoluteMinimum, Math.ceil(request.wordCount * 0.95));
+  // const targetWords = Math.max(1200, request.wordCount);
+  // Calculate word count requirements using config
+  const wordCounts = this.calculateWordCountRequirements(request.wordCount);
 
   const languageWarnings: Record<string, string> = {
     french: "Écrivez UNIQUEMENT en français. Pas un mot en anglais.",
@@ -2351,15 +2776,15 @@ ${languageWarnings[language] || ""}`
   let prompt = `${languageWarning}
 
 🚨 CRITICAL WORD COUNT REQUIREMENT 🚨
-ABSOLUTE MINIMUM: ${absoluteMinimum} words
-REQUIRED MINIMUM: ${requestedMinimum} words
-TARGET: ${targetWords}+ words
-⚠️ Content under ${requestedMinimum} words will be considered INCOMPLETE and REJECTED
+ABSOLUTE MINIMUM: ${wordCounts.absoluteMinimum} words
+REQUIRED MINIMUM: ${wordCounts.requiredMinimum} words
+TARGET: ${wordCounts.targetWords}}+ words
+⚠️ Content under ${wordCounts.absoluteMinimum} words will be considered INCOMPLETE and REJECTED
 
 LANGUAGE: ${languageCode}
 Article Topic: "${request.topic}"
 
-Word Count Breakdown (to reach ${requestedMinimum}+ words):
+Word Count Breakdown (to reach $${wordCounts.absoluteMinimum}}+ words):
   • Introduction (150-200 words): Context, hook, overview
   • Main Content (500-700 words): 3-5 major sections with examples
   • Supporting Details (200-300 words): Use cases, comparisons, data
@@ -2378,7 +2803,7 @@ ${contextSection}${brandVoiceSection}${audienceSection}${industryContext}
 - NO metadata boxes or admin information
 - Content starts directly with article content
 
-WRITING PRINCIPLES FOR COMPREHENSIVE ${requestedMinimum}+ WORD CONTENT:
+WRITING PRINCIPLES FOR COMPREHENSIVE ${wordCounts.requiredMinimum}+ WORD CONTENT:
 
 Voice:
 - Write like you know this topic inside-out
@@ -2387,7 +2812,7 @@ Voice:
 - Show personality while staying credible
 - Explain thoroughly - rushing means insufficient word count
 
-Structure (to achieve ${requestedMinimum}+ words):
+Structure (to achieve ${wordCounts.requiredMinimum}+ words):
 - Comprehensive introduction setting context (150-200 words)
 - Multiple detailed sections with subheadings (each section 150-250 words)
 - Include examples, case studies, or scenarios in each major section
@@ -2397,7 +2822,7 @@ Structure (to achieve ${requestedMinimum}+ words):
 - Provide actionable takeaways
 - Write a substantive conclusion (100-150 words minimum)
 
-Content Depth (CRITICAL for reaching ${requestedMinimum}+ words):
+Content Depth (CRITICAL for reaching ${wordCounts.requiredMinimum}}+ words):
 - Explain the "why" behind concepts, not just the "what"
 - Include background information and context
 - Add specific examples with details
@@ -2440,7 +2865,7 @@ Each major section should be 150-250 words minimum.
 JSON OUTPUT STRUCTURE:
 {
   "title": "Clear title under 60 chars with main keyword",
-  "content": "Full HTML article MINIMUM ${requestedMinimum} words (target ${targetWords}+ words) - comprehensive, detailed, thoroughly explained - NO metadata, NO 'Created:', NO 'Niche:', NO 'Keywords:' labels",
+  "content": "Full HTML article MINIMUM ${wordCounts.requiredMinimum} words (target ${wordCounts.targetWords}}+ words) - comprehensive, detailed, thoroughly explained - NO metadata, NO 'Created:', NO 'Niche:', NO 'Keywords:' labels",
   "excerpt": "150-160 character summary for the excerpt field (not in content)",
   "metaDescription": "150-160 char meta description for SEO",
   "metaTitle": "SEO title under 60 characters",
@@ -2449,17 +2874,45 @@ JSON OUTPUT STRUCTURE:
 
 ⚠️ FINAL WORD COUNT CHECK BEFORE SUBMITTING:
 - Count the words in your content field
-- If less than ${requestedMinimum} words: ADD MORE VALUABLE SECTIONS
-- If ${requestedMinimum}-${targetWords} words: Consider adding more depth
-- Aim for ${targetWords}+ words for truly comprehensive coverage
+- If less than ${wordCounts.requiredMinimum} words: ADD MORE VALUABLE SECTIONS
+- If ${wordCounts.requiredMinimum}-${wordCounts.targetWords} words: Consider adding more depth
+- Aim for ${wordCounts.targetWords}+ words for truly comprehensive coverage
 
-IMPORTANT: The "content" field must contain ONLY the article HTML with MINIMUM ${requestedMinimum} words. All metadata goes in separate JSON fields.
+IMPORTANT: The "content" field must contain ONLY the article HTML with MINIMUM ${wordCounts.requiredMinimum} words. All metadata goes in separate JSON fields.
 
-Write comprehensive, detailed content that naturally reaches ${requestedMinimum}+ words${request.niche && nicheContext ? ` for the ${nicheContext.label} niche` : ''}.`;
+Write comprehensive, detailed content that naturally reaches ${wordCounts.requiredMinimum}+ words${request.niche && nicheContext ? ` for the ${nicheContext.label} niche` : ''}.`;
 
   return prompt;
 }
 
+
+private calculateWordCountRequirements(requestedWords: number): {
+  absoluteMinimum: number;
+  requiredMinimum: number;
+  targetWords: number;
+  maximumWords: number;
+  closeEnoughThreshold: number;
+} {
+  const absoluteMinimum = this.WORD_COUNT_CONFIG.ABSOLUTE_MINIMUM;
+  const requiredMinimum = Math.max(
+    absoluteMinimum,
+    Math.ceil(requestedWords * this.WORD_COUNT_CONFIG.MINIMUM_MULTIPLIER)
+  );
+  const targetWords = Math.max(
+    requiredMinimum * 1.2,
+    Math.ceil(requestedWords * this.WORD_COUNT_CONFIG.TARGET_MULTIPLIER)
+  );
+  const maximumWords = Math.ceil(requestedWords * 2.0);
+  const closeEnoughThreshold = Math.ceil(requiredMinimum * this.WORD_COUNT_CONFIG.CLOSE_ENOUGH_THRESHOLD);
+  
+  return {
+    absoluteMinimum,
+    requiredMinimum,
+    targetWords,
+    maximumWords,
+    closeEnoughThreshold,
+  };
+}
 
 /**
  * Count words in HTML content
@@ -2477,20 +2930,311 @@ private countWordsInHtml(html: string): number {
 /**
  * Validate word count and log warning if insufficient
  */
-private validateWordCount(content: string, minimumRequired: number, topic: string): { valid: boolean; actualCount: number } {
+
+/**
+ * Validate word count with flexible threshold
+ */
+// private validateWordCount(
+//   content: string, 
+//   minimumRequired: number, 
+//   topic: string,
+//   closeEnoughThreshold: number
+// ): { 
+//   valid: boolean; 
+//   actualCount: number; 
+//   shortfall: number;
+//   closeEnough: boolean;
+//   percentageOfRequirement: number;
+// } {
+//   const wordCount = this.countWordsInHtml(content);
+//   const shortfall = Math.max(0, minimumRequired - wordCount);
+//   const percentageOfRequirement = (wordCount / minimumRequired) * 100;
+//   const closeEnough = wordCount >= closeEnoughThreshold;
+  
+//   if (wordCount < minimumRequired) {
+//     if (closeEnough) {
+//       console.warn(`⚠️ CLOSE TO REQUIREMENT - ACCEPTING`);
+//       console.warn(`   Topic: "${topic}"`);
+//       console.warn(`   Actual: ${wordCount} words`);
+//       console.warn(`   Required: ${minimumRequired} words`);
+//       console.warn(`   Close Enough Threshold: ${closeEnoughThreshold} words`);
+//       console.warn(`   Shortfall: ${shortfall} words (${percentageOfRequirement.toFixed(1)}% of requirement)`);
+//       console.warn(`   Status: ✅ ACCEPTING - meets ${this.WORD_COUNT_CONFIG.CLOSE_ENOUGH_THRESHOLD * 100}% threshold`);
+//     } else {
+//       console.warn(`❌ WORD COUNT VALIDATION FAILED`);
+//       console.warn(`   Topic: "${topic}"`);
+//       console.warn(`   Actual: ${wordCount} words`);
+//       console.warn(`   Required: ${minimumRequired} words`);
+//       console.warn(`   Close Enough Threshold: ${closeEnoughThreshold} words`);
+//       console.warn(`   Shortfall: ${shortfall} words (${percentageOfRequirement.toFixed(1)}%)`);
+//     }
+//     return { 
+//       valid: closeEnough, 
+//       actualCount: wordCount, 
+//       shortfall,
+//       closeEnough,
+//       percentageOfRequirement
+//     };
+//   }
+  
+//   console.log(`✅ ✅ ✅ WORD COUNT VALIDATION PASSED ✅ ✅ ✅`);
+//   console.log(`   Topic: "${topic}"`);
+//   console.log(`   Actual: ${wordCount} words`);
+//   console.log(`   Required: ${minimumRequired} words`);
+//   console.log(`   Percentage: ${percentageOfRequirement.toFixed(1)}% of requirement`);
+//   console.log(`   Surplus: ${wordCount - minimumRequired} extra words`);
+  
+//   return { 
+//     valid: true, 
+//     actualCount: wordCount, 
+//     shortfall: 0,
+//     closeEnough: true,
+//     percentageOfRequirement
+//   };
+// }
+
+/**
+ * Validate word count with flexible threshold
+ * FIND & REPLACE: "validateWordCount"
+ */
+private validateWordCount(
+  content: string, 
+  minimumRequired: number, 
+  topic: string,
+  closeEnoughThreshold: number
+): { 
+  valid: boolean; 
+  actualCount: number; 
+  shortfall: number;
+  closeEnough: boolean;
+  percentageOfRequirement: number;
+} {
   const wordCount = this.countWordsInHtml(content);
+  const shortfall = Math.max(0, minimumRequired - wordCount);
+  const percentageOfRequirement = (wordCount / minimumRequired) * 100;
+  const closeEnough = wordCount >= closeEnoughThreshold;
   
   if (wordCount < minimumRequired) {
-    console.warn(`⚠️ WARNING: Generated content has only ${wordCount} words (minimum: ${minimumRequired}) for topic: "${topic}"`);
-    console.warn(`   This is ${minimumRequired - wordCount} words SHORT of the minimum requirement`);
-    console.warn(`   Content may need to be regenerated for better depth`);
-    return { valid: false, actualCount: wordCount };
+    if (closeEnough) {
+      console.warn(`⚠️ CLOSE TO REQUIREMENT - ACCEPTING`);
+      console.warn(`   Topic: "${topic}"`);
+      console.warn(`   Actual: ${wordCount} words`);
+      console.warn(`   Required: ${minimumRequired} words`);
+      console.warn(`   Close Enough Threshold: ${closeEnoughThreshold} words`);
+      console.warn(`   Shortfall: ${shortfall} words (${percentageOfRequirement.toFixed(1)}% of requirement)`);
+      console.warn(`   Status: ✅ ACCEPTING - meets ${this.WORD_COUNT_CONFIG.CLOSE_ENOUGH_THRESHOLD * 100}% threshold`);
+    } else {
+      console.warn(`❌ WORD COUNT VALIDATION FAILED`);
+      console.warn(`   Topic: "${topic}"`);
+      console.warn(`   Actual: ${wordCount} words`);
+      console.warn(`   Required: ${minimumRequired} words`);
+      console.warn(`   Close Enough Threshold: ${closeEnoughThreshold} words`);
+      console.warn(`   Shortfall: ${shortfall} words (${percentageOfRequirement.toFixed(1)}%)`);
+    }
+    return { 
+      valid: closeEnough, 
+      actualCount: wordCount, 
+      shortfall,
+      closeEnough,
+      percentageOfRequirement
+    };
   }
   
-  console.log(`✅ Word count check passed: ${wordCount} words (minimum: ${minimumRequired})`);
-  return { valid: true, actualCount: wordCount };
+  console.log(`✅ ✅ ✅ WORD COUNT VALIDATION PASSED ✅ ✅ ✅`);
+  console.log(`   Topic: "${topic}"`);
+  console.log(`   Actual: ${wordCount} words`);
+  console.log(`   Required: ${minimumRequired} words`);
+  console.log(`   Percentage: ${percentageOfRequirement.toFixed(1)}% of requirement`);
+  console.log(`   Surplus: ${wordCount - minimumRequired} extra words`);
+  
+  return { 
+    valid: true, 
+    actualCount: wordCount, 
+    shortfall: 0,
+    closeEnough: true,
+    percentageOfRequirement
+  };
 }
 
+/**
+ * Build structured outline that naturally leads to target word count
+ */
+private buildContentStructureGuidance(targetWords: number, attempt: number = 1): string {
+  const intro = Math.ceil(targetWords * 0.15);
+  const mainContent = Math.ceil(targetWords * 0.55);
+  const perSection = Math.ceil(mainContent / 4);
+  const examples = Math.ceil(targetWords * 0.15);
+  const conclusion = Math.ceil(targetWords * 0.15);
+  
+  return `
+═══════════════════════════════════════════════════════
+📐 CONTENT STRUCTURE TO REACH ${targetWords}+ WORDS:
+═══════════════════════════════════════════════════════
+
+Follow this structure and you'll EASILY hit ${targetWords}+ words:
+
+1. INTRODUCTION (${intro} words minimum)
+   • Hook with interesting fact/question (30-50 words)
+   • Preview what reader will learn (40-60 words)
+   • Explain why this matters (40-60 words)
+   • Set context for topic (30-50 words)
+   Target: ${intro} words
+
+2. BACKGROUND/CONTEXT (${Math.ceil(targetWords * 0.10)} words)
+   • Historical perspective or origin
+   • Current state of affairs
+   • Why this is relevant now
+   Target: ${Math.ceil(targetWords * 0.10)} words
+
+3. MAIN CONTENT - 4 SECTIONS (${perSection} words EACH)
+   
+   Section A (${perSection} words):
+   • Main point with detailed explanation (60-80 words)
+   • 2-3 specific examples with details (60-80 words)
+   • Benefits and advantages (30-50 words)
+   • Common use cases (20-30 words)
+   
+   Section B (${perSection} words):
+   • Second major point with explanation
+   • Step-by-step breakdown
+   • Real-world applications  
+   • Data or statistics
+   
+   Section C (${perSection} words):
+   • Third major point
+   • Comparison or contrast
+   • Expert insights
+   • Best practices
+   
+   Section D (${perSection} words):
+   • Fourth major point
+   • Implementation guidance
+   • Common challenges/solutions
+   • Advanced considerations
+
+4. PRACTICAL EXAMPLES (${examples} words)
+   • Case study #1 with details (${Math.ceil(examples / 2)} words)
+   • Case study #2 with details (${Math.ceil(examples / 2)} words)
+   • Include: real numbers, timeframes, results
+
+5. CONCLUSION (${conclusion} words)
+   • Summarize 3-5 key takeaways (60-80 words)
+   • Actionable next steps (40-60 words)
+   • Future outlook (30-40 words)
+   • Final recommendation (20-30 words)
+
+═══════════════════════════════════════════════════════
+TOTAL FROM STRUCTURE: ${intro + mainContent + examples + conclusion}+ words
+═══════════════════════════════════════════════════════
+
+${attempt > 1 ? `
+🚨 THIS IS RETRY ${attempt} - YOUR PREVIOUS ATTEMPT WAS TOO SHORT!
+You MUST follow this structure completely.
+Don't skip sections. Don't cut corners.
+Each section MUST hit its word count target.
+` : ''}
+
+✅ BEFORE SUBMITTING, CHECK:
+   □ Introduction has ${intro}+ words?
+   □ Each main section has ${perSection}+ words?
+   □ Examples section has ${examples}+ words?
+   □ Conclusion has ${conclusion}+ words?
+   □ Total is ${targetWords}+ words?
+
+If ANY checkbox is ✗, ADD MORE to that section!
+`;
+}
+
+// ADD THIS NEW METHOD after `buildContentStructureGuidance`:
+
+/**
+ * Generate specific expansion instructions based on shortfall
+ */
+private generateExpansionInstructions(
+  previousWords: number, 
+  targetWords: number, 
+  attempt: number
+): string {
+  const shortfall = targetWords - previousWords;
+  const percentShort = previousWords > 0 ? ((shortfall / targetWords) * 100) : 100;
+  
+  if (attempt === 1 || previousWords === 0) {
+    return ''; // First attempt - no expansion needed
+  }
+  
+  return `
+🔴🔴🔴 RETRY ${attempt} - YOUR LAST ATTEMPT WAS TOO SHORT 🔴🔴🔴
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 PREVIOUS ATTEMPT ANALYSIS:
+   Words written: ${previousWords}
+   Words needed: ${targetWords}
+   Shortfall: ${shortfall} words (${percentShort.toFixed(1)}% short)
+
+❌ WHAT WENT WRONG:
+You didn't write enough content. The structure wasn't followed completely.
+
+✅ HOW TO FIX IT THIS TIME:
+1. Follow the COMPLETE structure template above
+2. Write ${Math.ceil(targetWords / 5)}+ words for EACH major section
+3. Add 2-3 detailed examples to EVERY section (not just one!)
+4. Explain the "WHY" behind concepts, not just "WHAT"
+5. Include specific numbers, statistics, data points
+6. Add step-by-step guidance or how-to instructions
+7. Don't rush through sections - be thorough
+
+🎯 SPECIFIC ADDITIONS NEEDED (to make up ${shortfall} words):
+${shortfall > 400 ? `
+   • Add 100+ words to introduction (more context and background)
+   • Add 100+ words to EACH main section (more examples and details)
+   • Add a new "Common Questions" section (100-150 words)
+   • Add a new "Best Practices" section (100-150 words)
+   • Expand conclusion with more actionable takeaways (100+ words)
+` : shortfall > 200 ? `
+   • Add 50+ words to EACH main section (more examples)
+   • Add a "Practical Tips" or "Common Mistakes" section (100+ words)
+   • Expand conclusion with specific action steps (50+ words)
+` : `
+   • Add one more detailed example to each section (30-40 words each)
+   • Expand conclusion with final recommendations (50+ words)
+`}
+
+⚠️ COUNT AS YOU WRITE:
+After writing each section, mentally estimate words:
+- Introduction done: ~${Math.ceil(targetWords * 0.15)} words ✓
+- Section 1 done: ~${Math.ceil(targetWords * 0.14)} words ✓
+- Section 2 done: ~${Math.ceil(targetWords * 0.14)} words ✓
+- Continue until ${targetWords}+ total!
+
+🔴 THIS IS ATTEMPT ${attempt}/${this.WORD_COUNT_CONFIG.MAX_RETRY_ATTEMPTS}
+${attempt === this.WORD_COUNT_CONFIG.MAX_RETRY_ATTEMPTS ? 
+`⚠️⚠️⚠️ THIS IS YOUR FINAL CHANCE - MUST HIT ${targetWords}+ WORDS! ⚠️⚠️⚠️` : 
+`You have ${this.WORD_COUNT_CONFIG.MAX_RETRY_ATTEMPTS - attempt + 1} attempts left.`}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+}
+
+// private validateWordCount(content: string, minimumRequired: number, topic: string): { valid: boolean; actualCount: number } {
+//   const wordCount = this.countWordsInHtml(content);
+  
+//   if (wordCount < minimumRequired) {
+//     console.warn(`⚠️ WARNING: Generated content has only ${wordCount} words (minimum: ${minimumRequired}) for topic: "${topic}"`);
+//     console.warn(`   This is ${minimumRequired - wordCount} words SHORT of the minimum requirement`);
+//     console.warn(`   Content may need to be regenerated for better depth`);
+//     return { valid: false, actualCount: wordCount };
+//   }
+  
+//   console.log(`✅ Word count check passed: ${wordCount} words (minimum: ${minimumRequired})`);
+//   return { valid: true, actualCount: wordCount };
+// }
+
+
+
+// ====================================================================
+// UPDATED generateContent METHOD with WORD COUNT FIXES
+// ====================================================================
+// Replace your existing generateContent method with this version
 
 async generateContent(
   request: ContentGenerationRequest
@@ -2518,6 +3262,15 @@ async generateContent(
 
     this.lastLanguage = language;
     this.lastRequestTopic = request.topic;
+
+    // Calculate word count requirements using config
+    const wordCounts = this.calculateWordCountRequirements(request.wordCount);
+    console.log(`📊 Word Count Requirements:`, {
+      absoluteMinimum: wordCounts.absoluteMinimum,
+      requiredMinimum: wordCounts.requiredMinimum,
+      targetWords: wordCounts.targetWords,
+      closeEnoughThreshold: wordCounts.closeEnoughThreshold,
+    });
 
     // Log content type
     if (request.websiteId) {
@@ -2555,124 +3308,308 @@ async generateContent(
       });
     }
 
-    // STEP 2: Generate content
+    // STEP 2: Generate content with RETRY LOGIC
     const languagePrompt = this.getLanguagePrompt(language);
     const systemPrompt = this.buildSystemPrompt(request, language, languagePrompt);
 
-    // ✅ CUSTOM PROMPT HANDLING: Use different user prompts based on mode
-    let userPrompt: string;
-    if (request.promptType === "custom" && request.customPrompt && request.customPrompt.trim()) {
-      // For custom prompts, use a minimal user message
-      // All instructions are already in the system prompt
-      userPrompt = `Generate the content based on the custom instructions and context provided in the system prompt above. 
+    let contentResponse;
+    let contentResult: any = null;
+    let retryAttempt = 0;
+    const maxRetries = this.WORD_COUNT_CONFIG.MAX_RETRY_ATTEMPTS;
+    
+    // ✅ FIX: Track previous word count OUTSIDE the loop
+    let previousWordCount = 0;
 
-Important reminders:
-- Write in ${language.toUpperCase()} only
-- Output valid JSON in the exact format specified
-- Follow all the custom instructions provided
-- Include all required fields: title, content, excerpt, metaDescription, metaTitle, keywords
-- MINIMUM ${Math.max(800, Math.ceil(request.wordCount * 0.95))} words in the content field
+    // 🔄 RETRY LOOP FOR WORD COUNT
+    while (retryAttempt <= maxRetries && !contentResult) {
+      if (retryAttempt > 0) {
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.log(`🔄 RETRY ${retryAttempt}/${maxRetries} - Previous content was too short`);
+        console.log(`   Previous attempt: ${previousWordCount} words`);
+        console.log(`   Required minimum: ${wordCounts.requiredMinimum} words`);
+        console.log(`   You were SHORT by: ${Math.max(0, wordCounts.requiredMinimum - previousWordCount)} words`);
+        console.log(`   This attempt MUST have: ${wordCounts.targetWords}+ words`);
+        
+        // ✅ NEW: Increase target for progressive retries
+        if (retryAttempt === 2) {
+          wordCounts.targetWords = Math.ceil(wordCounts.targetWords * 1.05); // +5% more
+          console.log(`   📈 Increasing target to ${wordCounts.targetWords} words for retry 2`);
+        } else if (retryAttempt === 3) {
+          wordCounts.targetWords = Math.ceil(wordCounts.targetWords * 1.1); // +10% more  
+          console.log(`   📈 Increasing target to ${wordCounts.targetWords} words for FINAL retry`);
+        }
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      }
 
-Begin generation now.`;
-      
-      console.log(`📝 Using CUSTOM PROMPT with simplified user message`);
-    } else {
-      // For system prompts, use the detailed content prompt
-      userPrompt = this.buildContentPrompt(request);
-      console.log(`📝 Using SYSTEM PROMPT with detailed content instructions`);
-    }
+      // Determine user prompt based on mode
+      let userPrompt: string;
+      if (request.promptType === "custom" && request.customPrompt && request.customPrompt.trim()) {
+        // ✅ IMPROVED: Add expansion instructions for custom prompts
+        const expansionInstructions = retryAttempt > 0 ? 
+          this.generateExpansionInstructions(previousWordCount, wordCounts.targetWords, retryAttempt + 1) : '';
+        
+        userPrompt = `${expansionInstructions}
 
-    console.log(`📝 System Prompt Language Enforcement: ${language.toUpperCase()}`);
-    console.log(`📝 User Prompt Language Code: ${language.toUpperCase()}`);
-    console.log(`📝 ${request.promptType === "custom" ? "Custom prompt" : "Conversational voice"} enabled for topic: ${request.topic}`);
+Generate the content based on the custom instructions and context provided.
 
-    const contentResponse = await this.callAI(
-      request.aiProvider,
-      [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      request.aiProvider === "openai" ? { type: "json_object" } : undefined,
-      0.7,
-      request.userId
-    );
+${retryAttempt > 0 ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️⚠️⚠️ THIS IS RETRY ATTEMPT ${retryAttempt}/${maxRetries} ⚠️⚠️⚠️
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    const keyTypeUsed = contentResponse.keyType || 'system';
-    let contentResult;
+YOUR PREVIOUS ATTEMPT WAS REJECTED FOR BEING TOO SHORT!
 
-    // Parse JSON response
-    try {
-      let cleanedContent = contentResponse.content.trim();
-      cleanedContent = cleanedContent.replace(/^\uFEFF/, "");
-      contentResult = JSON.parse(cleanedContent);
-      console.log("✅ Successfully parsed JSON response from", request.aiProvider.toUpperCase());
-    } catch (parseError: any) {
-      console.error("❌ Initial JSON parse failed, attempting extraction...", parseError.message);
-      let cleanedContent = contentResponse.content.trim();
-      const firstBrace = cleanedContent.indexOf("{");
-      const lastBrace = cleanedContent.lastIndexOf("}");
+📊 Previous attempt: ${previousWordCount} words
+📊 Required minimum: ${wordCounts.requiredMinimum} words
+📊 This attempt target: ${wordCounts.targetWords}+ words
+📊 Shortfall to overcome: ${wordCounts.targetWords - previousWordCount} words
 
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        const extractedJson = cleanedContent.substring(firstBrace, lastBrace + 1);
-        try {
-          contentResult = JSON.parse(extractedJson);
-          console.log("✅ Successfully parsed extracted JSON from", request.aiProvider.toUpperCase());
-        } catch (secondParseError: any) {
+🔴 YOU MUST WRITE MORE CONTENT THIS TIME:
+- Add MORE sections (not fewer)
+- Include MORE examples (2-3 per section)
+- Write MORE detailed explanations
+- Add MORE background and context
+- Include MORE practical applications
+- Write thorough introduction (200+ words)
+- Write thorough conclusion (150+ words)
+
+${retryAttempt >= maxRetries ? `
+⚠️⚠️⚠️ THIS IS YOUR FINAL ATTEMPT ⚠️⚠️⚠️
+If this attempt is also too short, the generation will FAIL.
+You MUST write ${wordCounts.targetWords}+ words this time.
+NO EXCUSES. NO SHORTCUTS. BE THOROUGH.
+` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+` : ''}
+
+🔴 CRITICAL REQUIREMENTS:
+- Write in ${language.toUpperCase()} ONLY
+- AIM FOR ${wordCounts.targetWords}+ words (SAFE TARGET - NOT NEGOTIABLE)
+- MINIMUM ${wordCounts.requiredMinimum} words absolutely required
+- Output valid JSON in exact format specified
+- Follow ALL custom instructions thoroughly
+- Count words before submitting - if under ${wordCounts.targetWords}, ADD MORE
+
+⚠️ IF YOU FINISH WITH LESS THAN ${wordCounts.targetWords} WORDS:
+You have NOT completed the task. You MUST add more valuable content sections.
+
+BEGIN COMPREHENSIVE CONTENT GENERATION NOW:`;
+        
+        console.log(`📝 Using CUSTOM PROMPT with ${retryAttempt > 0 ? 'EMPHATIC' : 'standard'} word count emphasis (attempt ${retryAttempt + 1})`);
+      } else {
+        userPrompt = this.buildContentPrompt(request);
+        
+        // ✅ IMPROVED: Add structured expansion for system prompts
+        if (retryAttempt > 0) {
+          const expansionInstructions = this.generateExpansionInstructions(
+            previousWordCount, 
+            wordCounts.targetWords, 
+            retryAttempt + 1
+          );
+          
+          userPrompt = `${expansionInstructions}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️⚠️⚠️ RETRY ${retryAttempt}/${maxRetries} - PREVIOUS WAS TOO SHORT ⚠️⚠️⚠️
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${userPrompt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 CRITICAL RETRY INSTRUCTIONS 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Previous content was REJECTED for being TOO SHORT:
+- You wrote: ${previousWordCount} words
+- You needed: ${wordCounts.requiredMinimum}+ words minimum
+- You should aim for: ${wordCounts.targetWords}+ words
+
+🔴 THIS TIME YOU MUST:
+✓ Write ${wordCounts.targetWords}+ words (NOT just ${wordCounts.requiredMinimum})
+✓ Add MORE sections (4-5 main sections minimum)
+✓ Include MORE examples (2-3 per section with details)
+✓ Write MORE depth (explain WHY, not just WHAT)
+✓ Add MORE explanations and context
+✓ Each section should be 150-250 words minimum
+✓ Include more background, more context, more real-world examples
+✓ Don't rush through sections - be thorough and comprehensive
+
+${retryAttempt >= maxRetries ? `
+⚠️⚠️⚠️ FINAL ATTEMPT - DO NOT FAIL ⚠️⚠️⚠️
+This is your LAST CHANCE. If you don't write ${wordCounts.targetWords}+ words,
+the entire generation will FAIL and the user will see an error message.
+THERE IS NO EXCUSE FOR FAILURE ON THIS ATTEMPT.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+` : ''}`;
+        }
+        
+        console.log(`📝 Using SYSTEM PROMPT with ${retryAttempt > 0 ? 'EMPHATIC RETRY' : 'standard'} instructions (attempt ${retryAttempt + 1})`);
+      }
+
+      console.log(`📝 Generating content (attempt ${retryAttempt + 1})...`);
+      console.log(`   Target: ${wordCounts.targetWords}+ words (SAFE)`);
+      console.log(`   Required: ${wordCounts.requiredMinimum} words (MINIMUM)`);
+      console.log(`   Close Enough: ${wordCounts.closeEnoughThreshold}+ words (${(this.WORD_COUNT_CONFIG.CLOSE_ENOUGH_THRESHOLD * 100).toFixed(0)}% threshold)`);
+
+      // Call AI
+      contentResponse = await this.callAI(
+        request.aiProvider,
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        request.aiProvider === "openai" ? { type: "json_object" } : undefined,
+        0.7,
+        request.userId
+      );
+
+      const keyTypeUsed = contentResponse.keyType || 'system';
+
+      // Parse JSON response
+      try {
+        let cleanedContent = contentResponse.content.trim();
+        cleanedContent = cleanedContent.replace(/^\uFEFF/, "");
+        contentResult = JSON.parse(cleanedContent);
+        console.log("✅ Successfully parsed JSON response from", request.aiProvider.toUpperCase());
+      } catch (parseError: any) {
+        console.error("❌ Initial JSON parse failed, attempting extraction...", parseError.message);
+        let cleanedContent = contentResponse.content.trim();
+        const firstBrace = cleanedContent.indexOf("{");
+        const lastBrace = cleanedContent.lastIndexOf("}");
+
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const extractedJson = cleanedContent.substring(firstBrace, lastBrace + 1);
+          try {
+            contentResult = JSON.parse(extractedJson);
+            console.log("✅ Successfully parsed extracted JSON from", request.aiProvider.toUpperCase());
+          } catch (secondParseError: any) {
+            throw new AIProviderError(
+              request.aiProvider,
+              `Failed to parse JSON response after multiple attempts. Original error: ${parseError.message}`
+            );
+          }
+        } else {
           throw new AIProviderError(
             request.aiProvider,
-            `Failed to parse JSON response after multiple attempts. Original error: ${parseError.message}`
+            `No valid JSON structure found in response. Response was: ${contentResponse.content.substring(0, 300)}...`
           );
         }
-      } else {
+      }
+
+      // Validate required fields
+      if (!contentResult.title || !contentResult.content) {
         throw new AIProviderError(
           request.aiProvider,
-          `No valid JSON structure found in response. Response was: ${contentResponse.content.substring(0, 300)}...`
+          "AI response missing required fields (title, content)"
         );
+      }
+
+      // Convert markdown to HTML
+      if (contentResult.content && contentResult.content.includes("#")) {
+        console.log("🔍 Markdown headers detected, converting to HTML...");
+        contentResult.content = ContentFormatter.convertMarkdownToHtml(contentResult.content);
+      }
+
+      contentResult.content = ContentFormatter.formatForWordPress(contentResult.content);
+      console.log("✅ Content formatted for WordPress");
+
+      // Sanitize metadata
+      contentResult.content = this.sanitizeContentMetadata(contentResult.content);
+
+      // ✅ VALIDATE WORD COUNT WITH RETRY LOGIC
+      const wordCountCheck = this.validateWordCount(
+        contentResult.content,
+        wordCounts.requiredMinimum,
+        request.topic,
+        wordCounts.closeEnoughThreshold
+      );
+
+      if (wordCountCheck.valid) {
+        // ✅ Success! Either meets requirement or is "close enough"
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.log(`✅ ✅ ✅ WORD COUNT VALIDATION PASSED ✅ ✅ ✅`);
+        console.log(`   Attempt: ${retryAttempt + 1}/${maxRetries + 1}`);
+        console.log(`   Generated: ${wordCountCheck.actualCount} words`);
+        console.log(`   Required: ${wordCounts.requiredMinimum} words`);
+        console.log(`   Target: ${wordCounts.targetWords} words`);
+        console.log(`   Percentage: ${wordCountCheck.percentageOfRequirement.toFixed(1)}%`);
+        console.log(`   Surplus: +${Math.max(0, wordCountCheck.actualCount - wordCounts.requiredMinimum)} words`);
+        console.log(`   Status: ${wordCountCheck.closeEnough ? 
+          (wordCountCheck.actualCount >= wordCounts.requiredMinimum ? '✅ PERFECT' : '✅ CLOSE ENOUGH - ACCEPTED') : 
+          '✅ PASSED'}`);
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        break; // Success - exit retry loop
+      } else {
+        // ❌ Too short and not close enough
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.error(`❌ ❌ ❌ ATTEMPT ${retryAttempt + 1} FAILED WORD COUNT ❌ ❌ ❌`);
+        console.error(`   Generated: ${wordCountCheck.actualCount} words`);
+        console.error(`   Required: ${wordCounts.requiredMinimum} words`);
+        console.error(`   Target: ${wordCounts.targetWords} words`);
+        console.error(`   Close Enough Threshold: ${wordCounts.closeEnoughThreshold} words`);
+        console.error(`   Shortfall: ${wordCountCheck.shortfall} words`);
+        console.error(`   Percentage: ${wordCountCheck.percentageOfRequirement.toFixed(1)}%`);
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        
+        // ✅ FIX: Store word count for next retry BEFORE reset
+        previousWordCount = wordCountCheck.actualCount;
+        
+        if (retryAttempt < maxRetries) {
+          console.log(`🔄 Will retry with stronger word count emphasis...`);
+          console.log(`   Next target: ${wordCounts.targetWords}+ words`);
+          console.log(`   Need to add: ~${wordCounts.targetWords - wordCountCheck.actualCount} more words`);
+          contentResult = null; // Reset for retry
+          retryAttempt++;
+          
+          // ✅ NEW: Add delay between retries to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        } else {
+          // Max retries reached
+          if (this.WORD_COUNT_CONFIG.STRICT_ENFORCEMENT) {
+            console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            console.error(`❌ ❌ ❌ CONTENT GENERATION FAILED ❌ ❌ ❌`);
+            console.error(`   Attempts exhausted: ${maxRetries + 1}`);
+            console.error(`   Best result: ${wordCountCheck.actualCount} words`);
+            console.error(`   Required: ${wordCounts.requiredMinimum} words`);
+            console.error(`   Shortfall: ${wordCountCheck.shortfall} words`);
+            console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            
+            throw new AIProviderError(
+              request.aiProvider,
+              `❌ CONTENT GENERATION FAILED AFTER ${maxRetries + 1} ATTEMPTS\n\n` +
+              `Topic: "${request.topic}"\n` +
+              `Required: ${wordCounts.requiredMinimum}+ words\n` +
+              `Best attempt: ${wordCountCheck.actualCount} words\n` +
+              `Shortfall: ${wordCountCheck.shortfall} words (${wordCountCheck.percentageOfRequirement.toFixed(1)}%)\n\n` +
+              `The AI consistently generated content that was too short. This may indicate:\n` +
+              `1. Topic is too narrow - consider broadening the scope\n` +
+              `2. Word count target is unrealistic for this topic\n` +
+              `3. Try adjusting the topic or reducing the word count requirement\n\n` +
+              `Please try again with:\n` +
+              `• More specific topic details\n` +
+              `• Lower word count (try ${Math.floor(wordCounts.requiredMinimum * 0.8)} words)\n` +
+              `• Different AI provider\n` +
+              `• Custom prompt with detailed outline`
+            );
+          } else {
+            // Non-strict mode - accept anyway with warning
+            console.warn(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            console.warn(`⚠️ ⚠️ ⚠️ ACCEPTING SHORT CONTENT (strict mode disabled) ⚠️ ⚠️ ⚠️`);
+            console.warn(`   Final count: ${wordCountCheck.actualCount} words`);
+            console.warn(`   Required: ${wordCounts.requiredMinimum} words`);
+            console.warn(`   Percentage: ${wordCountCheck.percentageOfRequirement.toFixed(1)}%`);
+            console.warn(`   Reason: STRICT_ENFORCEMENT is disabled - accepting best attempt`);
+            console.warn(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            break; // Accept the content
+          }
+        }
       }
     }
 
-    // Validate required fields
-    if (!contentResult.title || !contentResult.content) {
+    if (!contentResult) {
       throw new AIProviderError(
         request.aiProvider,
-        "AI response missing required fields (title, content)"
-      );
-    }
-
-    // Convert markdown to HTML
-    console.log("🔄 Converting markdown headers to HTML...");
-    if (contentResult.content && contentResult.content.includes("#")) {
-      console.log("🔍 Markdown headers detected, converting to HTML...");
-      contentResult.content = ContentFormatter.convertMarkdownToHtml(contentResult.content);
-    }
-
-    contentResult.content = ContentFormatter.formatForWordPress(contentResult.content);
-    console.log("✅ Content formatted for WordPress");
-
-    // Sanitize metadata
-    contentResult.content = this.sanitizeContentMetadata(contentResult.content);
-
-    // ✅ WORD COUNT VALIDATION
-    const minimumWords = Math.max(800, Math.ceil(request.wordCount * 0.95));
-    const wordCountCheck = this.validateWordCount(
-      contentResult.content,
-      minimumWords,
-      request.topic
-    );
-
-    // Log word count results
-    if (wordCountCheck.valid) {
-      console.log(`✅ Content meets word count requirement: ${wordCountCheck.actualCount} words (minimum: ${minimumWords})`);
-    } else {
-      console.warn(`⚠️ Content is ${minimumWords - wordCountCheck.actualCount} words SHORT`);
-      console.warn(`   Actual: ${wordCountCheck.actualCount} words | Required: ${minimumWords} words`);
-      console.warn(`   Consider regenerating for more comprehensive coverage`);
-      
-      // Optional: Enforce strict word count by throwing error
-      // Uncomment the next 3 lines if you want to force regeneration on short content
-      throw new AIProviderError(
-        request.aiProvider,
-        `Content too short: ${wordCountCheck.actualCount} words (minimum: ${minimumWords} required). Please regenerate with more comprehensive coverage.`
+        `Failed to generate content after ${maxRetries + 1} attempts`
       );
     }
 
@@ -2702,7 +3639,7 @@ Begin generation now.`;
           style: request.imageStyle || "natural",
           contentContext: contentResult.content.substring(0, 500),
           keywords: request.keywords,
-          niche: request.niche, // Pass niche for better image prompts
+          niche: request.niche,
         };
 
         const validation = imageService.validateImageRequest(imageGenerationRequest);
@@ -2719,7 +3656,6 @@ Begin generation now.`;
         );
         imageKeyType = imageResult.keyType || 'system';
 
-        // Upload to Cloudinary
         console.log(`☁️ Uploading images to Cloudinary...`);
 
         for (const img of imageResult.images) {
@@ -2739,7 +3675,7 @@ Begin generation now.`;
             });
             console.log(`✅ Image stored: ${img.filename}`);
           } catch (uploadError: any) {
-            console.error(`❌ Failed to upload to Cloudinary: ${img.filename}`, uploadError.message);
+            console.error(`❌ Failed to upload to Cloudinary: ${img.filename}`);
             images.push(img);
           }
         }
@@ -2757,15 +3693,6 @@ Begin generation now.`;
         }
       } catch (imageError: any) {
         console.error("❌ Image generation failed:", imageError.message);
-        if (imageError.message.includes("Rate limit")) {
-          console.warn("⚠️ Rate limit reached, continuing without images");
-        } else if (imageError.message.includes("credits") || imageError.message.includes("quota")) {
-          console.warn("⚠️ Insufficient credits, continuing without images");
-        } else if (imageError.message.includes("API key")) {
-          console.warn("⚠️ API key issue, continuing without images");
-        } else {
-          console.warn(`⚠️ Image error: ${imageError.message}`);
-        }
         images = [];
         totalImageCost = 0;
       }
@@ -2788,7 +3715,7 @@ Begin generation now.`;
     });
 
     // STEP 5: Calculate costs
-    const contentTokens = Math.max(1, contentResponse.tokens + analysisResult.tokensUsed);
+    const contentTokens = Math.max(1, contentResponse!.tokens + analysisResult.tokensUsed);
     const contentPricing = AI_MODELS[request.aiProvider].pricing;
     const avgTokenCost = (contentPricing.input + contentPricing.output) / 2;
     const textCostUsd = (contentTokens * avgTokenCost) / 1000;
@@ -2808,7 +3735,7 @@ Begin generation now.`;
         tokensUsed: contentTokens,
         costUsd: Math.max(1, Math.round(textCostUsd * 1000)),
         operation: "content_generation",
-        keyType: keyTypeUsed,
+        keyType: contentResponse!.keyType || 'system',
       });
 
       if (images.length > 0) {
@@ -2828,6 +3755,9 @@ Begin generation now.`;
 
     // STEP 7: Generate quality checks
     const qualityChecks = this.generateQualityChecks(contentResult.content, request);
+
+    // Get final word count for result
+    const finalWordCount = this.countWordsInHtml(contentResult.content);
 
     // STEP 8: Save to database
     let savedContentId: string | undefined;
@@ -2920,8 +3850,6 @@ Begin generation now.`;
               });
 
               console.log(`✅ Published to WordPress`);
-            } else {
-              console.error(`❌ Publishing failed: ${publishResult.error}`);
             }
           } catch (publishError: any) {
             console.error(`❌ Publishing error: ${publishError.message}`);
@@ -2985,7 +3913,7 @@ Begin generation now.`;
       totalCost: totalCostUsd.toFixed(6),
       language: language,
       conversationalVoice: request.promptType !== "custom",
-      wordCount: wordCountCheck.actualCount, // ✅ Include word count in result
+      wordCount: finalWordCount,
     };
 
     if (images.length > 0) {
@@ -3001,8 +3929,11 @@ Begin generation now.`;
       result.totalImageCost = totalImageCost;
     }
 
-    console.log(`✅ Generation complete - ${language.toUpperCase()} - ${request.promptType === "custom" ? "Custom Prompt" : "System Prompt"}`);
-    console.log(`📊 Final word count: ${wordCountCheck.actualCount} words (minimum: ${minimumWords})`);
+    console.log(`✅ Generation complete - ${language.toUpperCase()}`);
+    console.log(`📊 Final word count: ${finalWordCount} words`);
+    console.log(`   Target: ${wordCounts.targetWords} words`);
+    console.log(`   Required: ${wordCounts.requiredMinimum} words`);
+    console.log(`   Status: ${finalWordCount >= wordCounts.requiredMinimum ? '✅ PASSED' : '⚠️ CLOSE ENOUGH - ACCEPTED'}`);
 
     return result;
   } catch (error: any) {
@@ -3012,6 +3943,530 @@ Begin generation now.`;
     throw new Error(`Content generation failed: ${error.message}`);
   }
 }
+
+
+// async generateContent(
+//   request: ContentGenerationRequest
+// ): Promise<ContentGenerationResultWithPublishing> {
+//   try {
+//     console.log(
+//       `Generating content for user ${request.userId} with ${request.aiProvider.toUpperCase()} in ${
+//         request.language || "english"
+//       }`
+//     );
+
+//     // VALIDATION BLOCK
+//     if (!request.websiteId && !request.niche) {
+//       throw new Error(
+//         "Either websiteId or niche must be provided for content generation"
+//       );
+//     }
+
+//     const language = request.language || "english";
+//     if (!VALID_LANGUAGES.includes(language)) {
+//       throw new Error(
+//         `Invalid language: ${language}. Must be one of: ${VALID_LANGUAGES.join(", ")}`
+//       );
+//     }
+
+//     this.lastLanguage = language;
+//     this.lastRequestTopic = request.topic;
+
+//     // Log content type
+//     if (request.websiteId) {
+//       console.log(`📄 Generating website-specific content for website: ${request.websiteId}`);
+//     } else if (request.niche) {
+//       console.log(`📄 Generating standalone content for niche: ${request.niche}`);
+//     }
+
+//     // Log prompt type
+//     if (request.promptType === "custom" && request.customPrompt) {
+//       console.log(`🎯 Using CUSTOM PROMPT mode`);
+//     } else {
+//       console.log(`🤖 Using SYSTEM PROMPT mode (conversational)`);
+//     }
+
+//     // STEP 1: Check image generation
+//     if (request.includeImages && request.imageCount && request.imageCount > 0) {
+//       const openAiKey = await this.getApiKey('openai', request.userId);
+//       if (!openAiKey) {
+//         console.warn("⚠️ Image generation requested but no OpenAI API key available");
+//         request.includeImages = false;
+//         request.imageCount = 0;
+//       } else {
+//         console.log(
+//           `🎨 Will generate ${request.imageCount} images with DALL-E 3 (regardless of content AI provider: ${request.aiProvider})`
+//         );
+//       }
+//     }
+
+//     if (request.isAutoGenerated) {
+//       console.log(`Auto-generation detected:`, {
+//         autoScheduleId: request.autoScheduleId,
+//         autoPublish: request.autoPublish,
+//         publishDelay: request.publishDelay,
+//       });
+//     }
+
+//     // STEP 2: Generate content
+//     const languagePrompt = this.getLanguagePrompt(language);
+//     const systemPrompt = this.buildSystemPrompt(request, language, languagePrompt);
+
+//     // ✅ CUSTOM PROMPT HANDLING: Use different user prompts based on mode
+//     let userPrompt: string;
+//     if (request.promptType === "custom" && request.customPrompt && request.customPrompt.trim()) {
+//       // For custom prompts, use a minimal user message
+//       // All instructions are already in the system prompt
+//       userPrompt = `Generate the content based on the custom instructions and context provided in the system prompt above. 
+
+// Important reminders:
+// - Write in ${language.toUpperCase()} only
+// - Output valid JSON in the exact format specified
+// - Follow all the custom instructions provided
+// - Include all required fields: title, content, excerpt, metaDescription, metaTitle, keywords
+// - MINIMUM ${Math.max(800, Math.ceil(request.wordCount * 0.95))} words in the content field
+
+// Begin generation now.`;
+      
+//       console.log(`📝 Using CUSTOM PROMPT with simplified user message`);
+//     } else {
+//       // For system prompts, use the detailed content prompt
+//       userPrompt = this.buildContentPrompt(request);
+//       console.log(`📝 Using SYSTEM PROMPT with detailed content instructions`);
+//     }
+
+//     console.log(`📝 System Prompt Language Enforcement: ${language.toUpperCase()}`);
+//     console.log(`📝 User Prompt Language Code: ${language.toUpperCase()}`);
+//     console.log(`📝 ${request.promptType === "custom" ? "Custom prompt" : "Conversational voice"} enabled for topic: ${request.topic}`);
+
+//     const contentResponse = await this.callAI(
+//       request.aiProvider,
+//       [
+//         { role: "system", content: systemPrompt },
+//         { role: "user", content: userPrompt },
+//       ],
+//       request.aiProvider === "openai" ? { type: "json_object" } : undefined,
+//       0.7,
+//       request.userId
+//     );
+
+//     const keyTypeUsed = contentResponse.keyType || 'system';
+//     let contentResult;
+
+//     // Parse JSON response
+//     try {
+//       let cleanedContent = contentResponse.content.trim();
+//       cleanedContent = cleanedContent.replace(/^\uFEFF/, "");
+//       contentResult = JSON.parse(cleanedContent);
+//       console.log("✅ Successfully parsed JSON response from", request.aiProvider.toUpperCase());
+//     } catch (parseError: any) {
+//       console.error("❌ Initial JSON parse failed, attempting extraction...", parseError.message);
+//       let cleanedContent = contentResponse.content.trim();
+//       const firstBrace = cleanedContent.indexOf("{");
+//       const lastBrace = cleanedContent.lastIndexOf("}");
+
+//       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+//         const extractedJson = cleanedContent.substring(firstBrace, lastBrace + 1);
+//         try {
+//           contentResult = JSON.parse(extractedJson);
+//           console.log("✅ Successfully parsed extracted JSON from", request.aiProvider.toUpperCase());
+//         } catch (secondParseError: any) {
+//           throw new AIProviderError(
+//             request.aiProvider,
+//             `Failed to parse JSON response after multiple attempts. Original error: ${parseError.message}`
+//           );
+//         }
+//       } else {
+//         throw new AIProviderError(
+//           request.aiProvider,
+//           `No valid JSON structure found in response. Response was: ${contentResponse.content.substring(0, 300)}...`
+//         );
+//       }
+//     }
+
+//     // Validate required fields
+//     if (!contentResult.title || !contentResult.content) {
+//       throw new AIProviderError(
+//         request.aiProvider,
+//         "AI response missing required fields (title, content)"
+//       );
+//     }
+
+//     // Convert markdown to HTML
+//     console.log("🔄 Converting markdown headers to HTML...");
+//     if (contentResult.content && contentResult.content.includes("#")) {
+//       console.log("🔍 Markdown headers detected, converting to HTML...");
+//       contentResult.content = ContentFormatter.convertMarkdownToHtml(contentResult.content);
+//     }
+
+//     contentResult.content = ContentFormatter.formatForWordPress(contentResult.content);
+//     console.log("✅ Content formatted for WordPress");
+
+//     // Sanitize metadata
+//     contentResult.content = this.sanitizeContentMetadata(contentResult.content);
+
+//     // ✅ WORD COUNT VALIDATION
+//     // Calculate word count requirements using config
+//   const wordCounts = this.calculateWordCountRequirements(request.wordCount);
+//     // const minimumWords = Math.max(800, Math.ceil(request.wordCount * 0.95));
+//     const wordCountCheck = this.validateWordCount(
+//       contentResult.content,
+//       minimumWords,
+//       request.topic
+//     );
+
+//     // Log word count results
+//     if (wordCountCheck.valid) {
+//       console.log(`✅ Content meets word count requirement: ${wordCountCheck.actualCount} words (minimum: ${minimumWords})`);
+//     } else {
+//       console.warn(`⚠️ Content is ${minimumWords - wordCountCheck.actualCount} words SHORT`);
+//       console.warn(`   Actual: ${wordCountCheck.actualCount} words | Required: ${minimumWords} words`);
+//       console.warn(`   Consider regenerating for more comprehensive coverage`);
+      
+//       // Optional: Enforce strict word count by throwing error
+//       // Uncomment the next 3 lines if you want to force regeneration on short content
+//       throw new AIProviderError(
+//         request.aiProvider,
+//         `Content too short: ${wordCountCheck.actualCount} words (minimum: ${minimumWords} required). Please regenerate with more comprehensive coverage.`
+//       );
+//     }
+
+//     // Pre-generate contentId
+//     let contentId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+//     // STEP 3: Generate images if requested
+//     let images: Array<{
+//       url: string;
+//       filename: string;
+//       altText: string;
+//       prompt: string;
+//       cost: number;
+//       cloudinaryUrl?: string;
+//       cloudinaryPublicId?: string;
+//     }> = [];
+//     let totalImageCost = 0;
+//     let imageKeyType: 'user' | 'system' = 'system';
+
+//     if (request.includeImages && request.imageCount && request.imageCount > 0) {
+//       try {
+//         console.log(`🎨 Generating ${request.imageCount} images with DALL-E 3...`);
+
+//         const imageGenerationRequest = {
+//           topic: request.topic,
+//           count: request.imageCount,
+//           style: request.imageStyle || "natural",
+//           contentContext: contentResult.content.substring(0, 500),
+//           keywords: request.keywords,
+//           niche: request.niche, // Pass niche for better image prompts
+//         };
+
+//         const validation = imageService.validateImageRequest(imageGenerationRequest);
+//         if (!validation.valid) {
+//           throw new Error(
+//             `Image generation validation failed: ${validation.errors.join(", ")}`
+//           );
+//         }
+
+//         const imageResult = await imageService.generateImages(
+//           imageGenerationRequest,
+//           request.userId,
+//           request.websiteId
+//         );
+//         imageKeyType = imageResult.keyType || 'system';
+
+//         // Upload to Cloudinary
+//         console.log(`☁️ Uploading images to Cloudinary...`);
+
+//         for (const img of imageResult.images) {
+//           try {
+//             const cloudinaryImage = await cloudinaryStorage.uploadFromUrl(
+//               img.url,
+//               request.websiteId || `niche-${request.niche}`,
+//               contentId,
+//               img.filename
+//             );
+
+//             images.push({
+//               ...img,
+//               url: cloudinaryImage.secureUrl,
+//               cloudinaryUrl: cloudinaryImage.secureUrl,
+//               cloudinaryPublicId: cloudinaryImage.publicId,
+//             });
+//             console.log(`✅ Image stored: ${img.filename}`);
+//           } catch (uploadError: any) {
+//             console.error(`❌ Failed to upload to Cloudinary: ${img.filename}`, uploadError.message);
+//             images.push(img);
+//           }
+//         }
+
+//         totalImageCost = imageResult.totalCost;
+//         console.log(`✅ Generated ${images.length} images`);
+
+//         if (images.length > 0) {
+//           console.log("🖼️ Embedding images into content...");
+//           contentResult.content = this.embedImagesInContentPrivate(
+//             contentResult.content,
+//             images
+//           );
+//           console.log(`✅ Embedded ${images.length} images`);
+//         }
+//       } catch (imageError: any) {
+//         console.error("❌ Image generation failed:", imageError.message);
+//         if (imageError.message.includes("Rate limit")) {
+//           console.warn("⚠️ Rate limit reached, continuing without images");
+//         } else if (imageError.message.includes("credits") || imageError.message.includes("quota")) {
+//           console.warn("⚠️ Insufficient credits, continuing without images");
+//         } else if (imageError.message.includes("API key")) {
+//           console.warn("⚠️ API key issue, continuing without images");
+//         } else {
+//           console.warn(`⚠️ Image error: ${imageError.message}`);
+//         }
+//         images = [];
+//         totalImageCost = 0;
+//       }
+//     }
+
+//     // STEP 4: Analyze content
+//     const analysisResult = await this.performContentAnalysis({
+//       title: contentResult.title,
+//       content: contentResult.content,
+//       keywords: request.keywords,
+//       tone: request.tone,
+//       brandVoice: request.brandVoice,
+//       targetAudience: request.targetAudience,
+//       eatCompliance: request.eatCompliance,
+//       websiteId: request.websiteId || 'standalone',
+//       aiProvider: request.aiProvider,
+//       userId: request.userId,
+//       language: language,
+//       niche: request.niche,
+//     });
+
+//     // STEP 5: Calculate costs
+//     const contentTokens = Math.max(1, contentResponse.tokens + analysisResult.tokensUsed);
+//     const contentPricing = AI_MODELS[request.aiProvider].pricing;
+//     const avgTokenCost = (contentPricing.input + contentPricing.output) / 2;
+//     const textCostUsd = (contentTokens * avgTokenCost) / 1000;
+//     const totalCostUsd = textCostUsd + totalImageCost;
+
+//     console.log(`💰 Cost breakdown:`);
+//     console.log(`   Content: $${textCostUsd.toFixed(6)}`);
+//     console.log(`   Images: $${totalImageCost.toFixed(6)}`);
+//     console.log(`   Total: $${totalCostUsd.toFixed(6)}`);
+
+//     // STEP 6: Track AI usage
+//     try {
+//       await storage.trackAiUsage({
+//         websiteId: request.websiteId || null,
+//         userId: request.userId,
+//         model: AI_MODELS[request.aiProvider].model,
+//         tokensUsed: contentTokens,
+//         costUsd: Math.max(1, Math.round(textCostUsd * 1000)),
+//         operation: "content_generation",
+//         keyType: keyTypeUsed,
+//       });
+
+//       if (images.length > 0) {
+//         await storage.trackAiUsage({
+//           websiteId: request.websiteId || null,
+//           userId: request.userId,
+//           model: "dall-e-3",
+//           tokensUsed: 0,
+//           costUsd: Math.round(totalImageCost * 100),
+//           operation: "image_generation",
+//           keyType: imageKeyType,
+//         });
+//       }
+//     } catch (trackingError: any) {
+//       console.warn("Tracking failed:", trackingError.message);
+//     }
+
+//     // STEP 7: Generate quality checks
+//     const qualityChecks = this.generateQualityChecks(contentResult.content, request);
+
+//     // STEP 8: Save to database
+//     let savedContentId: string | undefined;
+//     let published = false;
+//     let scheduledForPublishing = false;
+//     let publishedAt: Date | undefined;
+//     let scheduledDate: Date | undefined;
+
+//     try {
+//       const contentToSave = {
+//         websiteId: request.websiteId || null,
+//         niche: request.niche || null,
+//         userId: request.userId,
+//         title: contentResult.title,
+//         body: contentResult.content,
+//         excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
+//         metaDescription:
+//           contentResult.metaDescription ||
+//           this.generateMetaDescription(contentResult.title, contentResult.content),
+//         metaTitle: contentResult.metaTitle || contentResult.title,
+//         aiModel: AI_MODELS[request.aiProvider].model,
+//         seoKeywords: contentResult.keywords || request.keywords,
+//         seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
+//         readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
+//         brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
+//         eatCompliance: request.eatCompliance || false,
+//         tokensUsed: contentTokens,
+//         costUsd: Math.round(totalCostUsd * 100),
+//         status: 'draft',
+//         hasImages: images.length > 0,
+//         imageCount: images.length,
+//         imageCostCents: Math.round(totalImageCost * 100),
+//         language: language,
+//         conversationalVoice: request.promptType !== "custom",
+//       };
+
+//       console.log(`💾 Saving content...`);
+//       const savedContent = await storage.createContent(contentToSave);
+//       savedContentId = savedContent.id;
+//       contentId = savedContentId;
+
+//       console.log(`✅ Content saved: ${savedContentId}`);
+
+//       if (!savedContentId || savedContentId.startsWith('temp-')) {
+//         throw new Error(`Invalid content ID: ${savedContentId}`);
+//       }
+
+//       // Handle auto-publishing
+//       if (request.isAutoGenerated && request.autoScheduleId && request.autoPublish) {
+//         console.log(`🚀 Processing auto-publishing...`);
+
+//         if (request.publishDelay === 0) {
+//           scheduledDate = new Date();
+//           try {
+//             await storage.createContentSchedule({
+//               contentId: savedContentId,
+//               userId: request.userId,
+//               websiteId: request.websiteId!,
+//               scheduled_date: scheduledDate,
+//               status: "publishing",
+//               title: contentResult.title,
+//               topic: request.topic,
+//               metadata: {
+//                 autoGenerated: true,
+//                 autoScheduleId: request.autoScheduleId,
+//                 publishedImmediately: true,
+//                 generatedAt: new Date(),
+//               },
+//             });
+
+//             const publishResult = await this.publishToWordPress(
+//               savedContentId,
+//               request.websiteId!,
+//               request.userId
+//             );
+
+//             if (publishResult.success) {
+//               published = true;
+//               publishedAt = new Date();
+
+//               await storage.updateContent(savedContentId, {
+//                 status: "published",
+//                 publishDate: publishedAt,
+//                 wordpressPostId: publishResult.postId,
+//               });
+
+//               await storage.updateContentScheduleByContentId(savedContentId, {
+//                 status: "published",
+//                 published_at: publishedAt,
+//               });
+
+//               console.log(`✅ Published to WordPress`);
+//             } else {
+//               console.error(`❌ Publishing failed: ${publishResult.error}`);
+//             }
+//           } catch (publishError: any) {
+//             console.error(`❌ Publishing error: ${publishError.message}`);
+//           }
+//         } else if (request.publishDelay && request.publishDelay > 0) {
+//           scheduledDate = new Date();
+//           scheduledDate.setHours(scheduledDate.getHours() + request.publishDelay);
+//           scheduledForPublishing = true;
+
+//           try {
+//             await storage.createContentSchedule({
+//               contentId: savedContentId,
+//               userId: request.userId,
+//               websiteId: request.websiteId!,
+//               scheduled_date: scheduledDate,
+//               status: "scheduled",
+//               title: contentResult.title,
+//               topic: request.topic,
+//               metadata: {
+//                 autoGenerated: true,
+//                 autoScheduleId: request.autoScheduleId,
+//                 publishDelay: request.publishDelay,
+//                 generatedAt: new Date(),
+//               },
+//             });
+
+//             console.log(`⏰ Scheduled for ${scheduledDate.toISOString()}`);
+//           } catch (scheduleError: any) {
+//             console.error(`❌ Schedule error: ${scheduleError.message}`);
+//           }
+//         }
+//       }
+//     } catch (saveError: any) {
+//       console.error(`❌ Save failed: ${saveError.message}`);
+//       throw new Error(`Content generation failed: Unable to save - ${saveError.message}`);
+//     }
+
+//     // STEP 9: Return result
+//     const result: ContentGenerationResultWithPublishing = {
+//       title: contentResult.title,
+//       content: contentResult.content,
+//       excerpt: contentResult.excerpt || this.generateExcerpt(contentResult.content),
+//       metaDescription:
+//         contentResult.metaDescription ||
+//         this.generateMetaDescription(contentResult.title, contentResult.content),
+//       metaTitle: contentResult.metaTitle || contentResult.title,
+//       keywords: contentResult.keywords || request.keywords,
+//       seoScore: Math.max(1, Math.min(100, analysisResult.seoScore)),
+//       readabilityScore: Math.max(1, Math.min(100, analysisResult.readabilityScore)),
+//       brandVoiceScore: Math.max(1, Math.min(100, analysisResult.brandVoiceScore)),
+//       eatCompliance: request.eatCompliance || false,
+//       tokensUsed: contentTokens,
+//       costUsd: Number(textCostUsd.toFixed(6)),
+//       aiProvider: request.aiProvider,
+//       qualityChecks,
+//       contentId: savedContentId,
+//       published: published,
+//       scheduledForPublishing: scheduledForPublishing,
+//       publishedAt: publishedAt,
+//       scheduledDate: scheduledDate,
+//       totalCost: totalCostUsd.toFixed(6),
+//       language: language,
+//       conversationalVoice: request.promptType !== "custom",
+//       wordCount: wordCountCheck.actualCount, // ✅ Include word count in result
+//     };
+
+//     if (images.length > 0) {
+//       result.images = images.map((img) => ({
+//         url: img.cloudinaryUrl || img.url,
+//         filename: img.filename,
+//         altText: img.altText,
+//         prompt: img.prompt,
+//         cost: img.cost,
+//         cloudinaryUrl: img.cloudinaryUrl,
+//         cloudinaryPublicId: img.cloudinaryPublicId,
+//       }));
+//       result.totalImageCost = totalImageCost;
+//     }
+
+//     console.log(`✅ Generation complete - ${language.toUpperCase()} - ${request.promptType === "custom" ? "Custom Prompt" : "System Prompt"}`);
+//     console.log(`📊 Final word count: ${wordCountCheck.actualCount} words (minimum: ${minimumWords})`);
+
+//     return result;
+//   } catch (error: any) {
+//     if (error instanceof AIProviderError || error instanceof AnalysisError) {
+//       throw error;
+//     }
+//     throw new Error(`Content generation failed: ${error.message}`);
+//   }
+// }
 
 
   async optimizeContent(
