@@ -59,6 +59,10 @@ export function Features() {
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [activeCategory, setActiveCategory] = useState<string>("all");
 
+    useEffect(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 50);

@@ -3159,42 +3159,137 @@ async toggleAutoSchedule(scheduleId: string, isActive: boolean): Promise<AutoSch
   /**
    * Get tracked SEO issues for a website
    */
-  async getTrackedSeoIssues(
-  websiteId: string, 
+//   async getTrackedSeoIssues(
+//   websiteId: string, 
+//   userId: string,
+//   options: {
+//     status?: string[];
+//     autoFixableOnly?: boolean;
+//     limit?: number;
+//     excludeRecentlyFixed?: boolean;
+//     fixedWithinDays?: number;
+//     issueIds?: string[];
+//   } = {}
+// ): Promise<SeoIssueTracking[]> {
+//   try {
+//     // Build all conditions in an array
+//     const conditions = [
+//       eq(seoIssueTracking.websiteId, websiteId),
+//       eq(seoIssueTracking.userId, userId)
+//     ];
+
+//     // Add status filter
+//     if (options.status && options.status.length > 0) {
+//       conditions.push(inArray(seoIssueTracking.status, options.status));
+//     }
+
+//     // Add auto-fixable filter
+//     if (options.autoFixableOnly) {
+//       conditions.push(eq(seoIssueTracking.autoFixAvailable, true));
+//     }
+
+//     // Add specific issue IDs filter
+//     if (options.issueIds && options.issueIds.length > 0) {
+//       conditions.push(inArray(seoIssueTracking.id, options.issueIds));
+//     }
+
+//     // Exclude recently fixed issues
+//     if (options.excludeRecentlyFixed && options.fixedWithinDays) {
+//       const cutoffDate = new Date();
+//       cutoffDate.setDate(cutoffDate.getDate() - options.fixedWithinDays);
+      
+//       conditions.push(
+//         or(
+//           isNull(seoIssueTracking.fixedAt),
+//           lt(seoIssueTracking.fixedAt, cutoffDate)
+//         )
+//       );
+//     }
+
+//     // Build the query with all conditions combined
+//     let query = db
+//       .select()
+//       .from(seoIssueTracking)
+//       .where(and(...conditions))
+//       .orderBy(desc(seoIssueTracking.lastSeenAt));
+
+//     // Apply limit if specified
+//     if (options.limit) {
+//       query = query.limit(options.limit);
+//     }
+
+//     const issues = await query;
+    
+//     console.log(`Retrieved ${issues.length} tracked SEO issues for website ${websiteId}`, {
+//       filters: {
+//         status: options.status,
+//         autoFixableOnly: options.autoFixableOnly,
+//         excludeRecentlyFixed: options.excludeRecentlyFixed,
+//         issueIds: options.issueIds?.length || 0,
+//       }
+//     });
+    
+//     return issues;
+//   } catch (error) {
+//     console.error('Error getting tracked SEO issues:', error);
+//     throw error;
+//   }
+// }
+
+async getTrackedSeoIssues(
+  websiteId: string,
   userId: string,
-  options: {
+  options?: {
     status?: string[];
+    issueType?: string;  // ✅ ADD THIS
+    url?: string | null;  // ✅ ADD THIS
     autoFixableOnly?: boolean;
-    limit?: number;
     excludeRecentlyFixed?: boolean;
     fixedWithinDays?: number;
-    issueIds?: string[];
-  } = {}
-): Promise<SeoIssueTracking[]> {
+    limit?: number;
+    issueIds?: string[];  // ✅ ADD THIS (if not already there)
+  }
+): Promise<any[]> {
   try {
-    // Build all conditions in an array
     const conditions = [
       eq(seoIssueTracking.websiteId, websiteId),
-      eq(seoIssueTracking.userId, userId)
+      eq(seoIssueTracking.userId, userId),
     ];
 
-    // Add status filter
-    if (options.status && options.status.length > 0) {
-      conditions.push(inArray(seoIssueTracking.status, options.status));
+    if (options?.status && options.status.length > 0) {
+      conditions.push(
+        inArray(seoIssueTracking.status, options.status as any[])
+      );
     }
 
-    // Add auto-fixable filter
-    if (options.autoFixableOnly) {
+    // ✅ NEW: Filter by specific issue type
+    if (options?.issueType) {
+      conditions.push(
+        eq(seoIssueTracking.issueType, options.issueType)
+      );
+    }
+
+    // ✅ NEW: Filter by URL (for page-specific issues)
+    if (options?.url !== undefined) {
+      if (options.url === null) {
+        conditions.push(isNull(seoIssueTracking.url));
+      } else {
+        conditions.push(eq(seoIssueTracking.url, options.url));
+      }
+    }
+
+    // ✅ NEW: Filter by specific issue IDs
+    if (options?.issueIds && options.issueIds.length > 0) {
+      conditions.push(
+        inArray(seoIssueTracking.id, options.issueIds)
+      );
+    }
+
+    if (options?.autoFixableOnly) {
       conditions.push(eq(seoIssueTracking.autoFixAvailable, true));
     }
 
-    // Add specific issue IDs filter
-    if (options.issueIds && options.issueIds.length > 0) {
-      conditions.push(inArray(seoIssueTracking.id, options.issueIds));
-    }
-
-    // Exclude recently fixed issues
-    if (options.excludeRecentlyFixed && options.fixedWithinDays) {
+    if (options?.excludeRecentlyFixed && options?.fixedWithinDays) {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - options.fixedWithinDays);
       
@@ -3206,37 +3301,22 @@ async toggleAutoSchedule(scheduleId: string, isActive: boolean): Promise<AutoSch
       );
     }
 
-    // Build the query with all conditions combined
-    let query = db
+    const issues = await db
       .select()
       .from(seoIssueTracking)
       .where(and(...conditions))
-      .orderBy(desc(seoIssueTracking.lastSeenAt));
+      .orderBy(desc(seoIssueTracking.detectedAt))
+      .limit(options?.limit || 100);
 
-    // Apply limit if specified
-    if (options.limit) {
-      query = query.limit(options.limit);
-    }
-
-    const issues = await query;
-    
-    console.log(`Retrieved ${issues.length} tracked SEO issues for website ${websiteId}`, {
-      filters: {
-        status: options.status,
-        autoFixableOnly: options.autoFixableOnly,
-        excludeRecentlyFixed: options.excludeRecentlyFixed,
-        issueIds: options.issueIds?.length || 0,
-      }
-    });
-    
     return issues;
-  } catch (error) {
-    console.error('Error getting tracked SEO issues:', error);
+    
+  } catch (error: any) {
+    console.error('Error fetching tracked SEO issues:', error);
     throw error;
   }
 }
 
-  async createTrackedSeoIssue(data: {
+async createTrackedSeoIssue(data: {
   websiteId: string;
   userId: string;
   issueType: string;
@@ -3248,8 +3328,134 @@ async toggleAutoSchedule(scheduleId: string, isActive: boolean): Promise<AutoSch
   status: 'detected' | 'fixing' | 'fixed' | 'resolved' | 'reappeared';
   autoFixable: boolean;
   detectedAt: Date;
+  url?: string | null;  // ✅ ADD: URL field for page-specific issues
 }): Promise<any> {
   try {
+    // ✅ NEW: Check for existing issue of same type (prevent duplicates)
+    const existingIssues = await db
+      .select()
+      .from(seoIssueTracking)
+      .where(
+        and(
+          eq(seoIssueTracking.websiteId, data.websiteId),
+          eq(seoIssueTracking.userId, data.userId),
+          eq(seoIssueTracking.issueType, data.issueType),
+          // Match by URL if provided, otherwise match site-wide (null)
+          data.url 
+            ? eq(seoIssueTracking.url, data.url)
+            : isNull(seoIssueTracking.url)
+        )
+      )
+      .limit(1);
+
+    if (existingIssues.length > 0) {
+      const existingIssue = existingIssues[0];
+      
+      // ✅ CASE 1: Recently fixed - respect grace period
+      if (existingIssue.status === 'fixed' && existingIssue.fixedAt) {
+        const GRACE_PERIOD_DAYS = 7;
+        const gracePeriodMs = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+        const timeSinceFix = Date.now() - new Date(existingIssue.fixedAt).getTime();
+        
+        if (timeSinceFix < gracePeriodMs) {
+          const daysSinceFix = Math.floor(timeSinceFix / (24 * 60 * 60 * 1000));
+          console.log(
+            `⏭️  Skipping duplicate: "${data.issueType}" was fixed ${daysSinceFix} day(s) ago (grace period)`
+          );
+          return existingIssue;  // Return existing, don't create duplicate
+        }
+        
+        // ✅ Grace period expired - mark as "reappeared"
+        console.log(
+          `🔄 Issue reappeared after ${Math.floor(timeSinceFix / (24 * 60 * 60 * 1000))} days: "${data.issueType}"`
+        );
+        
+        const [updated] = await db
+          .update(seoIssueTracking)
+          .set({
+            status: 'reappeared',
+            issueDescription: data.description,
+            severity: data.severity,
+            lastSeenAt: new Date(),
+            reappearedAt: new Date(),
+            metadata: {
+              ...(existingIssue.metadata as any || {}),
+              affectedPages: data.affectedPages,
+              category: data.category,
+              previouslyFixedAt: existingIssue.fixedAt,
+              reappearanceCount: ((existingIssue.metadata as any)?.reappearanceCount || 0) + 1,
+            },
+          })
+          .where(eq(seoIssueTracking.id, existingIssue.id))
+          .returning();
+        
+        return updated;
+      }
+      
+      // ✅ CASE 2: Already detected/fixing - update instead of create
+      if (['detected', 'fixing', 'reappeared'].includes(existingIssue.status)) {
+        console.log(
+          `🔄 Updating existing "${data.issueType}" issue (status: ${existingIssue.status})`
+        );
+        
+        const [updated] = await db
+          .update(seoIssueTracking)
+          .set({
+            issueDescription: data.description,
+            severity: data.severity,
+            lastSeenAt: new Date(),
+            metadata: {
+              ...(existingIssue.metadata as any || {}),
+              affectedPages: data.affectedPages,
+              category: data.category,
+              detectionCount: ((existingIssue.metadata as any)?.detectionCount || 1) + 1,
+              lastUpdated: new Date().toISOString(),
+            },
+          })
+          .where(eq(seoIssueTracking.id, existingIssue.id))
+          .returning();
+        
+        return updated;
+      }
+      
+      // ✅ CASE 3: Resolved/verified_fixed - create new if it's truly new
+      if (['resolved', 'verified_fixed'].includes(existingIssue.status)) {
+        // Check if it's been resolved for a while
+        const resolvedAt = existingIssue.resolvedAt || existingIssue.fixedAt;
+        if (resolvedAt) {
+          const timeSinceResolution = Date.now() - new Date(resolvedAt).getTime();
+          
+          if (timeSinceResolution < 7 * 24 * 60 * 60 * 1000) {
+            // Within 7 days - mark as reappeared
+            console.log(`🔄 Verified issue reappeared: "${data.issueType}"`);
+            
+            const [updated] = await db
+              .update(seoIssueTracking)
+              .set({
+                status: 'reappeared',
+                issueDescription: data.description,
+                severity: data.severity,
+                lastSeenAt: new Date(),
+                reappearedAt: new Date(),
+                metadata: {
+                  ...(existingIssue.metadata as any || {}),
+                  affectedPages: data.affectedPages,
+                  category: data.category,
+                  previouslyResolvedAt: resolvedAt,
+                },
+              })
+              .where(eq(seoIssueTracking.id, existingIssue.id))
+              .returning();
+            
+            return updated;
+          }
+        }
+      }
+    }
+    
+    // ✅ No duplicate found OR grace period expired - create new issue
+    console.log(`✅ Creating new tracked issue: "${data.issueType}"`);
+    
     const [issue] = await db
       .insert(seoIssueTracking)
       .values({
@@ -3263,19 +3469,64 @@ async toggleAutoSchedule(scheduleId: string, isActive: boolean): Promise<AutoSch
         autoFixAvailable: data.autoFixable,
         detectedAt: data.detectedAt,
         lastSeenAt: new Date(),
+        url: data.url || null,  // ✅ Store URL for page-specific issues
         metadata: {
           affectedPages: data.affectedPages,
           category: data.category,
+          detectionCount: 1,
+          createdBy: 'seo_analysis',
         },
       })
       .returning();
 
     return issue;
+    
   } catch (error: any) {
-    console.error('Error creating tracked SEO issue:', error);
+    console.error('Error creating/updating tracked SEO issue:', error);
     throw error;
   }
 }
+
+//   async createTrackedSeoIssue(data: {
+//   websiteId: string;
+//   userId: string;
+//   issueType: string;
+//   severity: 'critical' | 'warning' | 'info';
+//   title: string;
+//   description: string;
+//   affectedPages: number;
+//   category: string;
+//   status: 'detected' | 'fixing' | 'fixed' | 'resolved' | 'reappeared';
+//   autoFixable: boolean;
+//   detectedAt: Date;
+// }): Promise<any> {
+//   try {
+//     const [issue] = await db
+//       .insert(seoIssueTracking)
+//       .values({
+//         websiteId: data.websiteId,
+//         userId: data.userId,
+//         issueType: data.issueType,
+//         issueTitle: data.title,
+//         issueDescription: data.description,
+//         severity: data.severity,
+//         status: data.status,
+//         autoFixAvailable: data.autoFixable,
+//         detectedAt: data.detectedAt,
+//         lastSeenAt: new Date(),
+//         metadata: {
+//           affectedPages: data.affectedPages,
+//           category: data.category,
+//         },
+//       })
+//       .returning();
+
+//     return issue;
+//   } catch (error: any) {
+//     console.error('Error creating tracked SEO issue:', error);
+//     throw error;
+//   }
+// }
 
   /**
    * Update issue status (used during AI fixing)

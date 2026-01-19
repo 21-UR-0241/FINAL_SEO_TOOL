@@ -549,6 +549,10 @@ export const seoIssueTracking = pgTable(
     
     // Metadata stored as JSONB for flexibility
     metadata: jsonb("metadata").default({}),
+      url: text('url'),  // Which page has this issue (null = site-wide)
+  detectionCount: integer('detection_count').default(1),  // How many times detected
+  reappearanceCount: integer('reappearance_count').default(0),  // How many times reappeared
+  reappearedAt: timestamp('reappeared_at'),
     
     // Audit timestamps
     createdAt: timestamp("created_at").notNull().defaultNow(),
