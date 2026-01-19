@@ -1758,70 +1758,8 @@ const proceedWithAuthentication = async (clientId, clientSecret) => {
         </div>
       )}
 
-      {/* Performance Tab */}
-{activeTab === "performance" && (
+     {activeTab === "performance" && (
         <div className="bg-white rounded-lg shadow p-6">
-          {/* DEBUG SECTION */}
-          <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-start space-x-2">
-              <Info className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-yellow-800 flex-1">
-                <p className="font-medium mb-1">Current Account: {selectedAccount.email}</p>
-                <p className="mb-2">Property: {selectedProperty.siteUrl}</p>
-                
-                {/* Check OAuth Scopes Button */}
-                <button
-                  onClick={async () => {
-                    try {
-                      const response = await fetch(
-                        `${API_BASE_URL}/api/gsc/check-scopes?accountId=${selectedAccount.id}`,
-                        { credentials: 'include' }
-                      );
-                      const data = await response.json();
-                      
-                      console.log('========================================');
-                      console.log('🔍 OAUTH SCOPES CHECK');
-                      console.log('Granted scopes:', data.scopes);
-                      console.log('========================================');
-                      
-                      const hasWebmasters = data.scopes?.some(s => 
-                        s.includes('webmasters') || s.includes('searchconsole')
-                      );
-                      
-                      const hasReadonly = data.scopes?.includes('https://www.googleapis.com/auth/webmasters.readonly');
-                      
-                      const scopeList = data.scopes?.map(s => `  • ${s}`).join('\n') || '(none)';
-                      
-                      alert(
-                        `OAuth Scopes Granted:\n\n${scopeList}\n\n` +
-                        `${hasWebmasters ? '✅' : '❌'} Has webmasters scope\n` +
-                        `${hasReadonly ? '✅' : '❌'} Has webmasters.readonly scope (REQUIRED for performance data)\n\n` +
-                        `Email: ${data.email}`
-                      );
-                    } catch (error) {
-                      console.error('Scope check error:', error);
-                      alert('Error checking scopes: ' + error.message);
-                    }
-                  }}
-                  disabled={loading}
-                  className="px-3 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:opacity-50 flex items-center space-x-2"
-                >
-                  <HelpCircle className="w-4 h-4" />
-                  <span>Check OAuth Scopes</span>
-                </button>
-
-                <div className="mt-3 text-xs">
-                  <p className="font-medium mb-1">If performance data fails:</p>
-                  <ol className="list-decimal list-inside space-y-1">
-                    <li>Click "Check OAuth Scopes" to verify permissions</li>
-                    <li>Ensure "webmasters.readonly" scope is granted</li>
-                    <li>If missing scope, remove account and re-authenticate</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
               Performance Data (Last 28 Days)
