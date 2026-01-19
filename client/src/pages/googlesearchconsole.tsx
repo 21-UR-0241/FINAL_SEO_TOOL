@@ -1759,49 +1759,108 @@ const proceedWithAuthentication = async (clientId, clientSecret) => {
       )}
 
       {/* Performance Tab */}
-      {activeTab === "performance" && (
+{activeTab === "performance" && (
         <div className="bg-white rounded-lg shadow p-6">
-          {/* ADD THIS DEBUG SECTION AT THE TOP */}
+          {/* DEBUG SECTION */}
           <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div className="flex items-start space-x-2">
               <Info className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-yellow-800 flex-1">
                 <p className="font-medium mb-1">Current Account: {selectedAccount.email}</p>
                 <p className="mb-2">Property: {selectedProperty.siteUrl}</p>
-                <button
-                  onClick={async () => {
-                    try {
-                      const props = await SearchConsoleAPI.getProperties(selectedAccount.id);
-                      const propForSite = props.find(p => p.siteUrl === selectedProperty.siteUrl);
-                      
-                      console.log('========================================');
-                      console.log('🔍 PROPERTY VERIFICATION');
-                      console.log('All properties:', props);
-                      console.log('Looking for:', selectedProperty.siteUrl);
-                      console.log('Found:', propForSite);
-                      console.log('========================================');
-                      
-                      if (propForSite) {
-                        const message = `✅ Account HAS Access!\n\nURL: ${propForSite.siteUrl}\nPermission: ${propForSite.permissionLevel}\nType: ${propForSite.siteType}\nVerified: ${propForSite.verified}\n\nYou should be able to access performance data.`;
-                        alert(message);
-                        console.log(message);
-                      } else {
-                        const availableProps = props.map(p => `  • ${p.siteUrl} (${p.permissionLevel})`).join('\n');
-                        const message = `❌ Account Does NOT Have Access!\n\nThe account "${selectedAccount.email}" doesn't have access to:\n${selectedProperty.siteUrl}\n\nAvailable properties for this account:\n${availableProps || '  (none)'}`;
-                        alert(message);
-                        console.error(message);
+                
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Verify Property Access Button */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const props = await SearchConsoleAPI.getProperties(selectedAccount.id);
+                        const propForSite = props.find(p => p.siteUrl === selectedProperty.siteUrl);
+                        
+                        console.log('========================================');
+                        console.log('🔍 PROPERTY VERIFICATION');
+                        console.log('All properties:', props);
+                        console.log('Looking for:', selectedProperty.siteUrl);
+                        console.log('Found:', propForSite);
+                        console.log('========================================');
+                        
+                        if (propForSite) {
+                          const message = `✅ Account HAS Access!\n\nURL: ${propForSite.siteUrl}\nPermission: ${propForSite.permissionLevel}\nType: ${propForSite.siteType}\nVerified: ${propForSite.verified}\n\nYou should be able to access performance data.`;
+                          alert(message);
+                          console.log(message);
+                        } else {
+                          const availableProps = props.map(p => `  • ${p.siteUrl} (${p.permissionLevel})`).join('\n');
+                          const message = `❌ Account Does NOT Have Access!\n\nThe account "${selectedAccount.email}" doesn't have access to:\n${selectedProperty.siteUrl}\n\nAvailable properties for this account:\n${availableProps || '  (none)'}`;
+                          alert(message);
+                          console.error(message);
+                        }
+                      } catch (error) {
+                        console.error('Verification error:', error);
+                        alert('Error checking properties: ' + error.message);
                       }
-                    } catch (error) {
-                      console.error('Verification error:', error);
-                      alert('Error checking properties: ' + error.message);
-                    }
-                  }}
-                  disabled={loading}
-                  className="mt-2 px-3 py-2 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 disabled:opacity-50 flex items-center space-x-2"
-                >
-                  <Search className="w-4 h-4" />
-                  <span>Verify Account Has Access to This Property</span>
-                </button>
+                    }}
+                    disabled={loading}
+                    className="px-3 py-2 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 disabled:opacity-50 flex items-center justify-center space-x-2 flex-1 sm:flex-initial"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span>Verify Property Access</span>
+                  </button>
+
+                  {/* Check OAuth Scopes Button */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(
+                          `${API_BASE_URL}/api/gsc/check-scopes?accountId=${selectedAccount.id}`,
+                          { credentials: 'include' }
+                        );
+                        const data = await response.json();
+                        
+                        console.log('========================================');
+                        console.log('🔍 OAUTH SCOPES CHECK');
+                        console.log('Granted scopes:', data.scopes);
+                        console.log('========================================');
+                        
+                        const requiredScopes = [
+                          'https://www.googleapis.com/auth/webmasters',
+                          'https://www.googleapis.com/auth/webmasters.readonly'
+                        ];
+                        
+                        const hasWebmasters = data.scopes?.some(s => 
+                          s.includes('webmasters') || s.includes('searchconsole')
+                        );
+                        
+                        const hasReadonly = data.scopes?.includes('https://www.googleapis.com/auth/webmasters.readonly');
+                        
+                        const scopeList = data.scopes?.map(s => `  • ${s}`).join('\n') || '(none)';
+                        
+                        alert(
+                          `OAuth Scopes Granted:\n\n${scopeList}\n\n` +
+                          `${hasWebmasters ? '✅' : '❌'} Has webmasters scope\n` +
+                          `${hasReadonly ? '✅' : '❌'} Has webmasters.readonly scope (REQUIRED for performance data)\n\n` +
+                          `Email: ${data.email}`
+                        );
+                      } catch (error) {
+                        console.error('Scope check error:', error);
+                        alert('Error checking scopes: ' + error.message);
+                      }
+                    }}
+                    disabled={loading}
+                    className="px-3 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center space-x-2 flex-1 sm:flex-initial"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    <span>Check OAuth Scopes</span>
+                  </button>
+                </div>
+
+                <div className="mt-3 text-xs">
+                  <p className="font-medium mb-1">If performance data fails:</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Check if permission shows "siteOwner"</li>
+                    <li>Check if "webmasters.readonly" scope is granted</li>
+                    <li>If missing scope, remove account and re-authenticate</li>
+                  </ol>
+                </div>
               </div>
             </div>
           </div>
@@ -1894,6 +1953,12 @@ const proceedWithAuthentication = async (clientId, clientSecret) => {
             </div>
        )}
         </div>
+      )}
+
+
+
+
+
       //   <div className="bg-white rounded-lg shadow p-6">
       //     <div className="flex items-center justify-between mb-4">
       //       <h3 className="text-lg font-semibold text-gray-900">

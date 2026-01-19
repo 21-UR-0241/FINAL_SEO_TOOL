@@ -43,6 +43,7 @@ const GSC_SCOPES = [
   'https://www.googleapis.com/auth/webmasters',
   'https://www.googleapis.com/auth/indexing',
   'https://www.googleapis.com/auth/siteverification',
+  'https://www.googleapis.com/auth/webmasters.readonly', // ✅ ADD THIS LINE
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile'
 ];
@@ -1359,6 +1360,71 @@ router.post('/refresh-token', requireAuth, validateAccountId, async (req: Authen
   } catch (error) {
     console.error('Token refresh error:', error);
     res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+// ============================================================================
+// DEBUG ENDPOINTS
+// ============================================================================
+
+router.get('/check-scopes', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { accountId } = req.query;
+    
+    console.log('========================================');
+    console.log('🔍 CHECKING OAUTH SCOPES');
+    console.log('User ID:', userId);
+    console.log('Account ID:', accountId);
+    console.log('========================================');
+    
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID required' });
+    }
+    
+    const account = await gscStorage.getGscAccountWithCredentials(userId, accountId as string);
+    
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    
+    const config = await gscStorage.getGscConfiguration(userId);
+    if (!config) {
+      return res.status(400).json({ error: 'Config not found' });
+    }
+    
+    const oauth2Client = new google.auth.OAuth2(
+      config.clientId,
+      config.clientSecret,
+      config.redirectUri || getRedirectUri()
+    );
+    
+    oauth2Client.setCredentials({
+      access_token: account.accessToken,
+      refresh_token: account.refreshToken
+    });
+    
+    try {
+      // Get token info
+      const tokenInfo = await oauth2Client.getTokenInfo(account.accessToken);
+      
+      console.log('✅ Token info retrieved');
+      console.log('Scopes:', tokenInfo.scopes);
+      console.log('========================================');
+      
+      res.json({
+        scopes: tokenInfo.scopes,
+        email: tokenInfo.email,
+        expiresIn: tokenInfo.expiry_date
+      });
+    } catch (error: any) {
+      console.error('❌ Failed to get token info:', error.message);
+      console.error('========================================');
+      throw error;
+    }
+  } catch (error: any) {
+    console.error('Check scopes error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
