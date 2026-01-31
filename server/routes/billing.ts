@@ -149,6 +149,28 @@ router.get("/subscription", requireAuth, async (req: Request, res: Response) => 
       });
     }
 
+    // 👇 ADD THIS CHECK
+    const now = new Date();
+    const periodEnd = new Date(result.currentPeriodEnd);
+    
+    // If subscription is marked for cancellation and period has ended, update status
+    if (result.cancelAtPeriodEnd && periodEnd < now) {
+      await db
+        .update(userSubscriptions)
+        .set({
+          status: "cancelled",
+          updatedAt: new Date(),
+        })
+        .where(eq(userSubscriptions.id, result.subscriptionId));
+      
+      console.log("✅ Subscription expired, status updated to cancelled");
+      
+      return res.status(404).json({
+        success: false,
+        message: "Subscription has expired",
+      });
+    }
+
     console.log("✅ Subscription found:", {
       id: result.subscriptionId,
       plan: result.planName,
@@ -826,6 +848,74 @@ router.get("/payment-method", requireAuth, async (req: Request, res: Response) =
 });
 
 /**
+ * DELETE /api/billing/payment-method
+ * Remove user's default payment method (only if no active/trial subscription)
+ */
+router.delete("/payment-method", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    // 1) Block deletion if subscription is active/trialing
+    const [subscription] = await db
+      .select()
+      .from(userSubscriptions)
+      .where(
+        and(
+          eq(userSubscriptions.userId, userId),
+          sql`${userSubscriptions.status} IN ('active', 'trial')`,
+        ),
+      )
+      .limit(1);
+
+    if (subscription) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "SUBSCRIPTION_ACTIVE",
+          message:
+            "Cannot remove payment method while subscription is active. Cancel subscription first.",
+        },
+      });
+    }
+
+    // 2) Find default payment method
+    const [paymentMethod] = await db
+      .select()
+      .from(paymentMethods)
+      .where(
+        and(eq(paymentMethods.userId, userId), eq(paymentMethods.isDefault, true)),
+      )
+      .orderBy(desc(paymentMethods.createdAt))
+      .limit(1);
+
+    if (!paymentMethod) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "NOT_FOUND", message: "No payment method found" },
+      });
+    }
+
+    // 3) Detach in Stripe (if you store Stripe PM id)
+    if (paymentMethod.stripePaymentMethodId) {
+      await stripeService.detachPaymentMethod(paymentMethod.stripePaymentMethodId);
+    }
+
+    // 4) Remove from DB
+    await db
+      .delete(paymentMethods)
+      .where(eq(paymentMethods.id, paymentMethod.id));
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("❌ Error deleting payment method:", error);
+    return res.status(500).json({
+      success: false,
+      error: { code: "DELETE_FAILED", message: error.message },
+    });
+  }
+});
+
+/**
  * PUT /api/billing/payment-method
  * Update user's payment method
  */
@@ -1414,5 +1504,100 @@ router.post(
     }
   },
 );
+
+// Add this after your existing GET /subscription route
+
+/**
+ * GET /api/billing/subscription/current
+ * Legacy alias for GET /api/billing/subscription
+ */
+router.get("/subscription/current", requireAuth, async (req: Request, res: Response) => {
+  console.log("⚠️ Legacy endpoint called: /subscription/current");
+  
+  try {
+    const userId = req.user!.id;
+
+    console.log("📊 Fetching subscription for user:", userId);
+
+    const [result] = await db
+      .select({
+        subscriptionId: userSubscriptions.id,
+        planId: userSubscriptions.planId,
+        planName: subscriptionPlans.name,
+        status: userSubscriptions.status,
+        billingInterval: userSubscriptions.billingInterval,
+        currentPeriodEnd: userSubscriptions.currentPeriodEnd,
+        cancelAtPeriodEnd: userSubscriptions.cancelAtPeriodEnd,
+        monthlyPrice: subscriptionPlans.monthlyPrice,
+        yearlyPrice: subscriptionPlans.yearlyPrice,
+      })
+      .from(userSubscriptions)
+      .innerJoin(
+        subscriptionPlans,
+        eq(userSubscriptions.planId, subscriptionPlans.id),
+      )
+      .where(
+        and(
+          eq(userSubscriptions.userId, userId),
+          sql`${userSubscriptions.status} IN ('active', 'trial')`,
+        ),
+      )
+      .orderBy(desc(userSubscriptions.createdAt))
+      .limit(1);
+
+    if (!result) {
+      console.log("❌ No subscription found for user:", userId);
+      return res.status(404).json({
+        success: false,
+        message: "No subscription found",
+      });
+    }
+
+    // Check if subscription has expired
+    const now = new Date();
+    const periodEnd = new Date(result.currentPeriodEnd);
+    
+    if (result.cancelAtPeriodEnd && periodEnd < now) {
+      await db
+        .update(userSubscriptions)
+        .set({
+          status: "cancelled",
+          updatedAt: now,
+        })
+        .where(eq(userSubscriptions.id, result.subscriptionId));
+      
+      console.log("✅ Subscription expired, status updated to cancelled");
+      
+      return res.status(404).json({
+        success: false,
+        message: "Subscription has expired",
+      });
+    }
+
+    const amount =
+      result.billingInterval === "year"
+        ? Number(result.yearlyPrice)
+        : Number(result.monthlyPrice);
+
+    return res.json({
+      success: true,
+      id: result.subscriptionId,
+      planId: result.planId,
+      planName: result.planName,
+      status: result.status,
+      interval: result.billingInterval,
+      currentPeriodEnd: result.currentPeriodEnd.toISOString(),
+      cancelAtPeriodEnd: result.cancelAtPeriodEnd || false,
+      amount,
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching subscription:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch subscription",
+      error: error.message,
+    });
+  }
+});
 
 export default router;

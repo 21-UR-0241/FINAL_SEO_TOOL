@@ -107,21 +107,45 @@ export class WebhookHandler {
 
     const newStatus = statusMap[subscription.status] || "active";
 
+    const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+
+    // If Stripe says cancel_at_period_end and the period already ended,
+    // force status to cancelled (prevents stale "active" rows)
+    const isExpired =
+      subscription.cancel_at_period_end && currentPeriodEnd < new Date();
+
+    const finalStatus = isExpired ? "cancelled" : newStatus;
+
+    // Safely handle canceled_at timestamp
+    let cancelledAt: Date | null = null;
+    if (isExpired) {
+      cancelledAt = new Date();
+    } else if (subscription.canceled_at && typeof subscription.canceled_at === 'number') {
+      cancelledAt = new Date(subscription.canceled_at * 1000);
+    }
+
+    console.log("📝 Updating subscription:", {
+      id: dbSubscription.id,
+      oldStatus: dbSubscription.status,
+      newStatus: finalStatus,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      isExpired,
+      cancelledAt: cancelledAt?.toISOString() || null,
+    });
+
     await db
       .update(userSubscriptions)
       .set({
-        status: newStatus,
+        status: finalStatus,
         currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        cancelledAt: subscription.canceled_at
-          ? new Date(subscription.canceled_at * 1000)
-          : null,
+        cancelledAt,
         updatedAt: new Date(),
       })
       .where(eq(userSubscriptions.id, dbSubscription.id));
 
-    console.log(`✅ Updated subscription status to: ${newStatus}`);
+    console.log(`✅ Updated subscription status to: ${finalStatus}`);
   }
 
   static async handleSubscriptionDeleted(
@@ -173,6 +197,7 @@ export class WebhookHandler {
       console.error("❌ Subscription not found in database");
       return;
     }
+    
     const [transaction] = await db
       .insert(transactions)
       .values({
@@ -187,6 +212,7 @@ export class WebhookHandler {
         processedAt: new Date(invoice.status_transitions.paid_at! * 1000),
       })
       .returning();
+    
     const [existingInvoice] = await db
       .select()
       .from(invoices)
@@ -251,6 +277,7 @@ export class WebhookHandler {
       console.error("❌ Subscription not found in database");
       return;
     }
+    
     await db.insert(transactions).values({
       userId: dbSubscription.userId,
       subscriptionId: dbSubscription.id,

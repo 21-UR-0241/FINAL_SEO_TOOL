@@ -24,6 +24,7 @@
 //   DollarSign,
 //   ArrowUpCircle,
 //   XCircle,
+//   Edit,
 // } from "lucide-react";
 // import { Button } from "@/components/ui/button";
 // import { Input } from "@/components/ui/input";
@@ -58,6 +59,7 @@
 //   AlertDialogTitle,
 // } from "@/components/ui/alert-dialog";
 // import { Sanitizer } from "@/utils/inputSanitizer";
+// import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // // ✅ API base URL (for Render / CORS)
 // const API_URL = import.meta.env.VITE_API_URL || "";
@@ -181,6 +183,23 @@
 //   amount: number;
 // }
 
+// // 👇 INSERT HERE
+// interface PaymentMethod {
+//   id: string;
+//   brand: string; // "visa", "mastercard", "amex"
+//   last4: string;
+//   expMonth: number;
+//   expYear: number;
+//   isDefault: boolean;
+// }
+
+// interface CardUpdateData {
+//   cardNumber: string;
+//   expMonth: string;
+//   expYear: string;
+//   cvc: string;
+// }
+
 // export default function Settings() {
 //   const { toast } = useToast();
 //   const queryClient = useQueryClient();
@@ -209,6 +228,13 @@
 //     confirmPassword: "",
 //   });
 //   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+//   const [isEditingCard, setIsEditingCard] = useState(false);
+//   const [cardUpdateData, setCardUpdateData] = useState<CardUpdateData>({
+//     cardNumber: "",
+//     expMonth: "",
+//     expYear: "",
+//     cvc: "",
+//   });
 
 //   // --- SETTINGS ---
 //   const {
@@ -270,6 +296,26 @@
 //     },
 //   });
 
+
+//     // --- PAYMENT METHOD ---
+//   const {
+//     data: paymentMethod,
+//     isLoading: paymentMethodLoading,
+//   } = useQuery<PaymentMethod | null>({
+//     queryKey: ["/api/billing/payment-method"],
+//     queryFn: async () => {
+//       const response = await apiFetch("/api/billing/payment-method");
+//       if (!response.ok) {
+//         if (response.status === 404) {
+//           return null;
+//         }
+//         const err = await response.json().catch(() => ({}));
+//         throw new Error(err.message || "Failed to fetch payment method");
+//       }
+//       return response.json();
+//     },
+//     enabled: !!subscription, // Only fetch if user has subscription
+//   });
 //   // --- MUTATIONS ---
 
 //   // Delete website
@@ -522,6 +568,42 @@
 //     onError: (error: Error) => {
 //       toast({
 //         title: "Password Change Failed",
+//         description: error.message,
+//         variant: "destructive",
+//       });
+//     },
+//   });
+
+//   // Update payment method
+//   const updatePaymentMethod = useMutation({
+//     mutationFn: async (cardData: CardUpdateData) => {
+//       const response = await apiFetch("/api/billing/payment-method", {
+//         method: "PUT",
+//         body: JSON.stringify(cardData),
+//       });
+//       if (!response.ok) {
+//         const error = await response.json().catch(() => ({}));
+//         throw new Error(error.message || "Failed to update payment method");
+//       }
+//       return response.json();
+//     },
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({ queryKey: ["/api/billing/payment-method"] });
+//       toast({
+//         title: "Payment Method Updated",
+//         description: "Your card has been successfully updated.",
+//       });
+//       setIsEditingCard(false);
+//       setCardUpdateData({
+//         cardNumber: "",
+//         expMonth: "",
+//         expYear: "",
+//         cvc: "",
+//       });
+//     },
+//     onError: (error: Error) => {
+//       toast({
+//         title: "Update Failed",
 //         description: error.message,
 //         variant: "destructive",
 //       });
@@ -814,6 +896,63 @@
 //     setLocation("/subscription");
 //   };
 
+//     const handleUpdateCard = () => {
+//     // Validate card data
+//     if (!cardUpdateData.cardNumber || !cardUpdateData.expMonth || 
+//         !cardUpdateData.expYear || !cardUpdateData.cvc) {
+//       toast({
+//         title: "Missing Information",
+//         description: "Please fill in all card fields.",
+//         variant: "destructive",
+//       });
+//       return;
+//     }
+
+//     // Basic validation
+//     const cardNumber = cardUpdateData.cardNumber.replace(/\s/g, "");
+//     if (cardNumber.length < 13 || cardNumber.length > 19) {
+//       toast({
+//         title: "Invalid Card Number",
+//         description: "Please enter a valid card number.",
+//         variant: "destructive",
+//       });
+//       return;
+//     }
+
+//     if (parseInt(cardUpdateData.expMonth) < 1 || parseInt(cardUpdateData.expMonth) > 12) {
+//       toast({
+//         title: "Invalid Expiry Month",
+//         description: "Month must be between 01 and 12.",
+//         variant: "destructive",
+//       });
+//       return;
+//     }
+
+//     if (cardUpdateData.cvc.length < 3 || cardUpdateData.cvc.length > 4) {
+//       toast({
+//         title: "Invalid CVC",
+//         description: "CVC must be 3 or 4 digits.",
+//         variant: "destructive",
+//       });
+//       return;
+//     }
+
+//     updatePaymentMethod.mutate(cardUpdateData);
+//   };
+
+//   const getCardBrandIcon = (brand: string) => {
+//     switch (brand.toLowerCase()) {
+//       case "visa":
+//         return "💳";
+//       case "mastercard":
+//         return "💳";
+//       case "amex":
+//         return "💳";
+//       default:
+//         return "💳";
+//     }
+//   };
+
 //   // --- LOADING / ERROR STATES ---
 
 //   if (settingsLoading) {
@@ -1071,6 +1210,9 @@
 //                 </div>
 //               </CardContent>
 //             </Card>
+
+
+
 //           </TabsContent>
 
 //           {/* SUBSCRIPTION */}
@@ -1219,6 +1361,74 @@
 //                 )}
 //               </CardContent>
 //             </Card>
+
+//                         {/* 👇 INSERT HERE - Payment Method Card */}
+//             {subscription && (
+//               <Card>
+//                 <CardHeader>
+//                   <CardTitle className="flex items-center justify-between">
+//                     <span className="flex items-center">
+//                       <CreditCard className="w-5 h-5 mr-2" />
+//                       Payment Method
+//                     </span>
+// <Button
+//   size="sm"
+//   variant="outline"
+//   onClick={() => {
+//     // Pre-fill form with existing card details
+//     if (paymentMethod) {
+//       setCardUpdateData({
+//         cardNumber: "", // We don't have the full number, keep empty
+//         expMonth: paymentMethod.expMonth.toString().padStart(2, '0'),
+//         expYear: paymentMethod.expYear.toString().slice(-2), // Last 2 digits
+//         cvc: "", // Security - don't pre-fill CVC
+//       });
+//     }
+//     setIsEditingCard(true);
+//   }}
+//   className="flex items-center"
+// >
+//                       <Edit className="w-4 h-4 mr-2" />
+//                       Update Card
+//                     </Button>
+//                   </CardTitle>
+//                   <CardDescription>
+//                     Manage your payment method for subscription billing
+//                   </CardDescription>
+//                 </CardHeader>
+//                 <CardContent>
+//                   {paymentMethodLoading ? (
+//                     <div className="flex items-center justify-center py-4">
+//                       <Loader2 className="w-5 h-5 animate-spin mr-2" />
+//                       <span className="text-sm">Loading payment method...</span>
+//                     </div>
+//                   ) : paymentMethod ? (
+//                     <div className="flex items-center justify-between p-4 border rounded-lg">
+//                       <div className="flex items-center space-x-4">
+//                         <div className="text-3xl">{getCardBrandIcon(paymentMethod.brand)}</div>
+//                         <div>
+//                           <p className="font-medium text-gray-900 capitalize">
+//                             {paymentMethod.brand} •••• {paymentMethod.last4}
+//                           </p>
+//                           <p className="text-sm text-gray-500">
+//                             Expires {paymentMethod.expMonth.toString().padStart(2, '0')}/{paymentMethod.expYear}
+//                           </p>
+//                         </div>
+//                       </div>
+//                       {paymentMethod.isDefault && (
+//                         <Badge className="bg-blue-100 text-blue-800">Default</Badge>
+//                       )}
+//                     </div>
+//                   ) : (
+//                     <div className="text-center py-4 text-gray-500">
+//                       <p className="text-sm">No payment method on file</p>
+//                     </div>
+//                   )}
+//                 </CardContent>
+//               </Card>
+//             )}
+
+
 //           </TabsContent>
 
 //           {/* INTEGRATIONS (API Keys) */}
@@ -1774,6 +1984,135 @@
 //           </AlertDialogFooter>
 //         </AlertDialogContent>
 //       </AlertDialog>
+// {/* Edit Card Dialog */}
+// <Dialog open={isEditingCard} onOpenChange={setIsEditingCard}>
+//   <DialogContent className="sm:max-w-md">
+//     <DialogHeader>
+//       <DialogTitle className="flex items-center">
+//         <CreditCard className="w-5 h-5 mr-2" />
+//         Update Payment Method
+//       </DialogTitle>
+//       <DialogDescription>
+//         Enter your new card details. Your card will be charged on the next billing cycle.
+//       </DialogDescription>
+//     </DialogHeader>
+//     <div className="space-y-4 py-4">
+//       {/* Current Card Info */}
+//       {paymentMethod && (
+//         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+//           <p className="text-xs font-medium text-gray-700 mb-1">Current Card</p>
+//           <div className="flex items-center text-sm text-gray-600">
+//             <span className="capitalize">{paymentMethod.brand}</span>
+//             <span className="mx-2">••••</span>
+//             <span>{paymentMethod.last4}</span>
+//             <span className="mx-2">|</span>
+//             <span>Exp: {paymentMethod.expMonth.toString().padStart(2, '0')}/{paymentMethod.expYear}</span>
+//           </div>
+//         </div>
+//       )}
+
+//       <div>
+//         <Label htmlFor="cardNumber">Card Number</Label>
+//         <Input
+//           id="cardNumber"
+//           placeholder=""
+//           value={cardUpdateData.cardNumber}
+//           onChange={(e) => {
+//             const value = e.target.value.replace(/\D/g, "").substring(0, 19);
+//             const formatted = value.match(/.{1,4}/g)?.join(" ") || value;
+//             setCardUpdateData((prev) => ({ ...prev, cardNumber: formatted }));
+//           }}
+//           maxLength={19}
+//         />
+//         <p className="text-xs text-gray-500 mt-1">
+//           Enter the full 16-digit card number
+//         </p>
+//       </div>
+//       <div className="grid grid-cols-3 gap-4">
+//         <div>
+//           <Label htmlFor="expMonth">Month</Label>
+//           <Input
+//             id="expMonth"
+//             placeholder="MM"
+//             value={cardUpdateData.expMonth}
+//             onChange={(e) => {
+//               const value = e.target.value.replace(/\D/g, "").substring(0, 2);
+//               setCardUpdateData((prev) => ({ ...prev, expMonth: value }));
+//             }}
+//             maxLength={2}
+//           />
+//         </div>
+//         <div>
+//           <Label htmlFor="expYear">Year</Label>
+//           <Input
+//             id="expYear"
+//             placeholder="YY"
+//             value={cardUpdateData.expYear}
+//             onChange={(e) => {
+//               const value = e.target.value.replace(/\D/g, "").substring(0, 2);
+//               setCardUpdateData((prev) => ({ ...prev, expYear: value }));
+//             }}
+//             maxLength={2}
+//           />
+//         </div>
+//         <div>
+//           <Label htmlFor="cvc">CVC</Label>
+//           <Input
+//             id="cvc"
+//             type="password"
+//             placeholder=""
+//             value={cardUpdateData.cvc}
+//             onChange={(e) => {
+//               const value = e.target.value.replace(/\D/g, "").substring(0, 4);
+//               setCardUpdateData((prev) => ({ ...prev, cvc: value }));
+//             }}
+//             maxLength={4}
+//           />
+//         </div>
+//       </div>
+//       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+//         <p className="text-xs text-blue-800">
+//           🔒 Your card information is encrypted and secure. We use industry-standard security measures.
+//         </p>
+//       </div>
+//     </div>
+//     <DialogFooter className="flex-col sm:flex-row gap-2">
+//       <Button
+//         variant="outline"
+//         onClick={() => {
+//           setIsEditingCard(false);
+//           setCardUpdateData({
+//             cardNumber: "",
+//             expMonth: "",
+//             expYear: "",
+//             cvc: "",
+//           });
+//         }}
+//         className="w-full sm:w-auto"
+//       >
+//         Cancel
+//       </Button>
+//       <Button
+//         onClick={handleUpdateCard}
+//         disabled={updatePaymentMethod.isPending}
+//         className="w-full sm:w-auto"
+//       >
+//         {updatePaymentMethod.isPending ? (
+//           <>
+//             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+//             Updating...
+//           </>
+//         ) : (
+//           <>
+//             <Check className="w-4 h-4 mr-2" />
+//             Update Card
+//           </>
+//         )}
+//       </Button>
+      
+//     </DialogFooter>
+//   </DialogContent>
+// </Dialog>
 //     </div>
 //   );
 // }
@@ -2390,6 +2729,34 @@ export default function Settings() {
       });
     },
   });
+
+
+const deletePaymentMethod = useMutation({
+  mutationFn: async () => {
+    const response = await apiFetch("/api/billing/payment-method", {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || "Failed to delete payment method");
+    }
+    return response.json().catch(() => ({}));
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/billing/payment-method"] });
+    toast({
+      title: "Payment Method Deleted",
+      description: "Your card has been removed.",
+    });
+  },
+  onError: (error: Error) => {
+    toast({
+      title: "Delete Failed",
+      description: error.message,
+      variant: "destructive",
+    });
+  },
+});
 
   // --- DELETE CONFIRMATION ---
 
@@ -3152,23 +3519,23 @@ export default function Settings() {
                       <CreditCard className="w-5 h-5 mr-2" />
                       Payment Method
                     </span>
-<Button
-  size="sm"
-  variant="outline"
-  onClick={() => {
-    // Pre-fill form with existing card details
-    if (paymentMethod) {
-      setCardUpdateData({
-        cardNumber: "", // We don't have the full number, keep empty
-        expMonth: paymentMethod.expMonth.toString().padStart(2, '0'),
-        expYear: paymentMethod.expYear.toString().slice(-2), // Last 2 digits
-        cvc: "", // Security - don't pre-fill CVC
-      });
-    }
-    setIsEditingCard(true);
-  }}
-  className="flex items-center"
->
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        // Pre-fill form with existing card details
+                        if (paymentMethod) {
+                          setCardUpdateData({
+                            cardNumber: "", // We don't have the full number, keep empty
+                            expMonth: paymentMethod.expMonth.toString().padStart(2, '0'),
+                            expYear: paymentMethod.expYear.toString().slice(-2), // Last 2 digits
+                            cvc: "", // Security - don't pre-fill CVC
+                          });
+                        }
+                        setIsEditingCard(true);
+                      }}
+                      className="flex items-center"
+                    >
                       <Edit className="w-4 h-4 mr-2" />
                       Update Card
                     </Button>
@@ -3208,8 +3575,6 @@ export default function Settings() {
                 </CardContent>
               </Card>
             )}
-
-
           </TabsContent>
 
           {/* INTEGRATIONS (API Keys) */}
@@ -3890,6 +4255,7 @@ export default function Settings() {
           </>
         )}
       </Button>
+      
     </DialogFooter>
   </DialogContent>
 </Dialog>

@@ -213,6 +213,9 @@ export default function HighIntentCollection() {
   const [filterByCompetition, setFilterByCompetition] = useState<"all" | "low" | "medium" | "high">("all");
   const [showOnlyLowCompetition, setShowOnlyLowCompetition] = useState(false);
 
+  // Add this with other state declarations
+const [openDownloadMenu, setOpenDownloadMenu] = useState<string | null>(null);
+
   // Blog state
   const [generatedBlogs, setGeneratedBlogs] = useState<GeneratedBlog[]>([]);
   const [isGeneratingBlog, setIsGeneratingBlog] = useState(false);
@@ -1229,7 +1232,74 @@ export default function HighIntentCollection() {
                         )}
                       </div>
                     </div>
-                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+  <LoadingButton onClick={() => setPreviewBlog(blog)} variant="secondary" icon={Eye} className="w-full sm:w-auto">
+    Preview
+  </LoadingButton>
+  
+  {/* UPDATED: Click-based dropdown instead of hover */}
+  <div className="relative w-full sm:w-auto">
+    <LoadingButton 
+      onClick={() => setOpenDownloadMenu(openDownloadMenu === blog.id ? null : blog.id)}
+      variant="success" 
+      icon={Download} 
+      className="w-full sm:w-auto"
+    >
+      Download
+    </LoadingButton>
+    
+    {openDownloadMenu === blog.id && (
+      <>
+        {/* Backdrop to close menu when clicking outside */}
+        <div 
+          className="fixed inset-0 z-10" 
+          onClick={() => setOpenDownloadMenu(null)}
+        />
+        <div className="absolute right-0 mt-1 w-40 bg-white border rounded-lg shadow-lg z-20">
+          <button
+            onClick={() => {
+              downloadBlog(blog, "docx");
+              setOpenDownloadMenu(null);
+            }}
+            className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-t-lg font-medium"
+          >
+            📝 Word (DOCX)
+          </button>
+          <button
+            onClick={() => {
+              downloadBlog(blog, "html");
+              setOpenDownloadMenu(null);
+            }}
+            className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+          >
+            📄 HTML
+          </button>
+          <button
+            onClick={() => {
+              downloadBlog(blog, "md");
+              setOpenDownloadMenu(null);
+            }}
+            className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-b-lg"
+          >
+            📋 Markdown
+          </button>
+        </div>
+      </>
+    )}
+  </div>
+  
+  <LoadingButton
+    onClick={() => deleteBlog(blog.id)}
+    loading={isDeletingBlog === blog.id}
+    variant="danger"
+    icon={Trash2}
+    className="w-full sm:w-auto"
+  >
+    Delete
+  </LoadingButton>
+</div>
+                      {/* <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         <LoadingButton onClick={() => setPreviewBlog(blog)} variant="secondary" icon={Eye} className="w-full sm:w-auto">
                           Preview
                         </LoadingButton>
@@ -1267,7 +1337,7 @@ export default function HighIntentCollection() {
                         >
                           Delete
                         </LoadingButton>
-                      </div>
+                      </div> */}
                   </div>
                 </div>
               ))
@@ -1598,56 +1668,109 @@ export default function HighIntentCollection() {
 
       {/* Blog Preview Modal */}
       {previewBlog && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 truncate pr-4">{previewBlog.title}</h2>
-              <button onClick={() => setPreviewBlog(null)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-8">
-              <div className="prose max-w-none" dangerouslySetInnerHTML={{ 
-                __html: previewBlog.content
-                  .replace(/^```html\s*/gi, "")
-                  .replace(/^```\s*/gi, "")
-                  .replace(/```html\s*$/gi, "")
-                  .replace(/```\s*$/gi, "")
-                  .replace(/```html/gi, "")
-                  .replace(/```/gi, "")
-                  .trim()
-              }} />
-              {previewBlog.faqs && previewBlog.faqs.length > 0 && (
-                <div className="mt-8 border-t pt-8">
-                  <h2 className="text-2xl font-bold mb-6">FAQs</h2>
-                  <div className="space-y-4">
-                    {previewBlog.faqs.map((faq, idx) => (
-                      <div key={idx} className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                        <h3 className="font-semibold text-purple-900 mb-2">{faq.question}</h3>
-                        <p className="text-gray-700">{faq.answer}</p>
-                      </div>
-                    ))}
-                  </div>
+  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="px-6 py-4 border-b flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900 truncate pr-4">{previewBlog.title}</h2>
+        <button onClick={() => setPreviewBlog(null)} className="text-gray-400 hover:text-gray-600">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-8">
+        <div className="prose max-w-none" dangerouslySetInnerHTML={{ 
+          __html: previewBlog.content
+            .replace(/^```html\s*/gi, "")
+            .replace(/^```\s*/gi, "")
+            .replace(/```html\s*$/gi, "")
+            .replace(/```\s*$/gi, "")
+            .replace(/```html/gi, "")
+            .replace(/```/gi, "")
+            .trim()
+        }} />
+        {previewBlog.faqs && previewBlog.faqs.length > 0 && (
+          <div className="mt-8 border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">FAQs</h2>
+            <div className="space-y-4">
+              {previewBlog.faqs.map((faq, idx) => (
+                <div key={idx} className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <h3 className="font-semibold text-purple-900 mb-2">{faq.question}</h3>
+                  <p className="text-gray-700">{faq.answer}</p>
                 </div>
-              )}
-            </div>
-            <div className="border-t px-6 py-4 flex justify-end gap-2 bg-gray-50">
-              <LoadingButton onClick={() => setPreviewBlog(null)} variant="secondary">
-                Close
-              </LoadingButton>
-              <LoadingButton
-                onClick={() => {
-                  downloadBlog(previewBlog, "html");
-                  setPreviewBlog(null);
-                }}
-                variant="primary"
-                icon={Download}
-              >
-                Download
-              </LoadingButton>
+              ))}
             </div>
           </div>
-        </div>
+        )}
+      </div>
+      
+      {/* UPDATED: Changed to DOCX by default instead of HTML */}
+      <div className="border-t px-6 py-4 flex justify-end gap-2 bg-gray-50">
+        <LoadingButton onClick={() => setPreviewBlog(null)} variant="secondary">
+          Close
+        </LoadingButton>
+        <LoadingButton
+          onClick={() => {
+            downloadBlog(previewBlog, "docx"); // Changed from "html" to "docx"
+            setPreviewBlog(null);
+          }}
+          variant="primary"
+          icon={Download}
+        >
+          Download as Word
+        </LoadingButton>
+      </div>
+    </div>
+  </div>
+
+        // <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        //   <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        //     <div className="px-6 py-4 border-b flex items-center justify-between">
+        //       <h2 className="text-lg font-semibold text-gray-900 truncate pr-4">{previewBlog.title}</h2>
+        //       <button onClick={() => setPreviewBlog(null)} className="text-gray-400 hover:text-gray-600">
+        //         <X className="w-5 h-5" />
+        //       </button>
+        //     </div>
+        //     <div className="flex-1 overflow-y-auto p-8">
+        //       <div className="prose max-w-none" dangerouslySetInnerHTML={{ 
+        //         __html: previewBlog.content
+        //           .replace(/^```html\s*/gi, "")
+        //           .replace(/^```\s*/gi, "")
+        //           .replace(/```html\s*$/gi, "")
+        //           .replace(/```\s*$/gi, "")
+        //           .replace(/```html/gi, "")
+        //           .replace(/```/gi, "")
+        //           .trim()
+        //       }} />
+        //       {previewBlog.faqs && previewBlog.faqs.length > 0 && (
+        //         <div className="mt-8 border-t pt-8">
+        //           <h2 className="text-2xl font-bold mb-6">FAQs</h2>
+        //           <div className="space-y-4">
+        //             {previewBlog.faqs.map((faq, idx) => (
+        //               <div key={idx} className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+        //                 <h3 className="font-semibold text-purple-900 mb-2">{faq.question}</h3>
+        //                 <p className="text-gray-700">{faq.answer}</p>
+        //               </div>
+        //             ))}
+        //           </div>
+        //         </div>
+        //       )}
+        //     </div>
+        //     <div className="border-t px-6 py-4 flex justify-end gap-2 bg-gray-50">
+        //       <LoadingButton onClick={() => setPreviewBlog(null)} variant="secondary">
+        //         Close
+        //       </LoadingButton>
+        //       <LoadingButton
+        //         onClick={() => {
+        //           downloadBlog(previewBlog, "html");
+        //           setPreviewBlog(null);
+        //         }}
+        //         variant="primary"
+        //         icon={Download}
+        //       >
+        //         Download
+        //       </LoadingButton>
+        //     </div>
+        //   </div>
+        // </div>
       )}
     </div>
   );

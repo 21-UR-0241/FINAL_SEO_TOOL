@@ -2512,7 +2512,9 @@ ${faqHtml}
 </html>`;
   }
 
+
   async convertToDocx(blog: GeneratedBlog): Promise<Buffer> {
+  try {
     const children: Paragraph[] = [
       new Paragraph({
         text: blog.title,
@@ -2541,49 +2543,55 @@ ${faqHtml}
       }),
     ];
 
-    const contentText = blog.content
-      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "\n[H2]$1[/H2]\n")
-      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "\n[H3]$1[/H3]\n")
-      .replace(/<p[^>]*>(.*?)<\/p>/gi, "[P]$1[/P]\n")
-      .replace(/<li>(.*?)<\/li>/gi, "[LI]$1[/LI]\n")
-      .replace(/<[^>]+>/g, "");
+    // Better HTML to text conversion
+    const contentText = this.htmlToDocxText(blog.content);
 
-    for (const section of contentText.split(/\n+/).filter((s) => s.trim())) {
+    // Split into sections and process
+    const sections = contentText.split(/\n+/).filter((s) => s.trim());
+    
+    for (const section of sections) {
       const trimmed = section.trim();
 
       if (trimmed.startsWith("[H2]")) {
+        const text = this.decodeHtml(trimmed.replace(/\[H2\]|\[\/H2\]/g, ""));
         children.push(
           new Paragraph({
-            text: trimmed.replace("[H2]", "").replace("[/H2]", ""),
+            text,
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
           })
         );
       } else if (trimmed.startsWith("[H3]")) {
+        const text = this.decodeHtml(trimmed.replace(/\[H3\]|\[\/H3\]/g, ""));
         children.push(
           new Paragraph({
-            text: trimmed.replace("[H3]", "").replace("[/H3]", ""),
+            text,
             heading: HeadingLevel.HEADING_3,
             spacing: { before: 300, after: 150 },
           })
         );
       } else if (trimmed.startsWith("[LI]")) {
+        const text = this.decodeHtml(trimmed.replace(/\[LI\]|\[\/LI\]/g, ""));
         children.push(
           new Paragraph({
-            text: `• ${trimmed.replace("[LI]", "").replace("[/LI]", "")}`,
+            text: `• ${text}`,
             spacing: { after: 100 },
           })
         );
       } else if (trimmed.startsWith("[P]")) {
-        children.push(
-          new Paragraph({
-            text: trimmed.replace("[P]", "").replace("[/P]", ""),
-            spacing: { after: 200 },
-          })
-        );
+        const text = this.decodeHtml(trimmed.replace(/\[P\]|\[\/P\]/g, ""));
+        if (text.length > 0) {
+          children.push(
+            new Paragraph({
+              text,
+              spacing: { after: 200 },
+            })
+          );
+        }
       }
     }
 
+    // Add FAQs
     if (blog.faqs?.length > 0) {
       children.push(
         new Paragraph({
@@ -2596,18 +2604,182 @@ ${faqHtml}
       for (const faq of blog.faqs) {
         children.push(
           new Paragraph({
-            text: faq.question,
+            text: this.decodeHtml(faq.question),
             heading: HeadingLevel.HEADING_3,
             spacing: { before: 200, after: 100 },
           }),
-          new Paragraph({ text: faq.answer, spacing: { after: 200 } })
+          new Paragraph({ 
+            text: this.decodeHtml(faq.answer), 
+            spacing: { after: 200 } 
+          })
         );
       }
     }
 
-    const doc = new Document({ sections: [{ children }] });
-    return await Packer.toBuffer(doc);
+    const doc = new Document({ 
+      sections: [{ 
+        properties: {},
+        children 
+      }] 
+    });
+    
+    const buffer = await Packer.toBuffer(doc);
+    console.log(`✅ Generated DOCX buffer: ${buffer.length} bytes`);
+    return buffer;
+    
+  } catch (error: any) {
+    console.error("❌ DOCX conversion failed:", error);
+    throw new Error(`Failed to convert blog to DOCX: ${error.message}`);
   }
+}
+
+// NEW HELPER METHOD: Better HTML to text conversion
+private htmlToDocxText(html: string): string {
+  return html
+    // Preserve headings and paragraphs with markers
+    .replace(/<h2[^>]*>(.*?)<\/h2>/gis, "\n[H2]$1[/H2]\n")
+    .replace(/<h3[^>]*>(.*?)<\/h3>/gis, "\n[H3]$1[/H3]\n")
+    .replace(/<p[^>]*>(.*?)<\/p>/gis, "[P]$1[/P]\n")
+    .replace(/<li[^>]*>(.*?)<\/li>/gis, "[LI]$1[/LI]\n")
+    // Remove all other HTML tags
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    // Clean up multiple newlines
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// NEW HELPER METHOD: Decode HTML entities
+private decodeHtml(text: string): string {
+  const entities: { [key: string]: string } = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+    '&mdash;': '\u2014',  // em dash
+    '&ndash;': '\u2013',  // en dash
+    '&hellip;': '\u2026', // ellipsis
+    '&rsquo;': '\u2019',  // right single quote
+    '&lsquo;': '\u2018',  // left single quote
+    '&rdquo;': '\u201D',  // right double quote
+    '&ldquo;': '\u201C',  // left double quote
+  };
+
+  let decoded = text;
+  for (const [entity, char] of Object.entries(entities)) {
+    decoded = decoded.replace(new RegExp(entity, 'g'), char);
+  }
+  
+  // Decode numeric entities
+  decoded = decoded.replace(/&#(\d+);/g, (match, dec) => {
+    return String.fromCharCode(dec);
+  });
+  
+  decoded = decoded.replace(/&#x([0-9a-f]+);/gi, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+  
+  return decoded.trim();
+}
+  // async convertToDocx(blog: GeneratedBlog): Promise<Buffer> {
+  //   const children: Paragraph[] = [
+  //     new Paragraph({
+  //       text: blog.title,
+  //       heading: HeadingLevel.HEADING_1,
+  //       spacing: { after: 400 },
+  //     }),
+  //     new Paragraph({
+  //       children: [
+  //         new TextRun({
+  //           text: blog.metaDescription,
+  //           italics: true,
+  //           color: "666666",
+  //         }),
+  //       ],
+  //       spacing: { after: 400 },
+  //     }),
+  //     new Paragraph({
+  //       children: [
+  //         new TextRun({
+  //           text: `Words: ${blog.wordCount} | SEO: ${blog.seoScore}%`,
+  //           size: 20,
+  //           color: "888888",
+  //         }),
+  //       ],
+  //       spacing: { after: 600 },
+  //     }),
+  //   ];
+
+  //   const contentText = blog.content
+  //     .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "\n[H2]$1[/H2]\n")
+  //     .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "\n[H3]$1[/H3]\n")
+  //     .replace(/<p[^>]*>(.*?)<\/p>/gi, "[P]$1[/P]\n")
+  //     .replace(/<li>(.*?)<\/li>/gi, "[LI]$1[/LI]\n")
+  //     .replace(/<[^>]+>/g, "");
+
+  //   for (const section of contentText.split(/\n+/).filter((s) => s.trim())) {
+  //     const trimmed = section.trim();
+
+  //     if (trimmed.startsWith("[H2]")) {
+  //       children.push(
+  //         new Paragraph({
+  //           text: trimmed.replace("[H2]", "").replace("[/H2]", ""),
+  //           heading: HeadingLevel.HEADING_2,
+  //           spacing: { before: 400, after: 200 },
+  //         })
+  //       );
+  //     } else if (trimmed.startsWith("[H3]")) {
+  //       children.push(
+  //         new Paragraph({
+  //           text: trimmed.replace("[H3]", "").replace("[/H3]", ""),
+  //           heading: HeadingLevel.HEADING_3,
+  //           spacing: { before: 300, after: 150 },
+  //         })
+  //       );
+  //     } else if (trimmed.startsWith("[LI]")) {
+  //       children.push(
+  //         new Paragraph({
+  //           text: `• ${trimmed.replace("[LI]", "").replace("[/LI]", "")}`,
+  //           spacing: { after: 100 },
+  //         })
+  //       );
+  //     } else if (trimmed.startsWith("[P]")) {
+  //       children.push(
+  //         new Paragraph({
+  //           text: trimmed.replace("[P]", "").replace("[/P]", ""),
+  //           spacing: { after: 200 },
+  //         })
+  //       );
+  //     }
+  //   }
+
+  //   if (blog.faqs?.length > 0) {
+  //     children.push(
+  //       new Paragraph({
+  //         text: "Frequently Asked Questions",
+  //         heading: HeadingLevel.HEADING_2,
+  //         spacing: { before: 600, after: 300 },
+  //       })
+  //     );
+
+  //     for (const faq of blog.faqs) {
+  //       children.push(
+  //         new Paragraph({
+  //           text: faq.question,
+  //           heading: HeadingLevel.HEADING_3,
+  //           spacing: { before: 200, after: 100 },
+  //         }),
+  //         new Paragraph({ text: faq.answer, spacing: { after: 200 } })
+  //       );
+  //     }
+  //   }
+
+  //   const doc = new Document({ sections: [{ children }] });
+  //   return await Packer.toBuffer(doc);
+  // }
 
   async exportBlogToDocx(blog: GeneratedBlog): Promise<Buffer> {
     return this.convertToDocx(blog);
