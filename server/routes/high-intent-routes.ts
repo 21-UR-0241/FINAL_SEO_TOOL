@@ -558,6 +558,7 @@ router.delete("/blogs/:blogId", (async (req: Request, res: Response) => {
   }
 }) as RequestHandler);
 
+
 // GET /api/user/high-intent/blogs/:blogId/download
 router.get("/blogs/:blogId/download", (async (req: Request, res: Response) => {
   try {
@@ -575,52 +576,56 @@ router.get("/blogs/:blogId/download", (async (req: Request, res: Response) => {
     // Track download
     await highIntentService.trackBlogDownload(userId, blogId, format as string);
 
+    // Sanitize filename
     const filename = blog.title
       .toLowerCase()
       .replace(/[^a-z0-9]+/gi, "-")
-      .replace(/^-|-$/g, "");
+      .replace(/^-|-$/g, "")
+      .substring(0, 100); // Limit length
+
+    console.log(`📥 Download request: ${format} for blog "${blog.title}"`);
 
     switch (format) {
-      case "html":
-        res.setHeader("Content-Type", "text/html");
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <meta name="description" content="${blog.metaDescription}">
-            <title>${blog.title}</title>
-            <style>
-              body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
-              h1 { color: #333; }
-              .meta { color: #666; font-style: italic; margin-bottom: 20px; }
-              .faq { margin-top: 30px; }
-              .faq h3 { color: #444; }
-            </style>
-          </head>
-          <body>
-            <h1>${blog.title}</h1>
-            <p class="meta">${blog.metaDescription}</p>
-            ${blog.content}
-            ${blog.faqs && (blog.faqs as any[]).length > 0 ? `
-              <div class="faq">
-                <h2>Frequently Asked Questions</h2>
-                ${(blog.faqs as any[]).map((faq: any) => `
-                  <h3>${faq.question}</h3>
-                  <p>${faq.answer}</p>
-                `).join("")}
-              </div>
-            ` : ""}
-          </body>
-          </html>
-        `);
-        break;
+      case "html": {
+        const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="description" content="${blog.metaDescription}">
+  <title>${blog.title}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    h1 { color: #333; }
+    .meta { color: #666; font-style: italic; margin-bottom: 20px; }
+    .faq { margin-top: 30px; }
+    .faq h3 { color: #444; }
+  </style>
+</head>
+<body>
+  <h1>${blog.title}</h1>
+  <p class="meta">${blog.metaDescription}</p>
+  ${blog.content}
+  ${blog.faqs && (blog.faqs as any[]).length > 0 ? `
+    <div class="faq">
+      <h2>Frequently Asked Questions</h2>
+      ${(blog.faqs as any[]).map((faq: any) => `
+        <h3>${faq.question}</h3>
+        <p>${faq.answer}</p>
+      `).join("")}
+    </div>
+  ` : ""}
+</body>
+</html>`;
 
-      case "md":
-        res.setHeader("Content-Type", "text/markdown");
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}.md"`);
-        
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
+        res.setHeader("Content-Length", Buffer.byteLength(htmlContent, 'utf8').toString());
+        res.send(htmlContent);
+        console.log(`✅ HTML sent: ${Buffer.byteLength(htmlContent)} bytes`);
+        break;
+      }
+
+      case "md": {
         // Convert HTML to markdown (basic conversion)
         const mdContent = blog.content
           .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n")
@@ -634,7 +639,7 @@ router.get("/blogs/:blogId/download", (async (req: Request, res: Response) => {
           .replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n")
           .replace(/<[^>]*>/g, "");
 
-        res.send(`# ${blog.title}
+        const markdownFile = `# ${blog.title}
 
 *${blog.metaDescription}*
 
@@ -647,28 +652,195 @@ ${(blog.faqs as any[]).map((faq: any) => `### ${faq.question}
 
 ${faq.answer}
 `).join("\n")}
-` : ""}
-`);
-        break;
+` : ""}`;
 
-      case "docx":
+        res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}.md"`);
+        res.setHeader("Content-Length", Buffer.byteLength(markdownFile, 'utf8').toString());
+        res.send(markdownFile);
+        console.log(`✅ Markdown sent: ${Buffer.byteLength(markdownFile)} bytes`);
+        break;
+      }
+
+      case "docx": {
+        console.log(`📄 Generating DOCX for blog: ${blog.id}`);
+        
+        // Generate DOCX buffer
         const buffer = await highIntentService.exportBlogToDocx(blog);
+        
+        // Validate buffer
+        if (!buffer || buffer.length === 0) {
+          console.error("❌ Generated DOCX buffer is empty");
+          throw new Error('Generated DOCX buffer is empty');
+        }
+        
+        if (!Buffer.isBuffer(buffer)) {
+          console.error("❌ Generated content is not a Buffer");
+          throw new Error('Generated content is not a Buffer');
+        }
+        
+        // Verify it's a valid ZIP/DOCX file (should start with PK - 0x50 0x4B)
+        const isPKZip = buffer[0] === 0x50 && buffer[1] === 0x4B;
+        if (!isPKZip) {
+          console.error("❌ Buffer does not appear to be a valid DOCX file");
+          console.error("First 10 bytes:", Array.from(buffer.slice(0, 10)));
+          throw new Error('Invalid DOCX file generated - not a ZIP archive');
+        }
+        
+        console.log(`✅ DOCX buffer validated:`, {
+          size: buffer.length,
+          isBuffer: Buffer.isBuffer(buffer),
+          isPKZip,
+          filename: `${filename}.docx`
+        });
+        
+        // Set headers BEFORE sending - critical for CORS and browser handling
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}.docx"`);
-        res.send(buffer);
-        break;
+        res.setHeader("Content-Length", buffer.length.toString());
+        res.setHeader("Cache-Control", "no-cache");
+        
+        // CRITICAL: Use res.end() instead of res.send() for binary data
+        // res.send() may try to convert the buffer to a string which corrupts it
+        res.end(buffer, 'binary');
+        
+        console.log(`✅ DOCX sent successfully: ${buffer.length} bytes`);
+        
+        // Important: return here to prevent any further code execution
+        return;
+      }
 
       default:
-        res.status(400).json({ message: "Invalid format. Use: html, docx, or md" });
+        res.status(400).json({ 
+          success: false,
+          message: "Invalid format. Use: html, docx, or md" 
+        });
+        return;
     }
   } catch (error: any) {
     console.error("❌ Download blog error:", error);
+    console.error("Stack:", error.stack);
+    
     res.status(500).json({
       success: false,
       message: error.message || "Failed to download blog",
     });
   }
 }) as RequestHandler);
+
+
+
+// GET /api/user/high-intent/blogs/:blogId/download
+// router.get("/blogs/:blogId/download", (async (req: Request, res: Response) => {
+//   try {
+//     const { blogId } = req.params;
+//     const { format = "html" } = req.query;
+//     const userId = req.user!.id;
+
+//     const blog = await highIntentService.getBlogById(userId, blogId);
+
+//     if (!blog) {
+//       res.status(404).json({ success: false, message: "Blog not found" });
+//       return;
+//     }
+
+//     // Track download
+//     await highIntentService.trackBlogDownload(userId, blogId, format as string);
+
+//     const filename = blog.title
+//       .toLowerCase()
+//       .replace(/[^a-z0-9]+/gi, "-")
+//       .replace(/^-|-$/g, "");
+
+//     switch (format) {
+//       case "html":
+//         res.setHeader("Content-Type", "text/html");
+//         res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
+//         res.send(`
+//           <!DOCTYPE html>
+//           <html>
+//           <head>
+//             <meta charset="UTF-8">
+//             <meta name="description" content="${blog.metaDescription}">
+//             <title>${blog.title}</title>
+//             <style>
+//               body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+//               h1 { color: #333; }
+//               .meta { color: #666; font-style: italic; margin-bottom: 20px; }
+//               .faq { margin-top: 30px; }
+//               .faq h3 { color: #444; }
+//             </style>
+//           </head>
+//           <body>
+//             <h1>${blog.title}</h1>
+//             <p class="meta">${blog.metaDescription}</p>
+//             ${blog.content}
+//             ${blog.faqs && (blog.faqs as any[]).length > 0 ? `
+//               <div class="faq">
+//                 <h2>Frequently Asked Questions</h2>
+//                 ${(blog.faqs as any[]).map((faq: any) => `
+//                   <h3>${faq.question}</h3>
+//                   <p>${faq.answer}</p>
+//                 `).join("")}
+//               </div>
+//             ` : ""}
+//           </body>
+//           </html>
+//         `);
+//         break;
+
+//       case "md":
+//         res.setHeader("Content-Type", "text/markdown");
+//         res.setHeader("Content-Disposition", `attachment; filename="${filename}.md"`);
+        
+//         // Convert HTML to markdown (basic conversion)
+//         const mdContent = blog.content
+//           .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n")
+//           .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n")
+//           .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n")
+//           .replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n")
+//           .replace(/<strong[^>]*>(.*?)<\/strong>/gi, "**$1**")
+//           .replace(/<em[^>]*>(.*?)<\/em>/gi, "*$1*")
+//           .replace(/<ul[^>]*>/gi, "")
+//           .replace(/<\/ul>/gi, "\n")
+//           .replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n")
+//           .replace(/<[^>]*>/g, "");
+
+//         res.send(`# ${blog.title}
+
+// *${blog.metaDescription}*
+
+// ${mdContent}
+
+// ${blog.faqs && (blog.faqs as any[]).length > 0 ? `
+// ## Frequently Asked Questions
+
+// ${(blog.faqs as any[]).map((faq: any) => `### ${faq.question}
+
+// ${faq.answer}
+// `).join("\n")}
+// ` : ""}
+// `);
+//         break;
+
+//       case "docx":
+//         const buffer = await highIntentService.exportBlogToDocx(blog);
+//         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+//         res.setHeader("Content-Disposition", `attachment; filename="${filename}.docx"`);
+//         res.send(buffer);
+//         break;
+
+//       default:
+//         res.status(400).json({ message: "Invalid format. Use: html, docx, or md" });
+//     }
+//   } catch (error: any) {
+//     console.error("❌ Download blog error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || "Failed to download blog",
+//     });
+//   }
+// }) as RequestHandler);
 
 // =============================================================================
 // EXPORT ENDPOINTS

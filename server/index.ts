@@ -2233,6 +2233,11 @@
 // });
 
 
+
+
+
+
+
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import session from "express-session";
@@ -2383,7 +2388,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       "Access-Control-Allow-Headers",
       "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token",
     );
-    res.setHeader("Access-Control-Expose-Headers", "Set-Cookie, Content-Type");
+    res.setHeader("Access-Control-Expose-Headers", "Set-Cookie, Content-Type, Content-Disposition, Content-Length");
     res.setHeader("Access-Control-Max-Age", "86400");
     res.setHeader("Vary", "Origin");
 
@@ -2424,7 +2429,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token",
   );
-  res.setHeader("Access-Control-Expose-Headers", "Set-Cookie, Content-Type");
+  res.setHeader("Access-Control-Expose-Headers", "Set-Cookie, Content-Type, Content-Disposition, Content-Length");
   res.setHeader("Vary", "Origin");
 
   next();

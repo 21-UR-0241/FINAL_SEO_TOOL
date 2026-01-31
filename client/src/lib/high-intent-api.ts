@@ -359,18 +359,69 @@ export const highIntentApi = {
   /**
    * Download a blog in specified format
    */
-  async downloadBlog(blogId: string, format: "html" | "docx" | "md"): Promise<Blob> {
-    const response = await fetchWithCredentials(
-      `/api/user/high-intent/blogs/${blogId}/download?format=${format}`
+  // async downloadBlog(blogId: string, format: "html" | "docx" | "md"): Promise<Blob> {
+  //   const response = await fetchWithCredentials(
+  //     `/api/user/high-intent/blogs/${blogId}/download?format=${format}`
+  //   );
+
+  //   if (!response.ok) {
+  //     const error = await response.json().catch(() => ({ message: "Failed to download blog" }));
+  //     throw new Error(error.message || "Failed to download blog");
+  //   }
+
+  //   return response.blob();
+  // },
+
+
+/**
+ * Download a blog in specified format
+ */
+async downloadBlog(blogId: string, format: "html" | "docx" | "md"): Promise<Blob> {
+  try {
+    console.log(`📥 Downloading blog ${blogId} as ${format}...`);
+    
+    const response = await fetch(
+      `${API_URL}/api/user/high-intent/blogs/${blogId}/download?format=${format}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+      }
     );
 
+    console.log(`📡 Download response:`, {
+      status: response.status,
+      statusText: response.statusText,
+      contentType: response.headers.get('content-type'),
+      contentLength: response.headers.get('content-length'),
+    });
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Failed to download blog" }));
-      throw new Error(error.message || "Failed to download blog");
+      const errorText = await response.text();
+      console.error('❌ Download failed:', response.status, errorText);
+      throw new Error(`Download failed: ${response.status} - ${errorText}`);
     }
 
-    return response.blob();
-  },
+    const blob = await response.blob();
+    
+    console.log('✅ Downloaded blob:', {
+      size: blob.size,
+      type: blob.type,
+      format,
+    });
+    
+    if (blob.size === 0) {
+      throw new Error('Downloaded file is empty');
+    }
+    
+    return blob;
+    
+  } catch (error: any) {
+    console.error('❌ Download error:', error);
+    throw new Error(error.message || 'Failed to download blog');
+  }
+},
+
+
 
   /**
    * Delete a generated blog
