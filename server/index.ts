@@ -843,7 +843,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       log(`   - Health Check: http://${host}:${port}/health`);
 
       // Start scheduler after server is listening
-      schedulerService.startScheduler(10);
+      schedulerService.startScheduler(1);
       log(`⏰ Content scheduler started`);
 
       startSubscriptionCleanupJob(60); // Run every 60 minutes
