@@ -923,13 +923,15 @@ import express, { Request, Response, NextFunction } from "express";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
 import { Pool } from "pg";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 
-// Import only essential services
-import billingRoutes from "./routes/billing";
-import { stripeService } from "./services/stripe-service";
-import { WebhookHandler } from "./services/webhook-handler";
-import Stripe from "stripe";
+// ❌ REMOVED ALL STRIPE IMPORTS TO SAVE MEMORY (~50MB)
+// import billingRoutes from "./routes/billing";
+// import { stripeService } from "./services/stripe-service";
+// import { WebhookHandler } from "./services/webhook-handler";
+// import Stripe from "stripe";
 
 // =============================================================================
 // TYPE DECLARATIONS
@@ -944,7 +946,6 @@ declare global {
         email?: string;
         name?: string;
         isAdmin?: boolean;
-        stripeCustomerId?: string;
       };
     }
   }
@@ -958,43 +959,61 @@ declare module "express-session" {
 }
 
 // =============================================================================
-// MINIMAL CONFIGURATION
+// UTILITY FUNCTIONS
+// =============================================================================
+
+function log(message: string) {
+  if (process.env.NODE_ENV !== "production") {
+    console.log(message);
+  }
+}
+
+// =============================================================================
+// CORS CONFIGURATION
 // =============================================================================
 
 const ALLOWED_ORIGINS = [
   "https://final-seo-tool.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
+  "http://localhost:5000",
 ];
 
 const isAllowedOrigin = (origin: string | undefined): boolean => {
   if (!origin) return false;
-  if (process.env.ALLOW_VERCEL_PREVIEWS === "true" && origin.includes(".vercel.app")) {
+
+  if (
+    process.env.ALLOW_VERCEL_PREVIEWS === "true" &&
+    origin.includes(".vercel.app")
+  ) {
     return true;
   }
+
   return ALLOWED_ORIGINS.some((allowed) => origin.startsWith(allowed));
 };
 
 // =============================================================================
-// DATABASE - ULTRA MINIMAL
+// SESSION STORE CONFIGURATION - MEMORY OPTIMIZED
 // =============================================================================
 
 const PgSession = pgSession(session);
 
-// Absolute minimum connections
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-  max: 3, // Minimum possible
-  idleTimeoutMillis: 20000,
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? { rejectUnauthorized: false }
+      : (false as any),
+  max: 5, // Reduced from default 20
+  idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
 
 pool.query("SELECT NOW()", (err, res) => {
   if (err) {
-    console.error("❌ DB failed:", err.message);
+    console.error("❌ Database connection failed:", err);
   } else {
-    console.log("✅ DB connected");
+    console.log("✅ Database connected:", res.rows[0].now);
   }
 });
 
@@ -1009,95 +1028,234 @@ const sessionStore = new PgSession({
 export { pool };
 
 // =============================================================================
-// EXPRESS APP - MINIMAL MIDDLEWARE
+// EXPRESS APP SETUP
 // =============================================================================
 
 const app = express();
+
+// =============================================================================
+// 1. TRUST PROXY
+// =============================================================================
+
 app.set("trust proxy", 1);
 
 // =============================================================================
-// CORS - SIMPLIFIED
+// 2. OPTIONS HANDLER
 // =============================================================================
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin;
-  
   if (req.method === "OPTIONS") {
+    const origin = req.headers.origin;
+
     if (origin && isAllowedOrigin(origin)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
+    } else {
+      res.setHeader("Access-Control-Allow-Origin", "*");
     }
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie");
+
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+    );
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token",
+    );
+    res.setHeader("Access-Control-Expose-Headers", "Set-Cookie, Content-Type");
+    res.setHeader("Access-Control-Max-Age", "86400");
+    res.setHeader("Vary", "Origin");
+
     return res.status(200).end();
   }
 
-  if (origin && isAllowedOrigin(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-  }
-  
   next();
 });
 
 // =============================================================================
-// STRIPE WEBHOOK - MINIMAL LOGGING
+// 3. CORS FOR ALL OTHER REQUESTS
 // =============================================================================
 
-app.post(
-  "/api/billing/webhooks/stripe",
-  express.raw({ type: "application/json" }),
-  async (req: Request, res: Response) => {
-    try {
-      const sig = req.headers["stripe-signature"] as string;
-      const event = stripeService.constructWebhookEvent(req.body, sig);
-      
-      console.log("🔔 Webhook:", event.type);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
 
-      switch (event.type) {
-        case "checkout.session.completed":
-          await WebhookHandler.handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
-          break;
-        case "customer.subscription.created":
-          await WebhookHandler.handleSubscriptionCreated(event.data.object as Stripe.Subscription);
-          break;
-        case "customer.subscription.updated":
-          await WebhookHandler.handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
-          break;
-        case "customer.subscription.deleted":
-          await WebhookHandler.handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-          break;
-        case "invoice.paid":
-          await WebhookHandler.handleInvoicePaid(event.data.object as Stripe.Invoice);
-          break;
-        case "invoice.payment_failed":
-          await WebhookHandler.handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
-          break;
-        case "payment_intent.succeeded":
-          await WebhookHandler.handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent);
-          break;
-        case "payment_intent.payment_failed":
-          await WebhookHandler.handlePaymentFailed(event.data.object as Stripe.PaymentIntent);
-          break;
-      }
-
-      res.json({ received: true });
-    } catch (err: any) {
-      console.error("❌ Webhook error:", err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else if (!origin) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
   }
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-CSRF-Token",
+  );
+  res.setHeader("Access-Control-Expose-Headers", "Set-Cookie, Content-Type");
+  res.setHeader("Vary", "Origin");
+
+  next();
+});
+
+// =============================================================================
+// 4. BODY PARSERS
+// =============================================================================
+
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: false, limit: "5mb" }));
+
+// =============================================================================
+// 5. CORS TEST ENDPOINTS
+// =============================================================================
+
+app.get("/api/cors-test", (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    message: "CORS is working!",
+    origin: req.headers.origin,
+    isAllowed: isAllowedOrigin(req.headers.origin),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.post("/api/cors-test", (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    message: "CORS POST is working!",
+    origin: req.headers.origin,
+    isAllowed: isAllowedOrigin(req.headers.origin),
+    body: req.body,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// =============================================================================
+// 6. RATE LIMITING
+// =============================================================================
+
+const rateLimitHandler = (req: Request, res: Response) => {
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  res.status(429).json({
+    success: false,
+    message: "Too many requests, please try again later.",
+  });
+};
+
+const generalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 500,
+  handler: rateLimitHandler,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  skip: (req) => req.method === "OPTIONS",
+  skipFailedRequests: true,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  handler: rateLimitHandler,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  skip: (req) => req.method === "OPTIONS",
+  skipFailedRequests: true,
+});
+
+app.use("/api/", generalLimiter);
+app.use("/api/auth/", authLimiter);
+app.use("/api/gsc/auth", authLimiter);
+app.use("/api/gsc/auth-url", authLimiter);
+app.use("/api/gsc/oauth-callback", authLimiter);
+
+// =============================================================================
+// 7. SECURITY HEADERS - SIMPLIFIED FOR MEMORY
+// =============================================================================
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+
+  if (
+    req.path === "/api/gsc/oauth-callback" ||
+    req.path === "/api/auth/google/callback"
+  ) {
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  }
+
+  next();
+});
+
+// Simplified Helmet - CSP disabled in production to save memory
+app.use(
+  helmet({
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: process.env.NODE_ENV === "production" ? false : {
+      directives: {
+        defaultSrc: ["'self'"],
+        connectSrc: [
+          "'self'",
+          ...(process.env.NODE_ENV !== "production"
+            ? [
+                "http://localhost:3000",
+                "http://localhost:5000",
+                "http://localhost:5173",
+              ]
+            : []),
+          "https://www.googleapis.com",
+          "https://accounts.google.com",
+          "https://oauth2.googleapis.com",
+        ],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "https:", "*.googleusercontent.com"],
+        frameAncestors: ["'self'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+  }),
 );
 
 // =============================================================================
-// BODY PARSERS - MINIMAL
+// 8. INPUT SANITIZATION - SIMPLIFIED
 // =============================================================================
 
-app.use(express.json({ limit: "2mb" })); // Reduced to 2MB
-app.use(express.urlencoded({ extended: false, limit: "2mb" }));
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const sanitizeString = (str: any): any => {
+    if (typeof str !== "string") return str;
+    return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "").trim();
+  };
+
+  if (req.body && typeof req.body === "object") {
+    Object.keys(req.body).forEach((key) => {
+      if (!["password", "token", "refreshToken", "accessToken", "url", "redirectUri", "clientSecret"].includes(key)) {
+        req.body[key] = sanitizeString(req.body[key]);
+      }
+    });
+  }
+
+  next();
+});
 
 // =============================================================================
-// SESSION - MINIMAL
+// 9. SESSION CONFIGURATION
 // =============================================================================
 
 app.use(
@@ -1106,19 +1264,22 @@ app.use(
     secret: process.env.SESSION_SECRET || "your-super-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
-    name: "session",
+    name: "ai-seo-session",
     proxy: true,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      domain: undefined,
+      path: "/",
     },
+    rolling: true,
   }),
 );
 
 // =============================================================================
-// AUTH MIDDLEWARE
+// 10. AUTHENTICATION MIDDLEWARE
 // =============================================================================
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -1126,117 +1287,196 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
     req.user = {
       id: req.session.userId,
       username: req.session.username || req.session.userId,
+      email: undefined,
+      name: undefined,
     };
   }
   next();
 });
 
 // =============================================================================
-// ROUTES - REGISTER IMMEDIATELY
+// 11. REQUEST LOGGER - MINIMAL IN PRODUCTION
+// =============================================================================
+
+if (process.env.NODE_ENV !== "production") {
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith("/api") && !req.path.includes("cors-test")) {
+      console.log(`📥 ${req.method} ${req.path}`);
+    }
+    next();
+  });
+}
+
+// =============================================================================
+// 12. SESSION DEBUG ENDPOINT
+// =============================================================================
+
+app.get("/api/session-debug", (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    hasSession: !!req.session,
+    sessionID: req.sessionID,
+    userId: req.session?.userId || null,
+    username: req.session?.username || null,
+    environment: process.env.NODE_ENV || "development",
+  });
+});
+
+// =============================================================================
+// SERVER STARTUP & ROUTES
 // =============================================================================
 
 (async () => {
   try {
-    console.log("📋 Loading routes...");
+    console.log("📋 Registering API routes...");
     
     const { registerRoutes } = await import("./routes.ts").catch(() => ({
       registerRoutes: async (app: any) => app,
     }));
 
     await registerRoutes(app);
-    console.log("✅ Routes loaded");
+    console.log("✅ API routes registered");
 
-    app.use("/api/billing", billingRoutes);
+    // ❌ BILLING ROUTES REMOVED TO SAVE MEMORY
+    // app.use("/api/billing", billingRoutes);
 
-    // Health check with memory
+    // Health check with memory info
     app.get("/health", (_req: Request, res: Response) => {
       const mem = process.memoryUsage();
       res.json({
         status: "healthy",
-        memory: `${Math.round(mem.rss / 1024 / 1024)}MB`,
-        uptime: Math.round(process.uptime()),
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "development",
+        uptime: process.uptime(),
+        memory: {
+          rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
+          heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
+          heapTotal: `${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
+        },
       });
     });
 
-    app.get("/api", (_req: Request, res: Response) => {
-      res.json({ status: "running", version: "1.0.0" });
+    app.get("/api", (req: Request, res: Response) => {
+      res.json({
+        message: "SEO Tool API Server",
+        version: "1.0.0",
+        status: "running",
+        billing: "disabled", // ✅ Billing disabled to save memory
+      });
     });
 
-    // Minimal error handler
+    // Vite only in development
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        const { setupVite } = await import("./vite.ts").catch(() => ({ setupVite: null }));
+        if (setupVite) {
+          const httpServer = createServer(app);
+          await setupVite(app, httpServer);
+          console.log("✅ Vite dev server initialized");
+        }
+      } catch (e: any) {
+        console.log("⚠️ Vite setup failed:", e.message);
+      }
+    }
+
+    // =============================================================================
+    // GLOBAL ERROR HANDLER
+    // =============================================================================
+
     app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
       const origin = req.headers.origin;
+
+      console.error("❌ Error:", err.message);
+
+      if (origin && isAllowedOrigin(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+      } else {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      }
+
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+
+      res.status(status).json({
+        success: false,
+        message: process.env.NODE_ENV === "production" && status >= 500 ? "Internal Server Error" : message,
+      });
+    });
+
+    // =============================================================================
+    // 404 HANDLER
+    // =============================================================================
+
+    app.use("/api/*", (req: Request, res: Response) => {
+      const origin = req.headers.origin;
+
       if (origin && isAllowedOrigin(origin)) {
         res.setHeader("Access-Control-Allow-Origin", origin);
         res.setHeader("Access-Control-Allow-Credentials", "true");
       }
-      
-      console.error("❌", err.message);
-      res.status(err.status || 500).json({
+
+      res.status(404).json({
         success: false,
-        message: err.message || "Error",
+        message: "API route not found",
+        path: req.path,
       });
     });
 
-    // 404 handler
-    app.use("/api/*", (req: Request, res: Response) => {
-      res.status(404).json({ success: false, message: "Not found" });
-    });
-
     // =============================================================================
-    // START SERVER
+    // START HTTP SERVER
     // =============================================================================
 
     const port = parseInt(process.env.PORT || "5000", 10);
+    const host = "0.0.0.0";
+
     const httpServer = createServer(app);
 
-    httpServer.listen(port, "0.0.0.0", async () => {
+    httpServer.listen(port, host, async () => {
       const mem = process.memoryUsage();
-      console.log(`🚀 Server: http://0.0.0.0:${port}`);
+      console.log(`🚀 Server running on http://${host}:${port}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(`💾 Memory: ${Math.round(mem.rss / 1024 / 1024)}MB`);
-      console.log(`📊 Env: ${process.env.NODE_ENV || "dev"}`);
+      console.log(`💳 Billing: DISABLED (to save memory)`);
 
-      // OPTIONAL: Load scheduler only if memory allows
-      if (process.env.ENABLE_SCHEDULER === "true") {
+      // MEMORY OPTIMIZATION: Lazy load scheduler after server starts
+      if (process.env.ENABLE_SCHEDULER !== "false") {
         try {
           const { schedulerService } = await import("./services/scheduler-service.ts");
           schedulerService.startScheduler(1);
           console.log(`⏰ Scheduler started`);
         } catch (e) {
-          console.log("⚠️ Scheduler disabled");
+          console.error("⚠️ Scheduler failed to start:", e);
         }
       }
 
-      // OPTIONAL: Load cleanup only if memory allows
-      if (process.env.ENABLE_CLEANUP === "true") {
-        try {
-          const { startSubscriptionCleanupJob } = await import("./jobs/subscription-cleanup");
-          startSubscriptionCleanupJob(60);
-          console.log(`💳 Cleanup started`);
-        } catch (e) {
-          console.log("⚠️ Cleanup disabled");
-        }
-      }
+      // MEMORY OPTIMIZATION: Lazy load cleanup job (if billing was enabled)
+      // Currently disabled since billing is removed
+      // if (process.env.ENABLE_CLEANUP === "true") {
+      //   try {
+      //     const { startSubscriptionCleanupJob } = await import("./jobs/subscription-cleanup");
+      //     startSubscriptionCleanupJob(60);
+      //     console.log(`💳 Cleanup job started`);
+      //   } catch (e) {
+      //     console.error("⚠️ Cleanup job failed to start:", e);
+      //   }
+      // }
 
-      // Monitor memory every 2 minutes
-      setInterval(() => {
-        const m = process.memoryUsage();
-        const rss = Math.round(m.rss / 1024 / 1024);
-        console.log(`💾 ${rss}MB`);
-        
-        // Force garbage collection if available
-        if (global.gc && rss > 450) {
-          console.log("🗑️ Running GC");
-          global.gc();
-        }
-      }, 2 * 60 * 1000);
+      // Memory monitoring in production
+      if (process.env.NODE_ENV === "production") {
+        setInterval(() => {
+          const m = process.memoryUsage();
+          console.log(`💾 Memory: RSS=${Math.round(m.rss / 1024 / 1024)}MB, Heap=${Math.round(m.heapUsed / 1024 / 1024)}MB`);
+        }, 5 * 60 * 1000); // Every 5 minutes
+      }
     });
 
     httpServer.on("error", (error: any) => {
-      console.error("❌ Server error:", error.message);
+      console.error("❌ Server error:", error);
       process.exit(1);
     });
   } catch (error) {
-    console.error("❌ Startup failed:", error);
+    console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 })();
@@ -1246,21 +1486,27 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 // =============================================================================
 
 process.on("SIGTERM", () => {
-  console.log("🔴 Shutting down");
-  pool.end(() => process.exit(0));
+  console.log("🔴 SIGTERM received");
+  pool.end(() => {
+    console.log("🔌 Database closed");
+    process.exit(0);
+  });
 });
 
 process.on("SIGINT", () => {
-  console.log("🔴 Shutting down");
-  pool.end(() => process.exit(0));
+  console.log("🔴 SIGINT received");
+  pool.end(() => {
+    console.log("🔌 Database closed");
+    process.exit(0);
+  });
 });
 
 process.on("uncaughtException", (error) => {
-  console.error("❌ Exception:", error.message);
+  console.error("❌ Uncaught Exception:", error);
   process.exit(1);
 });
 
-process.on("unhandledRejection", (reason: any) => {
-  console.error("❌ Rejection:", reason.message || reason);
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("❌ Unhandled Rejection:", reason);
   process.exit(1);
 });
